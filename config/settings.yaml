@@ -1,0 +1,15 @@
+database_path: data/job_agent.sqlite3
+target_verified_submissions_per_day: 100
+discovery:
+  max_jobs_per_source_run: 1000
+workers:
+  discovery_concurrency: 2
+  resume_concurrency: 2
+  application_concurrency: 1
+rate_limits:
+  default_requests_per_minute: 30
+application_safety:
+  real_submission_enabled: false
+  captcha_policy: HUMAN_REQUIRED
+  ambiguous_question_policy: HUMAN_REQUIRED
+

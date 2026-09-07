@@ -1,0 +1,18 @@
+[project]
+name = "autonomous-newgrad-job-agent"
+version = "0.1.0"
+description = "Foundation for a safe, high-throughput new-grad job application agent."
+requires-python = ">=3.11"
+dependencies = [
+    "PyYAML>=6.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+

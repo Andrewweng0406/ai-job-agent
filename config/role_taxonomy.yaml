@@ -1,0 +1,47 @@
+accepted_job_families:
+  DATA_ANALYTICS:
+    persona: DATA
+    title_keywords:
+      - data analyst
+      - business intelligence analyst
+      - product analyst
+      - analytics analyst
+      - junior data scientist
+      - entry-level data scientist
+  PRODUCT_PM:
+    persona: PRODUCT_PM
+    title_keywords:
+      - associate product manager
+      - apm
+      - product operations
+      - product specialist
+      - junior product manager
+      - technical product analyst
+      - associate program manager
+      - program analyst
+  BUSINESS_SYSTEMS:
+    persona: BUSINESS_SYSTEMS
+    title_keywords:
+      - business analyst
+      - systems analyst
+      - business systems analyst
+      - technology analyst
+      - operations analyst
+      - strategy analyst
+  FINANCE:
+    persona: FINANCE
+    title_keywords:
+      - financial analyst
+      - risk analyst
+      - investment analyst
+      - finance analyst
+      - quantitative analyst
+      - fintech analyst
+  TECHNICAL:
+    persona: TECHNICAL
+    title_keywords:
+      - junior data engineer
+      - entry-level data engineer
+      - junior software engineer
+      - new grad software engineer
+

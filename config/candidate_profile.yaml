@@ -1,0 +1,31 @@
+# Source of truth for candidate facts.
+# Fill TODO values before enabling real application submission.
+personal_information:
+  full_name: TODO
+  email: TODO
+  phone: TODO
+  location: TODO
+education:
+  - school: TODO
+    degree: TODO
+    major: TODO
+    graduation_date: TODO
+skills: []
+programming_languages: []
+tools: []
+projects: []
+experience: []
+leadership: []
+awards: []
+languages: []
+work_authorization:
+  current_status: TODO
+  requires_future_sponsorship: TODO
+relocation_preferences:
+  willing_to_relocate: TODO
+location_preferences: []
+salary_preferences:
+  minimum: TODO
+  currency: USD
+application_answers: {}
+
