@@ -12,7 +12,8 @@ def test_check_profile_reports_missing_required_facts():
 
     assert result.returncode == 1
     assert "Candidate profile completeness: HUMAN_REQUIRED" in result.stdout
-    assert "name.full" in result.stdout
+    assert "auth.status" in result.stdout
+    assert "auth.needs_future_sponsorship" in result.stdout
 
 
 def test_autofill_preview_cli_fails_closed_for_unknown_transcript():
