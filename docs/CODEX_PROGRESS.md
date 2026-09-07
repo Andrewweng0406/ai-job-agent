@@ -7,7 +7,7 @@ Codex remains the primary implementation owner. Claude Round 1 P0/P1 findings ha
 Latest local verification:
 
 - `python3 -m pytest -q`
-- Result: `463 passed, 1 skipped`
+- Result: `464 passed, 1 skipped, 2 xfailed`
 
 ## Claude Round 1 Findings
 
@@ -117,9 +117,25 @@ Latest local verification:
 - Shared ATS red-team hardening: Lever/Ashby nested labels and radio groups now resolve without glyph bleed; live autofill requires worker lease identity and performs per-field lease checks.
 - Added `docs/REAL_CANDIDATE_PROFILE_BLOCKERS.md` so missing real facts are explicit and do not block unrelated engineering work or invite fabricated values.
 - Added a shared legal-question matrix for Greenhouse/Lever/Ashby that keeps authorization, sponsorship, citizenship, clearance, salary, relocation, and unmappable legal selects fail-closed.
+- Completed the authorized open-source reference comparison for CareerWeaver, applyai, and ai-job-agent. Their MIT licenses, exact review commits/files, local treatment, and safety conflicts are recorded in `THIRD_PARTY_NOTICES.md` and `docs/OPEN_SOURCE_REFERENCE_COMPARISON.md`. Useful patterns were cleanly reimplemented; no upstream source was copied.
 
 ## Next
 
 1. Repeat Greenhouse live dry-runs with a completed, validated candidate profile and real PDF QA artifact, still without submitting.
 2. Keep application concurrency at one until multiple reviewed Greenhouse dry-run transcripts are complete.
 3. Add provider-backed LLM tailoring only after deterministic prompt contracts and evals are in place.
+
+## Open-Source Reference Review
+
+### Fixed / Adapted
+
+- Adopted the compatible concepts of preflight gating, durable evidence traces, field read-back verification, ATS-specific normalization, and operator-visible status history. These are implemented through the existing local safety architecture rather than copied from upstream.
+- Added a regression test ensuring the comparison and provenance records continue to state the no-copy and no-submit policy.
+
+### Deferred
+
+- No direct upstream browser automation was imported. Provider-specific live behavior remains deferred behind the existing no-submit, approval, lease, and HUMAN_REQUIRED gates.
+
+### Rejected
+
+- Direct auto-submit and weaker “success” assumptions from reference implementations were rejected because they conflict with submission verification, `SUBMISSION_UNKNOWN`, transcript/hash approval, and `real_submission_enabled=false` invariants.
