@@ -167,7 +167,7 @@ fabricated résumé content, and no hidden unresolved questions.
 ### Deferred
 
 - Controlled real submission remains deferred; `real_submission_enabled` stays `false`.
-- Live Playwright navigation against a real Greenhouse posting is next after this checkpoint.
+- Greenhouse live Playwright navigation foundation is implemented; exercising it against reviewed public postings is next.
 - Lever and Ashby DOM-driven dry-run adapters remain deferred until Greenhouse live dry-run navigation is stable.
 - Real LLM bullet generation remains deferred; the truth system and planning guardrails are in place first.
 

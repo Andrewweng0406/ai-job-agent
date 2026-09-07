@@ -685,5 +685,5 @@ transcripts per ATS.
 ### Still Deferred
 
 - Controlled real submission remains deferred. `real_submission_enabled` stays `false`.
-- Live Playwright navigation is next; browser capture and Greenhouse fixture-driven dry-run transcript generation are implemented first.
+- Greenhouse live Playwright navigation foundation is implemented; exercising it against reviewed public postings is next.
 - Lever and Ashby DOM-driven dry-run adapters remain deferred until Greenhouse live dry-run navigation is stable.

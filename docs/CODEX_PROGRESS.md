@@ -107,10 +107,11 @@ Latest local verification:
 - Browser hard-stop state wiring for CAPTCHA/MFA/email-verification tasks.
 - Greenhouse DOM-driven dry-run adapter against realistic fixture HTML; it stops before submit even when `would_submit=true`.
 - PDF upload gate coverage proving invalid resume validation blocks the resume field before submit-ready state.
+- Optional Greenhouse live dry-run runner that performs read-only Playwright navigation, refuses `real_submission_enabled=True`, and hands the page to the no-submit dry-run adapter.
 
 ## Next
 
-1. Connect real Playwright navigation to the Greenhouse dry-run adapter for safe live page inspection.
+1. Exercise Greenhouse live dry-run navigation against reviewed public postings without submitting.
 2. Reuse the DOM dry-run adapter pattern for Lever and Ashby.
 3. Add approval-gated autofill previews backed by persisted dry-run transcripts.
 4. Add live worker integration tests before raising application concurrency cautiously.
