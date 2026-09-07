@@ -28,6 +28,8 @@ from app.services.dry_run_preparer import ApplicationDryRunPreparer
 from app.applications.preview import ApprovedAutofillPreviewBuilder
 from app.llm.tailoring import TailoringMode
 from app.llm.runtime import runtime_status
+from app.llm.runtime import build_router
+from app.llm.fact_selection import LLMFactSelector
 from app.utils.config import load_yaml
 from app.utils.logging import configure_logging
 
@@ -148,7 +150,14 @@ def main() -> int:
     if args.prepare_next:
         repo.initialize()
         profile = CandidateProfile.from_yaml(args.candidate_profile)
-        result = ApplicationPreparer(repo).prepare_next(profile, TailoringMode(args.tailoring_mode))
+        router = build_router(settings)
+        llm_config = settings.get("llm") or {}
+        selector = None if router is None else LLMFactSelector(
+            router, model=str(llm_config.get("selection_model", "gpt-5-nano"))
+        )
+        result = ApplicationPreparer(repo, fact_selector=selector).prepare_next(
+            profile, TailoringMode(args.tailoring_mode)
+        )
         if result.preview:
             print(result.preview.to_markdown())
             return 0

@@ -157,3 +157,13 @@ making a paid API request.
 
 Remaining cost-control work: durable content-hash response cache, structured-output contracts/evals,
 and dashboard usage reporting.
+
+### Selection-only tailoring contract
+
+The first pipeline integration does not ask a model to author resume claims. After deterministic
+Stage 0 and local keyword retrieval, `gpt-5-nano` may select a subset of allowed fact IDs. Identity,
+contact, address, legal, missing, and literal-only facts are excluded from the request. The response
+must be JSON containing exactly `selected_fact_ids`, all IDs must be from the supplied allowlist, and
+the local deterministic generator retrieves the original fact wording. Invalid output or provider
+failure falls back to the original deterministic selection. Resume artifacts record only model usage
+and selection metadata, never the prompt or API key.

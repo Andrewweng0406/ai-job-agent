@@ -18,6 +18,7 @@ llm:
   provider: openai
   cheap_model: gpt-5-nano
   strong_model: gpt-5-mini
+  selection_model: gpt-5-nano
   daily_cost_limit_usd: 5.0
   usage_ledger_path: data/llm_usage.sqlite3
   max_input_chars: 12000

@@ -141,8 +141,21 @@ Latest local verification:
 - Added date-keyed SQLite budget reservations so concurrent workers and restarted processes share the
   same daily cap without persisting prompts or responses. Converted the corresponding Claude xfail.
 - Full suite after persistent budget accounting: 522 passed, 1 skipped, 12 xfailed.
-- Deferred: durable cross-process response cache, structured prompt/eval contracts, and actual provider-
-  backed tailoring. No live paid API request was made in this checkpoint.
+- Deferred at that checkpoint: durable cross-process response cache, structured prompt/eval contracts,
+  and provider-backed tailoring. No live paid API request was made.
+
+## Selection-Only Tailoring Checkpoint (2026-09-07)
+
+- Added a strict JSON fact-selection contract and connected it to `ApplicationPreparer` when the LLM
+  runtime is explicitly enabled.
+- The low-cost `gpt-5-nano` selector can only return allowlisted fact IDs. Resume wording continues to
+  come from the local deterministic profile facts.
+- Identity, contact, address, authorization/legal, missing, and literal-only facts are excluded from
+  provider prompts. Invalid JSON, extra keys, fabricated IDs, and provider uncertainty all fail back
+  to deterministic selection.
+- Resume audit metadata records token usage, model, cost, cache status, and fallback reason without
+  storing prompts or candidate PII.
+- Full suite: 528 passed, 1 skipped, 12 xfailed.
 
 ## Open-Source Reference Review
 

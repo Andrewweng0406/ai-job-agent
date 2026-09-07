@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from app.applications.human_tasks import HumanTask
 from app.applications.preview import ApplicationPreview
 from app.llm.tailoring import JdAwareTailoringPlanner, TailoringMode
+from app.llm.fact_selection import LLMFactSelector
 from app.models.enums import ApplicationStatus, JobFamily, Persona
 from app.models.job import Job
 from app.resumes.generator import DeterministicResumeGenerator
@@ -19,10 +20,13 @@ class PrepareResult:
 
 
 class ApplicationPreparer:
-    def __init__(self, repository, resume_generator: DeterministicResumeGenerator | None = None) -> None:
+    def __init__(self, repository,
+                 resume_generator: DeterministicResumeGenerator | None = None,
+                 fact_selector: LLMFactSelector | None = None) -> None:
         self.repository = repository
         self.resume_generator = resume_generator or DeterministicResumeGenerator()
         self.tailoring = JdAwareTailoringPlanner()
+        self.fact_selector = fact_selector
 
     def prepare_next(self, profile: CandidateProfile, mode: TailoringMode = TailoringMode.FAST) -> PrepareResult:
         row = self.repository.get_next_application_with_job(ApplicationStatus.QUEUED)
@@ -48,7 +52,31 @@ class ApplicationPreparer:
 
         self.repository.transition_application(application_id, ApplicationStatus.TAILORING, "tailoring resume")
         plan = self.tailoring.build_plan(job, profile, mode)
-        result = self.resume_generator.generate(profile, job, persona, plan.selected_fact_ids)
+        selected_fact_ids = plan.selected_fact_ids
+        selection_metadata: dict[str, object] = {"source": "deterministic"}
+        if self.fact_selector is not None:
+            selection = self.fact_selector.select(
+                job=job,
+                profile=profile,
+                candidate_fact_ids=selected_fact_ids,
+                stage0_passed=True,
+            )
+            selected_fact_ids = selection.selected_fact_ids
+            selection_metadata = {
+                "source": "llm_fact_selection",
+                "fallback_reason": selection.fallback_reason,
+                "usage": None if selection.usage is None else {
+                    "stage": selection.usage.stage,
+                    "model": selection.usage.model,
+                    "input_tokens": selection.usage.input_tokens,
+                    "output_tokens": selection.usage.output_tokens,
+                    "estimated_cost_usd": selection.usage.estimated_cost_usd,
+                    "cache_hit": selection.usage.cache_hit,
+                },
+            }
+        result = self.resume_generator.generate(
+            profile, job, persona, selected_fact_ids, selection_metadata
+        )
         if result.artifact is None:
             self.repository.mark_human_required(
                 application_id,
@@ -110,4 +138,3 @@ def _persona_from_family(family: JobFamily) -> Persona | None:
         return Persona(family.value.replace("DATA_ANALYTICS", "DATA"))
     except ValueError:
         return None
-

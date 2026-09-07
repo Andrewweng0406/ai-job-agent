@@ -38,7 +38,9 @@ class DeterministicResumeGenerator:
     def __init__(self, output_dir: str | Path = "data/resumes") -> None:
         self.output_dir = Path(output_dir)
 
-    def generate(self, profile: CandidateProfile, job: Job, persona: Persona, selected_fact_ids: list[str]) -> ResumeGenerationResult:
+    def generate(self, profile: CandidateProfile, job: Job, persona: Persona,
+                 selected_fact_ids: list[str],
+                 selection_metadata: dict[str, object] | None = None) -> ResumeGenerationResult:
         completeness = profile_completeness_gate(profile)
         if not completeness.complete:
             return ResumeGenerationResult(
@@ -89,7 +91,9 @@ class DeterministicResumeGenerator:
             persona=persona,
             base_version=f"profile-v{profile.schema_version}",
             generated_at=utc_now().astimezone(timezone.utc).isoformat(),
-            changes={"mode": "deterministic", "selected_fact_ids": selected_fact_ids, "structured_json_path": str(json_path)},
+            changes={"mode": "deterministic", "selected_fact_ids": selected_fact_ids,
+                     "selection": selection_metadata or {"source": "deterministic"},
+                     "structured_json_path": str(json_path)},
             validation_status="VALIDATED",
             file_path=str(pdf_path),
             file_hash=file_hash,

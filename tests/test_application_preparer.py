@@ -1,6 +1,10 @@
+import json
+
 from app.applications.queue import ApplicationQueue
 from app.database.repository import JobAgentRepository
 from app.llm.tailoring import TailoringMode
+from app.llm.fact_selection import FactSelectionResult
+from app.llm.router import LLMUsage
 from app.models.application import Application
 from app.models.enums import ApplicationStatus, JobFamily
 from app.models.job import Job
@@ -45,6 +49,31 @@ def test_prepare_next_profile_incomplete_opens_human_task(tmp_path):
     assert app["status"] == "HUMAN_REQUIRED"
     assert app["human_required_reason"] == "PROFILE_INCOMPLETE"
     assert tasks["count"] == 1
+
+
+def test_prepare_next_records_safe_llm_selection_metadata(tmp_path):
+    class Selector:
+        def select(self, **kwargs):
+            assert kwargs["stage0_passed"] is True
+            return FactSelectionResult(
+                ["skill.sql"],
+                LLMUsage("3", "gpt-5-mini", 80, 20, 4, 0.000013, False),
+            )
+
+    repo, _ = _seed_eligible(tmp_path)
+    ApplicationQueue(repo).enqueue_eligible()
+    result = ApplicationPreparer(repo, fact_selector=Selector()).prepare_next(
+        _complete_profile(), TailoringMode.FAST
+    )
+
+    assert result.status == ApplicationStatus.READY
+    with repo.connect() as conn:
+        row = conn.execute("SELECT changes_json FROM resumes").fetchone()
+    changes = json.loads(row["changes_json"])
+    assert changes["selected_fact_ids"] == ["skill.sql"]
+    assert changes["selection"]["source"] == "llm_fact_selection"
+    assert changes["selection"]["usage"]["model"] == "gpt-5-mini"
+    assert "prompt" not in json.dumps(changes).lower()
 
 
 def _seed_eligible(tmp_path):
@@ -93,4 +122,3 @@ def _complete_profile():
         },
         application_answers={"work_authorized_us": "Yes"},
     )
-
