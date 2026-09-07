@@ -317,6 +317,78 @@ visible text for those sources.
 
 ---
 
+## Review round 1.5 — on top of `525ecae` ("Add human task and form field foundations")
+
+**Re-reviewed:** `state_machine.py`, `workflow.py`, `pipeline.py`, `hard_filters.py`, `deduplication.py`,
+`truth_validation.py`, `discovery/adapters.py`, `schema.py`, new `form_fields.py` / `human_tasks.py`.
+**Tests:** `pytest -q` → 140 passed, 0 xfailed.
+
+### Fixed since round 1 (verified)
+| Ref | Status |
+|---|---|
+| P0-5 (unknown → re-submit launder) | **Fixed.** `SUBMISSION_UNKNOWN → {VERIFIED, SKIPPED, CLOSED}` only; no path back to `APPLYING`. |
+| P1-8 (`SUBMISSION_UNKNOWN → VERIFIED`) | **Fixed.** Now legal; `SUBMITTED → {VERIFIED, SUBMISSION_UNKNOWN}`. |
+| P1-9 (adapters drop posted date) | **Fixed** for Greenhouse/Lever/Ashby (source timestamp → `Job.posted_at`). |
+| P1-9a (non-ASCII / "to" experience ranges) | **Fixed.** `1–5`, `1—5`, `3 to 5` now kept. |
+| P1-10 (narrow sponsorship pattern) | **Fixed** for the tested phrasings — but see P1-16 (brittleness). |
+| P1-11 (ITAR / "U.S. Person") | **Fixed.** New reason `EXPORT_CONTROL_RESTRICTED`. |
+| P2-2 (`UNIQUE(apply_url)` hazard) | **Fixed.** Constraint removed. |
+| P2-3 (`human_tasks` table) | **Landed.** `human_tasks` + `app/applications/human_tasks.py`. |
+| DB-review #4 (application dedupe_key on surrogate `job_id`) | **Fixed.** Now `candidate_id | company_id | ATS/req_key` via `application_dedupe_key_for_job`. |
+| P1-6 (completeness gate) | **Partial.** Missing `auth.needs_future_sponsorship` + no-sponsorship JD → `HUMAN_REQUIRED` (`WORK_AUTHORIZATION_PROFILE_INCOMPLETE`). Full gate (block all real submission while any `required` fact is TODO) still not enforced centrally. |
+
+### Still open
+
+#### P1-13 — `ApplicationWorkflowRunner.run()` still never persists / never guards idempotency. **(open)**
+**File:** `app/applications/workflow.py:29-58`. Confirmed unchanged: it mutates `application.status` in
+memory and returns; no `repository.transition_application`, no check that the row isn't already
+`SUBMITTED`/`VERIFIED`/`SUBMISSION_UNKNOWN` before driving the form, no `attempt_count`/`applied_at`.
+Re-running a queued application ⇒ duplicate submit. This is the top remaining P1. Required fix unchanged
+from round 1.5 first pass. Test: `tests/test_adversarial_workflow.py` (regression, currently marks the
+gap).
+
+#### P1-14 — Discovery insert/transition is still check-then-act. **(open)**
+**File:** `discovery/pipeline.py:78-95`. `if not application_exists_for_job(job_id): insert_application();
+transition_application(ELIGIBLE)`. `insert_application` is idempotent, but with `discovery_concurrency: 2`
+the losing worker's `transition_application` hits an already-advanced row ⇒
+`RuntimeError("Concurrent status modification")` bubbles up as a company-level error. Use the insert's
+returned id and only transition if the row is still `DISCOVERED` (CAS; swallow the benign race). Also
+`_incremental_status()` still opens its own connection before `upsert_job` (TOCTOU on `description_hash`).
+
+#### P1-15 — Entailment "fix" over-corrects: all numeric claims are now rejected. **(new)**
+**File:** `truth_validation.py` `validate_with_provenance` — `if numbers: unsupported_numbers.extend(numbers)`.
+Every digit-bearing claim is now invalid, even `"Analyzed 50,000 rows"` citing a real
+`project.retail_dashboard` fact whose text contains "50,000". This will force every quantified bullet to
+`HUMAN_REQUIRED` and pushes generation toward number-free (weaker) bullets. Plus `OVERREACH_PATTERN` is a
+fixed word-list ("production", "senior", "expert", "managed a team", …) — it will miss inflations phrased
+differently and false-positive on legitimate uses. **Required:** real per-claim checks — a number is
+supported iff it appears in the text of a cited fact (normalize `50,000`/`50000`/`~50k`); skill/tool
+tokens ⊆ cited facts; forbidden closed-set terms absent; residual NL → entailment judge or
+`HUMAN_REQUIRED`. Tests: `tests/test_resume_redteam.py::test_legit_cited_number_is_accepted` (add).
+
+#### P1-16 — Sponsorship / clearance patterns are becoming phrase-specific. **(new, watch)**
+`NO_SPONSORSHIP_PATTERN` now has ~10 literal branches, several matching the exact adversarial strings
+("will require sponsorship now or in the future will not be considered"). This passes the suite but is
+brittle against real-world variance. **Recommended:** refactor to the compositional rule (negation window
++ `sponsor`-stem, AND-NOT positive) so new phrasings are covered without a new branch each time. Not a
+blocker; track for a cleanup pass.
+
+#### Carried forward (unchanged): P2-1 (lossy `upsert_job` update — `requirements_json`, `salary_*`,
+`posted_at`, `employment_type` not refreshed on conflict), P2-5 (family classification is keyword-only;
+`UNKNOWN` handling path), P2-7, P2-8, and the P3 list.
+
+### DB / concurrency — remaining
+- Indexes from the round-1.5 DB table still not added (`idx_applications_status`, `idx_transitions_app`,
+  `idx_jobs_company_status`, `idx_jobs_incremental`). `get_applications_by_status` full-scans each tick.
+- `human_tasks`: add the partial unique index `(application_id, category) WHERE status='OPEN'`.
+- `mark_human_required` still does transition + a second UPDATE on a **separate connection** — wrap in one
+  `BEGIN IMMEDIATE`.
+- Add `worker_id` / `claimed_at` + a stuck-row reaper before raising `application_concurrency` above 1
+  (see `THROUGHPUT_MODEL.md` §4 — the 1→3-4 bump is the biggest throughput unlock and is gated on P1-13,
+  P1-14, and the reaper).
+
+---
+
 ## Answers to Codex handoff questions
 
 1. **State machine completeness / terminal states** — see P0-1. Add `VERIFIED` (only counted state) and

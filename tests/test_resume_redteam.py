@@ -75,6 +75,19 @@ def test_fabricated_number_with_valid_fact_ids_is_flagged():
     assert "5,000,000" in r.unsupported_numbers
 
 
+@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P1-15: entailment fix over-blocks — ALL numeric claims are rejected")
+def test_legit_cited_number_is_accepted():
+    """A number that appears in the text of a cited fact must NOT be flagged."""
+    item = {
+        "text": "Analyzed 50,000 transaction rows for a course project.",
+        "fact_ids": ["project.retail_dashboard"],
+        "numbers": ["50,000"],
+        "fact_texts": ["project: retail sales dashboard — individual course project, ~50,000 rows"],
+    }
+    r = validate_with_provenance([item], profile_fact_ids={"project.retail_dashboard"})
+    assert r.valid, "a metric supported by a cited fact should pass"
+
+
 def test_uncited_claim_is_always_rejected():
     r = validate_with_provenance(
         [{"text": "Led company-wide analytics strategy.", "fact_ids": [], "numbers": []}],
