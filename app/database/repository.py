@@ -138,6 +138,16 @@ class JobAgentRepository:
             ).fetchall()
             return list(rows)
 
+    def get_application_status(self, application_id: str) -> ApplicationStatus:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT status FROM applications WHERE application_id = ?",
+                (application_id,),
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"Unknown application_id: {application_id}")
+        return ApplicationStatus(row["status"])
+
     def update_application_context(self, application_id: str, *, persona: str | None = None, queued_at: str | None = None) -> None:
         updates: list[str] = []
         values: list[str] = []
@@ -193,6 +203,28 @@ class JobAgentRepository:
             conn.execute(
                 "UPDATE applications SET resume_id = ? WHERE application_id = ?",
                 (resume_id, application_id),
+            )
+
+    def merge_confirmation_data(self, application_id: str, confirmation_data: dict[str, object]) -> None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT confirmation_data_json FROM applications WHERE application_id = ?",
+                (application_id,),
+            ).fetchone()
+            if row is None:
+                raise KeyError(f"Unknown application_id: {application_id}")
+            current = json.loads(row["confirmation_data_json"] or "{}")
+            current.update(confirmation_data)
+            conn.execute(
+                "UPDATE applications SET confirmation_data_json = ? WHERE application_id = ?",
+                (json.dumps(current, sort_keys=True), application_id),
+            )
+
+    def set_submission_verified_at(self, application_id: str, verified_at: datetime) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "UPDATE applications SET submission_verified_at = ? WHERE application_id = ?",
+                (dt(verified_at), application_id),
             )
 
     def open_human_task(self, task: HumanTask) -> str:

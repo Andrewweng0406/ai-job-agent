@@ -7,7 +7,7 @@ Codex remains the primary implementation owner. Claude Round 1 P0/P1 findings ha
 Latest local verification:
 
 - `python3 -m pytest -q`
-- Result: `140 passed`
+- Result: `143 passed`
 
 ## Claude Round 1 Findings
 
@@ -61,10 +61,10 @@ Latest local verification:
 - ATS-agnostic form field taxonomy resolver with fail-closed handling for legal/authorization fields.
 - Human task schema and idempotent task creation for application/category blocking cases.
 - Read-only SmartRecruiters and Workday fixture-backed source contracts.
+- Verification evidence-tier persistence with T1-T4 strong evidence promotion and T5 weak-evidence storage.
 
 ## Next
 
 1. Add artifact cache reuse by persona/skill/profile signature.
-2. Add verification worker evidence-tier persistence.
-3. Add seeded company registry entries for read-only discovery testing.
-4. Add non-submitting ATS form inspection/canary tests.
+2. Add seeded company registry entries for read-only discovery testing.
+3. Add non-submitting ATS form inspection/canary tests.

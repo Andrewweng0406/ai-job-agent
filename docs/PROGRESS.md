@@ -34,6 +34,7 @@ Completed additional foundation work:
 - Added SmartRecruiters and Workday read-only discovery adapters against source-contract fixtures.
 - Expanded hard-filter coverage for Round 1.5 sponsorship, experience, ITAR/export-control, and posted-date contracts.
 - Full test suite is now clean with no expected-failure markers: `140 passed`.
+- Added verification evidence model/service. Strong T1-T4 evidence promotes `SUBMITTED` or `SUBMISSION_UNKNOWN` to `VERIFIED`; weak T5 page text is stored but does not count.
 
 Next engineering phase:
 

@@ -96,6 +96,10 @@ Global guards:
 Keep the screenshot + DOM snapshot for every `SUBMITTED`, `VERIFIED`, and `SUBMISSION_UNKNOWN` — they are
 the audit trail and the input to human resolution.
 
+Implementation note: `app/tracking/verification.py` persists evidence into
+`applications.confirmation_data_json`. Only T1-T4 evidence promotes an application to `VERIFIED`; T5 is
+stored for audit but remains unverified until stronger evidence arrives.
+
 ---
 
 ## 6. Reporting
