@@ -79,7 +79,6 @@ def test_daily_budget_persists_across_router_instances():
         b.complete(stage="1", model="m", prompt="hi", stage0_passed=True, estimated_cost_usd=0.9)
 
 
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P3: no model-tier enforcement — a caller can route a cheap 'stage 1' to an expensive model (LLM_COST_STRATEGY: never invert tiers)")
 def test_stage1_cannot_use_a_strong_model():
     r = _router()
     with pytest.raises((RuntimeError, ValueError)):

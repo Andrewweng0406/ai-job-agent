@@ -27,6 +27,7 @@ from app.services.application_preparer import ApplicationPreparer
 from app.services.dry_run_preparer import ApplicationDryRunPreparer
 from app.applications.preview import ApprovedAutofillPreviewBuilder
 from app.llm.tailoring import TailoringMode
+from app.llm.runtime import runtime_status
 from app.utils.config import load_yaml
 from app.utils.logging import configure_logging
 
@@ -46,6 +47,7 @@ def main() -> int:
     parser.add_argument("--dry-run-next", action="store_true", help="Build and persist a no-submit dry-run transcript for one ready application.")
     parser.add_argument("--autofill-preview", help="Render an approved, hash-valid dry-run transcript as an autofill preview.")
     parser.add_argument("--tailoring-mode", choices=["FAST", "DEEP"], default="FAST", help="Resume tailoring mode.")
+    parser.add_argument("--llm-status", action="store_true", help="Show local LLM readiness without making an API request.")
     parser.add_argument("--limit", type=int, default=100, help="Limit for queueing operations.")
     parser.add_argument("--settings", default="config/settings.yaml", help="Path to settings YAML.")
     parser.add_argument("--companies", default="config/companies.yaml", help="Path to company registry YAML.")
@@ -58,6 +60,17 @@ def main() -> int:
     configure_logging()
     settings = load_yaml(args.settings)
     repo = JobAgentRepository(settings.get("database_path", "data/job_agent.sqlite3"))
+
+    if args.llm_status:
+        status = runtime_status(settings)
+        print(f"LLM enabled: {str(status.enabled).lower()}")
+        print(f"Provider configured: {str(status.configured).lower()}")
+        print(f"Provider: {status.provider}")
+        print(f"Cheap model: {status.cheap_model}")
+        print(f"Strong model: {status.strong_model}")
+        print(f"Candidate PII allowed: {str(status.send_candidate_pii).lower()}")
+        print(f"Status: {status.reason}")
+        return 0 if status.reason == "READY" else 1
 
     if args.init_db:
         repo.initialize()

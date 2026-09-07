@@ -13,3 +13,12 @@ application_safety:
   real_submission_enabled: false
   captcha_policy: HUMAN_REQUIRED
   ambiguous_question_policy: HUMAN_REQUIRED
+llm:
+  enabled: false
+  provider: openai
+  cheap_model: gpt-5-nano
+  strong_model: gpt-5-mini
+  daily_cost_limit_usd: 5.0
+  max_input_chars: 12000
+  max_output_tokens: 2000
+  send_candidate_pii: false

@@ -128,6 +128,19 @@ Latest local verification:
 2. Keep application concurrency at one until multiple reviewed Greenhouse dry-run transcripts are complete.
 3. Add provider-backed LLM tailoring only after deterministic prompt contracts and evals are in place.
 
+## OpenAI Provider Checkpoint (2026-09-07)
+
+- Added a minimal OpenAI Responses API provider using environment-only credentials, `store: false`,
+  bounded output, timeout handling, and no blind POST retry.
+- Added API-reported token accounting, configurable model prices, conservative unknown-model costing,
+  identical-request in-process caching, and cheap-stage model-tier enforcement.
+- Added a fail-closed runtime factory and a no-cost `--llm-status` command. AI and candidate PII transfer
+  remain disabled in the tracked settings.
+- Converted Claude's model-tier xfail into a passing adversarial test.
+- Full suite: 519 passed, 1 skipped, 13 xfailed.
+- Deferred: persistent cross-process daily budget/cache, structured prompt/eval contracts, and actual
+  provider-backed tailoring. No live paid API request was made in this checkpoint.
+
 ## Open-Source Reference Review
 
 ### Fixed / Adapted

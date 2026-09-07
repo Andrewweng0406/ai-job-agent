@@ -128,3 +128,31 @@ from the start.
 - Regenerating a resume per posting when family+skills are identical.
 - Using the strong model for extraction or validation.
 - No per-stage budget cap / no cost metrics.
+
+---
+
+## 9. OpenAI provider checkpoint (2026-09-07)
+
+The first provider boundary is implemented with the OpenAI Responses API and remains disabled by
+default. `OPENAI_API_KEY` is read from the process environment only; requests use `store: false`, have
+a bounded output size and timeout, and are never blindly retried after an unknown network result.
+
+Current routing defaults:
+
+| Purpose | Model | Configured text price per 1M tokens (input / output) |
+|---|---|---|
+| Stage 1 extraction and Stage 4 validation | `gpt-5-nano` | $0.05 / $0.40 |
+| Gated Stage 2/3 work | `gpt-5-mini` | $0.25 / $2.00 |
+
+Prices are explicit router data and must be reviewed when provider pricing changes. The router records
+the API's returned input/output token counts, derives cost from the model price table, caches identical
+requests within the process, and rejects strong models in cheap-only stages. Unknown models are
+estimated conservatively rather than treated as free.
+
+`config/settings.yaml` keeps both `llm.enabled` and `llm.send_candidate_pii` false. Provider-backed
+resume generation remains deferred until the prompt contract proves that only selected, provenance-
+validated candidate facts are sent. `python3 "apply company.py" --llm-status` checks readiness without
+making a paid API request.
+
+Remaining cost-control work: date-keyed persistent budget accounting, durable content-hash cache,
+structured-output contracts/evals, and dashboard usage reporting.
