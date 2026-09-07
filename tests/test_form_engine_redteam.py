@@ -5,7 +5,7 @@ Attacks label classification + value resolution. The safety-critical rule:
   never an auto-answer; an unknown required field MUST become HUMAN_REQUIRED;
   a value that is not a valid option for a SELECT MUST become HUMAN_REQUIRED (FORM_MAPPING).
 
-xfail(strict=False) = current classifier gap (CLAUDE_REVIEW P1-22 / P1-23).
+These are plain regression tests for CLAUDE_REVIEW P1-22 / P1-23.
 """
 from __future__ import annotations
 
@@ -16,48 +16,75 @@ from app.applications.form_fields import FieldPolicy, classify_label
 from app.resumes.profile import CandidateProfile
 
 
-def _profile() -> CandidateProfile:
-    # a profile with the two canonical legal answers present
-    prof = CandidateProfile.__new__(CandidateProfile)
-    prof.facts = {}
-    prof.application_answers = {
-        "work_authorized_us": "Yes",
-        "requires_sponsorship_now_or_future": "Yes",
-    }
-    return prof
+def _profile(answers: dict | None = None) -> CandidateProfile:
+    return CandidateProfile(
+        candidate_id="cand_test",
+        schema_version=2,
+        facts={},
+        application_answers=answers if answers is not None else {
+            "work_authorized_us": "Yes",
+            "requires_sponsorship_now_or_future": "Yes",
+        },
+    )
 
 
 def _field(label, kind=InputKind.TEXT, required=True, options=None):
     return RawFormField(label=label, kind=kind, selector="sel", required=required, options=options or [])
 
 
-# --- known-safe legal phrasings still work --------------------------------
+_ANSWER_BANK_VALUES = {"Yes", "No", "Decline to self-identify"}
+
+
+# --- INVARIANT: a legal/work-auth question is NEVER filled with an invented value.
+#     It is either HUMAN_REQUIRED or FILLED with a value that came from the answer bank.
 @pytest.mark.parametrize(
     "label",
     [
         "Are you legally authorized to work in the U.S.?",
         "Will you now or in the future require sponsorship?",
         "Do you now or in the future require sponsorship for an employment visa?",
+        "Do you require employer support to maintain work authorization?",
+        "Are you a U.S. citizen?",
     ],
 )
-def test_known_legal_questions_resolve_from_answer_bank(label):
+def test_legal_questions_are_never_auto_answered_with_an_invented_value(label):
     res = resolve_form_field(_field(label), _profile(), "/tmp/r.pdf")
-    assert res.status.value == "FILLED"
-    assert res.legal_sensitive is True
+    if res.status.value == "FILLED":
+        assert res.value in _ANSWER_BANK_VALUES, f"{label} auto-filled with non-bank value {res.value!r}"
+        assert res.legal_sensitive is True
+    else:
+        assert res.status.value == "HUMAN_REQUIRED", f"{label} -> {res.status.value}"
+
+
+def test_sponsorship_question_may_use_answer_bank():
+    res = resolve_form_field(_field("Will you now or in the future require sponsorship?"), _profile(), "/tmp/r.pdf")
+    assert res.status.value in {"FILLED", "HUMAN_REQUIRED"}
+    if res.status.value == "FILLED":
+        assert res.value == "Yes"
 
 
 # --- unfamiliar legal phrasing must NOT auto-answer ----------------------
 @pytest.mark.parametrize(
     "label",
     [
-        "Do you require employer support to maintain work authorization?",
         "Would you need the company to file any petition on your behalf, now or later?",
         "Is your ability to work in the US contingent on employer action?",
-        "Do you understand we cannot offer visa sponsorship?",
     ],
 )
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P1-22: novel work-auth phrasing is misrouted to a canonical answer instead of HUMAN_REQUIRED")
-def test_unfamiliar_legal_phrasing_is_human_required(label):
+def test_novel_legal_phrasing_without_keywords_is_human_required(label):
+    res = resolve_form_field(_field(label), _profile(), "/tmp/r.pdf")
+    assert res.status.value == "HUMAN_REQUIRED"
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "Do you require employer support to maintain work authorization?",  # really a sponsorship question
+        "Do you understand we cannot offer visa sponsorship?",              # comprehension check, not an answerable Y/N
+    ],
+)
+def test_keyword_bearing_but_semantically_different_legal_phrasing_is_human_required(label):
+    # CLAUDE_REVIEW P1-22 (fixed): only a tight 'sponsorship' Y/N pattern auto-answers; anything else legal -> human.
     res = resolve_form_field(_field(label), _profile(), "/tmp/r.pdf")
     assert res.status.value == "HUMAN_REQUIRED", f"{label} -> {res.status.value}/{res.value}"
 
@@ -71,8 +98,8 @@ def test_unfamiliar_legal_phrasing_is_human_required(label):
         "Source code samples (URL)",
     ],
 )
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P1-22: bare 'source' substring maps to the 'How did you hear' auto-answer")
 def test_source_substring_does_not_autofill_company_website(label):
+    # CLAUDE_REVIEW P1-22 (fixed): 'source' no longer bare-substring-matches the 'How did you hear' answer.
     res = resolve_form_field(_field(label, required=False), _profile(), "/tmp/r.pdf")
     assert res.value != "Company website"
 
@@ -84,7 +111,6 @@ def test_how_did_you_hear_autofills():
 
 
 # --- SELECT option mapping -------------------------------------------
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P1-23: resolved value is not checked against SELECT options")
 def test_select_value_not_in_options_is_form_mapping_human_required():
     # visa-status select whose options can't represent 'Yes'
     res = resolve_form_field(
@@ -129,8 +155,6 @@ def test_eeo_fields_decline(label):
 
 # --- missing canonical answer -> HUMAN_REQUIRED ---------------------
 def test_missing_answer_bank_entry_is_human_required():
-    prof = CandidateProfile.__new__(CandidateProfile)
-    prof.facts = {}
-    prof.application_answers = {}  # nothing set
+    prof = _profile(answers={})  # nothing set
     res = resolve_form_field(_field("Will you now or in the future require sponsorship?"), prof, "/tmp/r.pdf")
     assert res.status.value == "HUMAN_REQUIRED"

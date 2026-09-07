@@ -561,3 +561,97 @@ round-1.5 DB review item #4; the discovery path still leaks `source`.)
 `docs/ROUND2_5_CHECKLIST.md` A–I with exact test names. A/C/E/F/B and worker-lease **PASS** (demonstrated);
 P1-18 reaper is implemented, but `application_concurrency` stays 1 until live worker integration tests
 exist; G2/G3 need `tests/test_http_client.py`. `real_submission_enabled` stays `false`.
+
+---
+
+## Review round 3 — Phase 4 implementation (incremental)
+
+**Reviewed at `6bbe19c` + uncommitted form-engine/dry-run WIP.** Full suite: **294 passed, 1 skipped,
+5 xfailed** (xfails = the open findings below). New reviewer tests: `tests/test_form_engine_redteam.py`,
+`tests/test_dry_run_consistency.py`, `tests/test_pdf_qa.py`, `tests/test_browser_capture_hardstop.py`.
+Checklist: `docs/ROUND3_CHECKLIST.md`.
+
+### Verified PASS (reviewer test demonstrates it)
+
+| Area | Evidence |
+|---|---|
+| **P1-18 reaper** | `reap_expired_leases()`: `APPLYING`+`SUBMIT_POST_SENT` note → `SUBMISSION_UNKNOWN`; else `APPLYING`/`TAILORING` → `RETRY_PENDING`; CAS + `BEGIN IMMEDIATE` + logged transition. `tests/test_worker_lease.py`. |
+| **P1-22** legal-question routing (raised + fixed this round) | Only a tight `sponsorship` Y/N pattern auto-answers from the bank; every other legal / work-auth / citizenship / "employer support" / "open source" label → `HUMAN_REQUIRED`, never an invented value. `tests/test_form_engine_redteam.py`. |
+| **P1-23** SELECT option mapping (raised + fixed this round) | A resolved value not present in `field.options` → `HUMAN_REQUIRED`/`FORM_MAPPING`, not a silent fill. |
+| **P1-21** résumé validation gate (raised + fixed this round) | `FormDryRunEngine.build_transcript(..., resume_validation_status=…)`: a non-`PASS` artifact → the résumé field is not `FILLED`; dry run → `HUMAN_REQUIRED`. `tests/test_dry_run_consistency.py::test_dry_run_blocks_when_resume_not_validated`. |
+| Dry-run never submits | `build_transcript` returns `READY`/`HUMAN_REQUIRED` only; no adapter/`submit()` call. `would_submit` computed, not adapter-set. Unresolved required field → `human_tasks` row + `would_submit=False`. |
+| Transcript determinism | identical inputs → identical `payload["fields"]`. |
+| CAPTCHA / MFA hard stop (capture level) | CAPTCHA/MFA/`recaptcha/api.js` HTML → 0 fields extracted, `blocking_reasons`, `human_required=True`, screenshot saved. No solver anywhere in `app/`. `tests/test_browser_capture_hardstop.py`. |
+| LLM résumé truth | **N/A — no bullet generator exists.** `JdAwareTailoringPlanner` only selects `fact_id`s and excludes `literal_only`/missing facts. Fabrication is not currently possible. Forward contract stands (`LLM_RESUME_REVIEW_CONTRACT.md`). |
+
+### New findings — open
+
+#### P1-24 — "submit was sent" is signalled by a substring in the free-text `notes` column. **(open)**
+**File:** `app/database/repository.py` `reap_expired_leases` — routes `APPLYING` → `SUBMISSION_UNKNOWN`
+only if `"SUBMIT_POST_SENT" in (notes or "")`, else → `RETRY_PENDING`. `notes` is a general-purpose
+free-text field other code also writes. If the browser adapter fails to set that exact string
+immediately before the submit click (or another writer clobbers it), a post-submit crash is routed to
+`RETRY_PENDING` ⇒ **duplicate submission** — the precise failure the reaper exists to prevent.
+**Fix:** dedicated column `submit_attempted_at TEXT` (or `submit_epoch INTEGER`), set in the same
+transaction as the "about to click submit" step; reaper checks that column, not `notes`.
+**Test:** extend `tests/test_worker_lease.py` — set `submit_attempted_at`, crash, reap → `SUBMISSION_UNKNOWN`;
+without it → `RETRY_PENDING`.
+
+#### P2-9 — `FormDryRunEngine` opens one human task for `blocking_reasons[0]` only. **(open)**
+**File:** `app/applications/form_engine.py` `build_transcript`. Unresolved fields spanning ≥2 categories
+(e.g. `PROFILE_INCOMPLETE` + `FORM_MAPPING`) produce a single task; the operator resolves it and the
+re-run is still blocked by the other category. **Fix:** one `HumanTask` per distinct category in
+`blocking_reasons` (the partial-unique index already supports it). **Test:**
+`test_dry_run_multi_category_unresolved_opens_a_task_per_category`.
+
+#### P2-10 — Transcript payload missing `persona` / `requisition_key`; no approval-hash enforcement. **(open)**
+`build_transcript` payload has `job`, `resume`, `fields`, `unresolved`, `would_submit` — but no
+`persona`, no `requisition_key`, and `dry_run_transcripts` has `payload_hash` but no `approved_by/at`
+and no code that re-checks the hash before a (future) submit. Per `DRY_RUN_DESIGN.md` §2/§5. Track now
+since browser submit is next.
+
+#### P2-11 — `render_simple_pdf` silently corrupted content; no PDF-QA module. **(fixed in-round)**
+Raised: `line[:110]` truncation, non-latin-1 → `?`, single `/Page` with no pagination/overflow signal,
+no gate. Codex added `app/resumes/pdf_qa.py` and reworked `app/resumes/pdf.py`; `tests/test_pdf_qa.py`
+guards are now plain assertions. Still to verify at the next checkpoint: failing QA →
+`validation_status=PDF_QA_FAILED` → application `HUMAN_REQUIRED` and the PDF never reaches an upload
+field (end-to-end wiring, not just the module).
+
+#### P2-12 — Bot-wall detection & state wiring. **(detection fixed in-round; state wiring open)**
+**File:** `app/applications/browser_capture.py`. Codex added tokenless-challenge detection (Cloudflare
+Turnstile / `cf-challenge`) — `test_turnstile_widget_without_captcha_token_is_detected` now passes.
+**Still open:** `BrowserCaptureResult.human_required` is returned but **no application-state transition
+happens** — the hard stop is not yet wired to `mark_human_required(category=CAPTCHA|MFA|EMAIL_VERIFICATION,
+task=…)`; and "verification code" is labelled `MFA` even when it is email verification.
+
+#### P2-13 — Radio groups become N separate `BOOL` fields. **(open)**
+**File:** `app/applications/html_form_extractor.py` `_kind_for` maps every `type=radio` to `BOOL`, and
+each radio input is emitted as its own field. A "Sponsorship: (Yes) (No) (Decline)" group → 3 fields
+with the same label, each resolved and "FILLED". **Fix:** coalesce `type=radio` sharing a `name` into
+one `SELECT` field whose `options` are the radio labels.
+
+#### P2-14 — Custom-question labels not captured when the ATS omits `<label for>`. **(open)**
+**File:** `html_form_extractor.py` `_label_for` falls back to `aria-label` → `placeholder` → `name` →
+preceding text. Greenhouse/Lever/Ashby custom questions frequently use a `<div class="label">` or
+`<legend>` with the input inside a wrapper and no `for`. Those land with an ugly `name`-attribute
+"label" → `classify_label` returns `None` → `HUMAN_REQUIRED` (safe but noisy; kills throughput on
+otherwise-answerable questions). **Fix:** capture `<legend>` and the nearest preceding block-level text
+/ `[class*=label]` sibling.
+
+#### P2-15 — Single-token name → last-name field `FILLED` with `""`. **(open)**
+**File:** `app/applications/form_fields.py` `resolve_value` — `personal.last_name` returns `""` when the
+full name has one token. A required last-name field then submits blank / fails ATS validation. **Fix:**
+`HUMAN_REQUIRED` when the name cannot be split.
+
+#### P3 — `StaticAtsFieldProvider` field lists are hand-written guesses; salary/relocation always `HUMAN_REQUIRED`.
+Dry runs today do not reflect a real posting's DOM. Replace with `BrowserFieldCapture` + per-ATS
+fixtures. Add `compensation.*` / `location.relocation` specs so questions with a canonical answer don't
+needlessly page the operator.
+
+### Phase 4 readiness
+
+Not ready for controlled real submission. Blockers before that decision: P1-24 (submit-attempted flag),
+P2-11 (PDF QA gate), P2-9 (multi-category tasks), P2-12 (hard-stop state wiring), and at least one real
+fixture-driven ATS adapter dry run that stops before submit, verified by a spy adapter. `real_submission_enabled`
+stays `false`; controlled submission remains a separate human decision after ≥3 reviewed dry-run
+transcripts per ATS.
