@@ -10,7 +10,7 @@ performed. Synthetic values must never be copied into this file or accepted by a
 
 Required facts currently missing: none.
 
-Resume-derived identity, education, skills, projects, and experience are now present locally. Contact
-data is intentionally local-only and is not committed to the public repository. The LinkedIn URL uses
-a different display-name slug than the resume and therefore requires human identity confirmation before
-autofill. The profile still never authorizes submission: `would_submit=false` and real submission remains disabled.
+The candidate confirmed `Andrew Weng` as the canonical identity for the supplied resume and LinkedIn
+profile. Contact data and the completed local profile are intentionally local-only and are not committed
+to the public repository. The profile still never authorizes submission: `would_submit=false` and real
+submission remains disabled.
