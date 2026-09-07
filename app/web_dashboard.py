@@ -8,12 +8,16 @@ import sys
 from urllib.parse import urlparse
 
 from app.database.repository import JobAgentRepository
+from app.llm.budget import SQLiteDailyBudget
+from app.llm.runtime import runtime_status
 from app.resumes.profile import CandidateProfile, profile_completeness_gate
+from app.utils.config import load_yaml
 
 
 class DashboardHandler(BaseHTTPRequestHandler):
     repo: JobAgentRepository
     profile_path: Path
+    settings_path: Path
 
     def do_GET(self) -> None:  # noqa: N802
         route = urlparse(self.path).path
@@ -42,6 +46,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def _state(self) -> dict:
         profile = CandidateProfile.from_yaml(self.profile_path)
+        settings = load_yaml(self.settings_path)
+        llm_status = runtime_status(settings)
+        llm_config = settings.get("llm") or {}
+        ledger_path = Path(str(llm_config.get("usage_ledger_path", "data/llm_usage.sqlite3")))
+        spent_today = SQLiteDailyBudget(ledger_path).spent_today() if ledger_path.exists() else 0.0
         with self.repo.connect() as conn:
             jobs = [dict(row) for row in conn.execute(
                 "SELECT id, company_name, title, location, status, source, apply_url FROM jobs ORDER BY discovered_at DESC LIMIT 100"
@@ -55,6 +64,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
         return {"profile": {"candidate_id": profile.candidate_id,
                              "complete": profile_completeness_gate(profile).complete,
                              "missing": profile.required_missing_fact_ids()},
+                "llm": {"enabled": llm_status.enabled,
+                        "configured": llm_status.configured,
+                        "status": llm_status.reason,
+                        "cheap_model": llm_status.cheap_model,
+                        "strong_model": llm_status.strong_model,
+                        "send_candidate_pii": llm_status.send_candidate_pii,
+                        "spent_today_usd": spent_today,
+                        "daily_limit_usd": float(llm_config.get("daily_cost_limit_usd", 5.0))},
                 "jobs": jobs, "applications": applications, "human_tasks": tasks,
                 "safety": {"real_submission_enabled": False, "submit_endpoint": False}}
 
@@ -78,17 +95,19 @@ class DashboardHandler(BaseHTTPRequestHandler):
 DASHBOARD_HTML = """<!doctype html><html><head><meta charset=utf-8><title>Job Agent</title>
 <style>body{font:15px system-ui;margin:32px;background:#f5f6f8;color:#17202a}main{max-width:1100px;margin:auto}header{display:flex;justify-content:space-between;align-items:center}button{padding:9px 14px;border:1px solid #87909a;border-radius:6px;background:white;cursor:pointer}section{background:white;border:1px solid #d8dde3;border-radius:6px;padding:18px;margin:16px 0}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;border-bottom:1px solid #e5e8eb}.status{font-weight:650}.safe{color:#147d45}.warn{color:#a45b00}</style></head>
 <body><main><header><div><h1>Job Application Agent</h1><p>Discovery, review, and safe dry-runs</p></div><div><button onclick="discover()">Search jobs</button> <button onclick="run('queue')">Queue eligible</button> <button onclick="run('prepare')">Prepare next</button> <button onclick="run('dry-run')">Build dry-run</button></div></header>
-<section id=profile>Loading profile...</section><section><h2>Jobs</h2><table id=jobs></table></section><section><h2>Applications</h2><table id=apps></table></section><section><h2>Human review queue</h2><table id=tasks></table></section>
+<section id=profile>Loading profile...</section><section id=llm>Loading AI status...</section><section><h2>Jobs</h2><table id=jobs></table></section><section><h2>Applications</h2><table id=apps></table></section><section><h2>Human review queue</h2><table id=tasks></table></section>
 <script>const esc=x=>String(x??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
-async function load(){let s=await (await fetch('/api/state')).json();profile.innerHTML=`<h2>Profile</h2><p class="${s.profile.complete?'safe':'warn'}">${s.profile.complete?'Ready for review':'Missing: '+s.profile.missing.join(', ')}</p><p>Submission is permanently disabled in this dashboard.</p>`; jobs.innerHTML='<tr><th>Company</th><th>Role</th><th>Location</th><th>ATS</th><th>Status</th></tr>'+s.jobs.map(j=>`<tr><td>${esc(j.company_name)}</td><td>${esc(j.title)}</td><td>${esc(j.location)}</td><td>${esc(j.source)}</td><td class=status>${esc(j.status)}</td></tr>`).join('');apps.innerHTML='<tr><th>Company</th><th>Role</th><th>Status</th><th>Reason</th></tr>'+s.applications.map(a=>`<tr><td>${esc(a.company)}</td><td>${esc(a.position)}</td><td>${esc(a.status)}</td><td>${esc(a.human_required_reason)}</td></tr>`).join('');tasks.innerHTML='<tr><th>Category</th><th>Task</th><th>Status</th></tr>'+s.human_tasks.map(t=>`<tr><td>${esc(t.category)}</td><td>${esc(t.title)}</td><td>${esc(t.status)}</td></tr>`).join('')}
+async function load(){let s=await (await fetch('/api/state')).json();profile.innerHTML=`<h2>Profile</h2><p class="${s.profile.complete?'safe':'warn'}">${s.profile.complete?'Ready for review':'Missing: '+s.profile.missing.join(', ')}</p><p>Submission is permanently disabled in this dashboard.</p>`;llm.innerHTML=`<h2>AI cost control</h2><p class="${s.llm.status==='READY'?'safe':'warn'}">${esc(s.llm.status)}</p><p>${esc(s.llm.cheap_model)} for extraction and validation | ${esc(s.llm.strong_model)} for gated work | $${Number(s.llm.spent_today_usd).toFixed(4)} / $${Number(s.llm.daily_limit_usd).toFixed(2)} today | candidate PII ${s.llm.send_candidate_pii?'allowed':'blocked'}</p>`;jobs.innerHTML='<tr><th>Company</th><th>Role</th><th>Location</th><th>ATS</th><th>Status</th></tr>'+s.jobs.map(j=>`<tr><td>${esc(j.company_name)}</td><td>${esc(j.title)}</td><td>${esc(j.location)}</td><td>${esc(j.source)}</td><td class=status>${esc(j.status)}</td></tr>`).join('');apps.innerHTML='<tr><th>Company</th><th>Role</th><th>Status</th><th>Reason</th></tr>'+s.applications.map(a=>`<tr><td>${esc(a.company)}</td><td>${esc(a.position)}</td><td>${esc(a.status)}</td><td>${esc(a.human_required_reason)}</td></tr>`).join('');tasks.innerHTML='<tr><th>Category</th><th>Task</th><th>Status</th></tr>'+s.human_tasks.map(t=>`<tr><td>${esc(t.category)}</td><td>${esc(t.title)}</td><td>${esc(t.status)}</td></tr>`).join('')}
 async function discover(){await fetch('/api/discover',{method:'POST'});await load()}async function run(x){await fetch('/api/'+x,{method:'POST'});await load()}load();</script></main></body></html>"""
 
 
 def serve(*, host: str = "127.0.0.1", port: int = 8765,
           database: str = "data/job_agent.sqlite3",
-          profile: str = "config/candidate_profile.local.yaml") -> None:
+          profile: str = "config/candidate_profile.local.yaml",
+          settings: str = "config/settings.yaml") -> None:
     handler = DashboardHandler
     handler.repo = JobAgentRepository(database)
     handler.repo.initialize()
     handler.profile_path = Path(profile if Path(profile).exists() else "config/candidate_profile.yaml")
+    handler.settings_path = Path(settings)
     ThreadingHTTPServer((host, port), handler).serve_forever()
