@@ -1216,3 +1216,50 @@ name needle from `config/candidate_profile.local.yaml` so any re-introduction fa
 - **P1** `--approved-by` has no URL allowlist / acknowledgment — would type real `.local.yaml` PII
   into an arbitrary live form.
 - Greenhouse Gate G FAIL; Lever/Ashby not live-run. `real_submission_enabled` stays `false`.
+
+
+---
+
+## Review round 3.9 - real discovery run + dashboard + company registry (autonomous)
+
+Codex pivoted to getting discovery running. Suite: 510 passed / 1 skipped / 14 xfailed.
+
+### Verified - responsible, no fabrication
+- config/companies.yaml (9b61aef): 5 entries. Only `openai` is active:true (ats_type ashby,
+  verified_public_ashby_board). google/meta/apple/tesla are active:false with an honest
+  reason "Official careers search is not yet covered by a verified read-only adapter." - no
+  fabricated endpoints.
+- First real discovery run (data/job_agent.sqlite3, gitignored): 750 OpenAI Ashby jobs, 518
+  applications (490 ELIGIBLE / 26 HUMAN_REQUIRED / 2 QUEUED). Skip reasons all legitimate
+  (SENIORITY_TOO_HIGH 104, EXPERIENCE_REQUIREMENT_TOO_HIGH 95, LOCATION_INELIGIBLE 24,
+  clearance 5, export-control 3). Filters firing.
+- strong_job_identity_keys (3cf1813): excludes description_shingle keys from the pipeline's
+  global seen-set, so shared company boilerplate no longer collapses two distinct jobs.
+  Correct; is_duplicate() still uses shingles for soft near-dup.
+- app/web_dashboard.py (cf4982d): 127.0.0.1 only, NO submission route (_state returns
+  real_submission_enabled False, submit_endpoint False), read-only discovery + subprocess
+  queue/prepare/dry-run. HTML is esc()-escaped.
+
+### New findings
+- P2 (discovery precision): 490 OpenAI roles marked ELIGIBLE but a sample is all senior IC /
+  research (Research Engineer, SWE RL Training Infra, Researcher Robustness and Safety, ML
+  Framework Engineer) - not new-grad. Deterministic filters only catch explicit Senior /
+  N+ years; soft phrasing (deep experience / track record / PhD or equivalent) passes. Per
+  PRIMARY PRINCIPLE this is keep-unless-disqualified, but a real run queues ~490 non-viable
+  applications and burns the daily budget. Fix: an LLM Stage-1 realistically-open-to-a-grad
+  gate before QUEUED (in LLM_COST_STRATEGY.md), or require a positive new-grad signal for
+  broad TECHNICAL/DATA titles. Test: tests/test_discovery_precision.py.
+- P2-5 (carried): classify_title is keyword-only; broad senior titles map into an accepted
+  family with no seniority check. Same root cause.
+- P3: .gitignore did not cover SQLite -wal / -shm sidecars (-wal can hold uncommitted rows).
+  Fixed: added *.sqlite3-wal / -shm / -journal.
+- P3: .local.yaml sets meta.candidate_id = internal-andrew-weng (contains the name); the
+  dashboard /api/state returns it. Recommend internal-<random>.
+- P2 (dashboard, carried): no CSRF token; any local POST triggers a pipeline subprocess
+  (--prepare-next can write real-PII resumes, --dry-run-next can navigate a live page).
+
+### Unchanged blockers
+- P1 scripts/live_dry_run.py 0-second lease TTL - every live evidence run self-LEASE_LOSTs.
+- P1 --approved-by has no URL allowlist / acknowledgment.
+- Greenhouse Gate G FAIL; Lever/Ashby not live-run. real_submission_enabled stays false.
+- Only 1 active company (OpenAI) - far from the ~1000+ boards the 100/day target needs.

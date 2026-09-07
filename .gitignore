@@ -9,6 +9,11 @@ venv/
 
 # Local data and logs
 data/*.sqlite3
+data/*.sqlite3-wal
+data/*.sqlite3-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.sqlite3-journal
 data/*.db
 data/resumes/
 artifacts/**/run.sqlite3
