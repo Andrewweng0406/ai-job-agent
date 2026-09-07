@@ -44,7 +44,9 @@ def test_router_uses_provider_tokens_for_cost_and_caches_identical_calls():
             return ProviderResult("ok", input_tokens=1000, output_tokens=100)
 
     provider = MeteredProvider()
-    router = LLMRouter(provider, model_prices={"cheap": ModelPrice(1.0, 2.0)})
+    router = LLMRouter(
+        provider, model_prices={"cheap": ModelPrice(1.0, 2.0)}, cache_enabled=True
+    )
     first = router.complete(
         stage="extract", model="cheap", prompt="job", stage0_passed=True
     )

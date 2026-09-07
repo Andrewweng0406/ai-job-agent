@@ -18,6 +18,12 @@ class LLMProvider(Protocol):
     ) -> ProviderResult | str: ...
 
 
+class DailyBudget(Protocol):
+    def reserve(self, amount_usd: float, limit_usd: float) -> None: ...
+    def reconcile(self, reserved_usd: float, actual_usd: float,
+                  limit_usd: float) -> None: ...
+
+
 @dataclass(frozen=True, slots=True)
 class ModelPrice:
     input_per_million_usd: float
@@ -73,10 +79,14 @@ class LLMRouter:
         *,
         policy: RouterPolicy | None = None,
         model_prices: dict[str, ModelPrice] | None = None,
+        daily_budget: DailyBudget | None = None,
+        cache_enabled: bool = False,
     ) -> None:
         self.provider = provider
         self.policy = policy or RouterPolicy()
         self.model_prices = model_prices or DEFAULT_MODEL_PRICES
+        self.daily_budget = daily_budget
+        self.cache_enabled = cache_enabled
         self.spent_usd = 0.0
         self.usage: list[LLMUsage] = []
         self._cache: dict[str, ProviderResult] = {}
@@ -112,13 +122,14 @@ class LLMRouter:
             preflight_cost = conservative.cost(
                 input_tokens=max(1, len(prompt) // 4), output_tokens=limit
             )
-        if self.spent_usd + preflight_cost > self.policy.daily_cost_limit_usd:
-            raise RuntimeError("LLM_DAILY_BUDGET_EXCEEDED")
-
         cache_key = hashlib.sha256(f"{model}\0{limit}\0{prompt}".encode()).hexdigest()
-        result = self._cache.get(cache_key)
+        result = self._cache.get(cache_key) if self.cache_enabled else None
         cache_hit = result is not None
         if result is None:
+            if self.daily_budget is not None:
+                self.daily_budget.reserve(preflight_cost, self.policy.daily_cost_limit_usd)
+            elif self.spent_usd + preflight_cost > self.policy.daily_cost_limit_usd:
+                raise RuntimeError("LLM_DAILY_BUDGET_EXCEEDED")
             raw = self.provider.complete(model=model, prompt=prompt, max_tokens=limit)
             if isinstance(raw, ProviderResult):
                 if raw.input_tokens < 0 or raw.output_tokens < 0:
@@ -126,13 +137,18 @@ class LLMRouter:
                 result = raw
             else:
                 result = ProviderResult(raw, max(1, len(prompt) // 4), limit)
-            self._cache[cache_key] = result
+            if self.cache_enabled:
+                self._cache[cache_key] = result
 
         actual_cost = 0.0 if cache_hit else (
             price.cost(input_tokens=result.input_tokens, output_tokens=result.output_tokens)
             if price is not None else preflight_cost
         )
-        if self.spent_usd + actual_cost > self.policy.daily_cost_limit_usd:
+        if self.daily_budget is not None and not cache_hit:
+            self.daily_budget.reconcile(
+                preflight_cost, actual_cost, self.policy.daily_cost_limit_usd
+            )
+        elif self.spent_usd + actual_cost > self.policy.daily_cost_limit_usd:
             raise RuntimeError("LLM_DAILY_BUDGET_EXCEEDED_AFTER_RESPONSE")
         usage = LLMUsage(
             stage, model, len(prompt),

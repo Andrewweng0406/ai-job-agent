@@ -137,9 +137,12 @@ Latest local verification:
 - Added a fail-closed runtime factory and a no-cost `--llm-status` command. AI and candidate PII transfer
   remain disabled in the tracked settings.
 - Converted Claude's model-tier xfail into a passing adversarial test.
-- Full suite: 519 passed, 1 skipped, 13 xfailed.
-- Deferred: persistent cross-process daily budget/cache, structured prompt/eval contracts, and actual
-  provider-backed tailoring. No live paid API request was made in this checkpoint.
+- Full suite after provider boundary: 519 passed, 1 skipped, 13 xfailed.
+- Added date-keyed SQLite budget reservations so concurrent workers and restarted processes share the
+  same daily cap without persisting prompts or responses. Converted the corresponding Claude xfail.
+- Full suite after persistent budget accounting: 522 passed, 1 skipped, 12 xfailed.
+- Deferred: durable cross-process response cache, structured prompt/eval contracts, and actual provider-
+  backed tailoring. No live paid API request was made in this checkpoint.
 
 ## Open-Source Reference Review
 

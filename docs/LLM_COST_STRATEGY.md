@@ -146,13 +146,14 @@ Current routing defaults:
 
 Prices are explicit router data and must be reviewed when provider pricing changes. The router records
 the API's returned input/output token counts, derives cost from the model price table, caches identical
-requests within the process, and rejects strong models in cheap-only stages. Unknown models are
-estimated conservatively rather than treated as free.
+requests within the process, and rejects strong models in cheap-only stages. A date-keyed SQLite ledger
+atomically reserves the worst-case request cost across workers before the API call and reconciles it to
+actual usage afterward. Unknown models are estimated conservatively rather than treated as free.
 
 `config/settings.yaml` keeps both `llm.enabled` and `llm.send_candidate_pii` false. Provider-backed
 resume generation remains deferred until the prompt contract proves that only selected, provenance-
 validated candidate facts are sent. `python3 "apply company.py" --llm-status` checks readiness without
 making a paid API request.
 
-Remaining cost-control work: date-keyed persistent budget accounting, durable content-hash cache,
-structured-output contracts/evals, and dashboard usage reporting.
+Remaining cost-control work: durable content-hash response cache, structured-output contracts/evals,
+and dashboard usage reporting.

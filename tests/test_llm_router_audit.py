@@ -8,6 +8,7 @@ from __future__ import annotations
 import pytest
 
 from app.llm.router import LLMRouter, RouterPolicy
+from app.llm.budget import SQLiteDailyBudget
 
 
 class _StubProvider:
@@ -69,12 +70,18 @@ def test_zero_declared_cost_cannot_bypass_the_budget():
     assert r.spent_usd > 0.01, "the router treated 1000 large generations as free"
 
 
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P2: spent_usd is per-instance/in-memory — 'daily' budget resets every process; needs date-keyed persistence")
-def test_daily_budget_persists_across_router_instances():
+def test_daily_budget_persists_across_router_instances(tmp_path):
     RouterPolicy_ = RouterPolicy(daily_cost_limit_usd=1.0)
-    a = LLMRouter(_StubProvider(), policy=RouterPolicy_)
+    ledger_path = tmp_path / "llm-usage.sqlite3"
+    a = LLMRouter(
+        _StubProvider(), policy=RouterPolicy_,
+        daily_budget=SQLiteDailyBudget(ledger_path),
+    )
     a.complete(stage="1", model="m", prompt="hi", stage0_passed=True, estimated_cost_usd=0.9)
-    b = LLMRouter(_StubProvider(), policy=RouterPolicy_)  # new process/instance, same day
+    b = LLMRouter(
+        _StubProvider(), policy=RouterPolicy_,
+        daily_budget=SQLiteDailyBudget(ledger_path),
+    )
     with pytest.raises(RuntimeError, match="LLM_DAILY_BUDGET_EXCEEDED"):
         b.complete(stage="1", model="m", prompt="hi", stage0_passed=True, estimated_cost_usd=0.9)
 

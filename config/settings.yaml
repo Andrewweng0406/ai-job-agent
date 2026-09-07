@@ -19,6 +19,7 @@ llm:
   cheap_model: gpt-5-nano
   strong_model: gpt-5-mini
   daily_cost_limit_usd: 5.0
+  usage_ledger_path: data/llm_usage.sqlite3
   max_input_chars: 12000
   max_output_tokens: 2000
   send_candidate_pii: false

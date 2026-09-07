@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.llm.openai_provider import OpenAIResponsesProvider
+from app.llm.budget import SQLiteDailyBudget
 from app.llm.router import LLMRouter, RouterPolicy
 
 
@@ -55,4 +56,10 @@ def build_router(settings: dict[str, Any]) -> LLMRouter | None:
         cheap_models=(status.cheap_model,),
         strong_models=(status.strong_model,),
     )
-    return LLMRouter(OpenAIResponsesProvider(), policy=policy)
+    budget_path = str(config.get("usage_ledger_path", "data/llm_usage.sqlite3"))
+    return LLMRouter(
+        OpenAIResponsesProvider(),
+        policy=policy,
+        daily_budget=SQLiteDailyBudget(budget_path),
+        cache_enabled=True,
+    )
