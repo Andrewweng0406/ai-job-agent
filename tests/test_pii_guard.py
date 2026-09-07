@@ -46,13 +46,27 @@ def test_tracked_candidate_profile_has_no_real_pii():
         assert re.search(rf"{key}:\s*TODO", text), f"{key} is not TODO in the tracked template"
 
 
-def test_no_tracked_file_contains_the_candidate_name_or_contact():
-    """Cheap belt-and-braces: scan the whole tracked tree for the known real identifiers."""
+def test_no_tracked_file_contains_the_real_contact_details_from_the_local_profile():
+    """Belt-and-braces: whatever email / URL strings are in the (gitignored) local profile must
+    NOT appear anywhere in the tracked tree. Skips when there is no local profile (e.g. CI)."""
+    import pytest
+
+    local = ROOT / "config" / "candidate_profile.local.yaml"
+    if not local.exists():
+        pytest.skip("no config/candidate_profile.local.yaml on this machine")
+
+    local_text = local.read_text()
+    # extract the concrete identifiers present in the real profile
+    needles = set(_EMAIL.findall(local_text))
+    needles |= set(re.findall(r"https?://[^\s\"']+", local_text))
+    needles |= set(re.findall(r"\+?\d[\d ().-]{9,}\d", local_text))
+    needles = {n.strip() for n in needles if len(n.strip()) >= 8}
+    assert needles, "local profile has no detectable contact identifiers to check"
+
     tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True).stdout.split()
-    needles = ("andrewweng.weng@sjsu.edu", "sheng-po-weng-029190352")
     hits = []
     for rel in tracked:
-        if rel.startswith((".git/",)) or rel.endswith((".png", ".pdf", ".sqlite3")):
+        if rel == "tests/test_pii_guard.py" or rel.endswith((".png", ".pdf", ".sqlite3")):
             continue
         try:
             body = (ROOT / rel).read_text(errors="ignore")
@@ -61,4 +75,4 @@ def test_no_tracked_file_contains_the_candidate_name_or_contact():
         for n in needles:
             if n in body:
                 hits.append((rel, n))
-    assert not hits, f"real candidate contact info found in tracked files: {hits}"
+    assert not hits, f"real contact info from the local profile leaked into tracked files: {hits}"
