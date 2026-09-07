@@ -836,3 +836,49 @@ submission vector remain in the code, but "reviewable evidence" is missing. **Ga
 ### May Codex proceed to Lever?
 **No.** Close P1-28, land P2-21, and produce a reproducible live-run script + full archived artifact
 bundle (P2-22). No new P0. `real_submission_enabled` stays `false`.
+
+---
+
+## Review round 3.3 — final Greenhouse Gate G audit
+
+**HEAD = `60985ce` (my R3.2 commit). No Phase 4.3 follow-up exists** — newest Codex commit is `9088c37`
+(post-fill hard-stop re-capture only). Suite: 392 passed / 1 skipped / 4 xfailed / 0 failed.
+Checklist: `docs/ROUND3_3_CHECKLIST.md`.
+
+### New this round (positive)
+Reviewer did an **independent read-only Playwright navigation** to
+`https://job-boards.greenhouse.io/anthropic/jobs/4461450008` (no app code, no interaction beyond
+`goto`+`content`): HTTP 200, title "Job Application for Account Executive, AI Native at Anthropic",
+1 `<form>`, 29 `<input>`, 3 `<textarea>`, contains `first_name`/`last_name`/`resume`/`sponsorship`/
+`authoriz`/`submit application`. ⇒ the page Codex navigated in `dc766fc` **was a real live Greenhouse
+application form.** Navigation authenticity: independently CONFIRMED.
+
+### Still FAIL — unchanged since R3.2
+- **P1-28 lease fencing — absent.** `GreenhouseLiveDryRunRunner.run()` has no `lease_still_mine` /
+  `worker_id` / `lease_epoch`; `autofill.apply` mutates the live page with zero lease checks.
+- **P1-28 approval gate — absent.** `grep ApprovedAutofillPreviewBuilder|approved_by` over
+  `greenhouse_live.py` + `browser_autofill.py` → no match. Autofill runs from the just-built
+  `resolutions`; `human_invoked=True` is the only gate. Unapproved / expired / tampered-payload /
+  changed-resume-hash / changed-answers all currently drive live fill.
+- **P2-21** — `_is_noninteractive` unchanged (misses `hidden` attr / `disabled` / offscreen / `opacity:0`).
+- **P2-22** — `scripts/` is empty; `artifacts/` holds one JD-fold PNG. No `dom.sanitized.html`,
+  `field_map.json`, `browser_actions.jsonl`, `safety.json`, `transcript.sanitized.json`, before/after
+  form screenshots, `run_id`, or ISO `captured_at`. Field-traceability (§8), honeypot-exclusion (§9),
+  browser-action (§11), transcript/browser-diff (§12), lease-trace (§13), approval-trace (§14) audits
+  are all impossible.
+
+### Truthfully N/A — PASS
+- Resume upload: `resume_upload_call_count: 0`, profile TODO-backed ⇒ HUMAN_REQUIRED; report states it, no overclaim.
+- PII: only the Anthropic-JD PNG + an aggregate report.json are committed; no email/phone/address/token/
+  résumé text; profile still 20× TODO.
+- Submit: `final_submit_invocation_count: 0`; no implicit submit primitive in code (re-verified). But
+  the unfenced/unapproved autofill means a future misuse is not *structurally* prevented.
+
+### Gate G — **FAIL**
+Real navigation is now independently confirmed. Every other core requirement is unmet: no DOM capture,
+no field map, no action log, no lease fencing, no approval gate, incomplete artifact bundle.
+
+### New P0: none.  New P1: P1-28 (both halves still open).
+
+### May Codex proceed to Lever / Ashby? **No.** Blockers: P1-28, P2-21, P2-22.
+`real_submission_enabled` stays `false`.
