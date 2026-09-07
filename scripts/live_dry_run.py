@@ -38,6 +38,8 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=False)
     captured_at = datetime.now(timezone.utc).isoformat()
     profile = CandidateProfile.from_yaml(_resolve_profile_path(args.profile))
+    if args.test_only and profile.profile_source != "synthetic_test_only":
+        raise SystemExit("TEST_ONLY requires meta.profile_source=synthetic_test_only")
     job = _job_from_url(args.url, args.company, args.role, ats)
     repo = JobAgentRepository(out / "run.sqlite3")
     repo.initialize()
@@ -56,6 +58,7 @@ def main() -> int:
         raise SystemExit("could not acquire evidence worker lease")
     application_id, lease_epoch = lease
     actions: list[dict[str, object]] = []
+    mismatch_count = 0
     page_title = ""
     final_browser_url = args.url
     _action(actions, "NAVIGATE", lease_epoch=lease_epoch, success=True)
@@ -90,15 +93,26 @@ def main() -> int:
                 repo.approve_dry_run_transcript(transcript.transcript_id, args.approved_by)
                 ApprovedAutofillPreviewBuilder(repo).build(transcript.transcript_id)
                 _action(actions, "APPROVAL_VERIFIED", lease_epoch=lease_epoch, success=True)
-                autofill = DryRunBrowserAutofill().apply(
-                            page, resolutions, expected_resume_hash=""
-                )
+                try:
+                    autofill = DryRunBrowserAutofill().apply(
+                        page, resolutions, expected_resume_hash="",
+                        lease_check=lambda: _lease_check(repo, application_id, worker_id, lease_epoch)
+                    )
+                except RuntimeError as exc:
+                    mismatch_count = int("BROWSER_TRANSCRIPT_MISMATCH" in str(exc))
+                    _action(actions, "FILL_MISMATCH", lease_epoch=lease_epoch, success=False,
+                            reason=str(exc))
+                    raise
                 for selector in autofill.filled_selectors:
                     _action(actions, "FILL_TEXT", field_id=selector, lease_epoch=lease_epoch, success=True)
             else:
                 autofill = None
             _form_screenshot(page, out / "after_fill.png")
-            _action(actions, "POST_FILL_SCAN", lease_epoch=lease_epoch, success=True)
+            _lease_check(repo, application_id, worker_id, lease_epoch)
+            post_fill = BrowserFieldCapture().capture(page, ats_type=ats)
+            _action(actions, "POST_FILL_SCAN", lease_epoch=lease_epoch,
+                    success=not post_fill.human_required,
+                    human_required=post_fill.human_required)
         finally:
             context.close()
             browser.close()
@@ -119,8 +133,8 @@ def main() -> int:
     (out / "field_map.json").write_text(json.dumps(field_map, indent=2, sort_keys=True), encoding="utf-8")
     (out / "browser_actions.jsonl").write_text("".join(json.dumps(item, sort_keys=True) + "\n" for item in actions), encoding="utf-8")
     (out / "safety.json").write_text(json.dumps({
-        "planned_field_count": len(resolutions), "attempted_field_count": 0,
-        "matched_field_count": 0, "mismatch_count": 0, "unplanned_browser_actions": 0,
+        "planned_field_count": len(resolutions), "attempted_field_count": len(autofill.filled_selectors) if autofill else 0,
+        "matched_field_count": len(autofill.filled_selectors) if autofill else 0, "mismatch_count": mismatch_count, "unplanned_browser_actions": 0,
         "unfilled_required_fields": [r.label for r in resolutions if r.required and r.status.value != "FILLED"],
         "submit_invocation_count": 0,
     }, indent=2, sort_keys=True), encoding="utf-8")
@@ -159,6 +173,7 @@ def _args():
     parser.add_argument("--timeout-ms", type=int, default=30_000)
     parser.add_argument("--approved-by", help="Explicit reviewer identity; required before any browser autofill")
     parser.add_argument("--real-submission-enabled", action="store_true")
+    parser.add_argument("--test-only", action="store_true")
     return parser.parse_args()
 
 
@@ -224,6 +239,11 @@ def _field_entry(index, raw, resolution, html):
 def _action(actions, action, *, lease_epoch, success, **extra):
     actions.append({"timestamp": datetime.now(timezone.utc).isoformat(), "action": action,
                     "lease_epoch": lease_epoch, "success": success, **extra})
+
+
+def _lease_check(repo, application_id, worker_id, lease_epoch):
+    if not repo.lease_still_mine(application_id, worker_id, lease_epoch):
+        raise RuntimeError("LEASE_LOST")
 
 
 def _write_blocked_bundle(out, run_id, ats, job, application_id, worker_id,
