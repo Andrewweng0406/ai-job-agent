@@ -1090,7 +1090,7 @@ file in a repo that pushes to GitHub. Fixed in `155f8e3`/`f9992ea`: real values 
 `apply company.py` + `scripts/live_dry_run.py` auto-prefer `.local.yaml` when no explicit path given;
 `tests/test_pii_guard.py` (5 guards). Verified: git history contains **no** prior commit of the real
 values; no tracked file contains the real email / phone / LinkedIn / address. **P3:**
-`tests/test_form_engine.py` uses the literal string "Andrew Weng" as a fixture name (name-only, no
+`tests/test_form_engine.py` uses the literal string the real candidate name as a fixture name (name-only, no
 linkage) — Codex should switch it to an obviously-fake name.
 
 ### First approved-autofill Gate-G attempt — hit a CAPTCHA, stopped correctly, NO PII typed
@@ -1177,3 +1177,43 @@ AND (b) refuse `profile_source=synthetic_test_only` on the autofill path.
   needs the P1 URL guard.
 - Lever / Ashby — `--ats` dispatch only; no live run.
 - `real_submission_enabled` stays `false`. Local `.local.yaml` PII still unpushed / safe.
+
+---
+
+## Review round 3.8 — resume generator audit + PII name scrub (autonomous)
+
+Suite: 505 passed / 1 skipped / 8 xfailed.
+
+### `DeterministicResumeGenerator` — safe, near-non-functional. No P0/P1.
+- **Fail-closed gates work:** incomplete profile → `PROFILE_INCOMPLETE`; missing required education fact
+  → `REQUIRED_RESUME_FACT_MISSING`; PDF QA fail → `PDF_QA_FAILED`. Verified.
+- **Output is verbatim profile facts** — `bullets` are extracted from the rendered selected-fact list,
+  which is `profile.supported_fact_text(selected_fact_ids)`. Nothing is paraphrased → nothing can be
+  fabricated. `render_simple_pdf` no longer truncates (earlier P2-11 fix confirmed: a 160-char bullet
+  round-trips through `pdf_qa`).
+- **P2** — `_render_sections` emits only `header` (name) / `target` / `education` / a flat selected-fact
+  bullet list. There is **no experience / projects / skills section**, and the fact-ID model does not
+  carry those types, so a real deterministic résumé is name + education + a few fact strings. The rich
+  `projects`/`experience`/`leadership` in the legacy YAML block is unused by the generator.
+- **P3** — `validate_claims_against_profile(bullets, fact_text)` with `bullets` derived from `fact_text`
+  is a self-check; `validation_status="VALIDATED"` is asserted without an independent comparison (safe
+  for a verbatim generator, but the label overstates what was checked).
+- Tests: `tests/test_resume_generator_audit.py`.
+
+### PII — real name was leaking into tracked files
+`74babfc` ("Record canonical candidate identity") and earlier commits put the literal candidate name
+into `docs/REAL_CANDIDATE_PROFILE_BLOCKERS.md`, `docs/CODEX_PROGRESS.md`, `tests/test_form_engine.py`
+fixtures (×3), and — my own mistake — `docs/CLAUDE_REVIEW.md`. **Scrubbed from all tracked files**
+(name → "Test Candidate" / "their name"); `tests/test_pii_guard.py` strengthened to also derive the
+name needle from `config/candidate_profile.local.yaml` so any re-introduction fails.
+- The name **remains in git history** (commit content + the git author identity
+  `andrewweng.weng@sjsu.edu` on every commit). A `git filter-repo` rewrite would break every review
+  SHA; since the email is already unavoidably in commit metadata, the real mitigation is **making the
+  GitHub repo private** — flag for the user.
+- **P3 for Codex** — stop putting the real name in tracked docs/tests; use "Test Candidate".
+
+### Still open (unchanged from 3.7)
+- **P1** `scripts/live_dry_run.py` 0-second lease TTL — every evidence run self-`LEASE_LOST`s.
+- **P1** `--approved-by` has no URL allowlist / acknowledgment — would type real `.local.yaml` PII
+  into an arbitrary live form.
+- Greenhouse Gate G FAIL; Lever/Ashby not live-run. `real_submission_enabled` stays `false`.

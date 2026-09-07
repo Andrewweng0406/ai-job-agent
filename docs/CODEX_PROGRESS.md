@@ -119,7 +119,7 @@ Latest local verification:
 - Added a shared legal-question matrix for Greenhouse/Lever/Ashby that keeps authorization, sponsorship, citizenship, clearance, salary, relocation, and unmappable legal selects fail-closed.
 - Generalized the no-submit live evidence runner to accept Greenhouse, Lever, and Ashby adapters through one shared `--ats` path. Public Lever and Ashby navigation was exercised with real Chromium on 2026-09-07; both captured live DOM and stopped on provider CAPTCHA/hard-stop before transcript creation, with zero submit invocations and no challenge bypass.
 - Candidate profiles with `meta.candidate_id: TODO` now receive a stable internal UUID namespace. This identifier is database-only and does not unlock or fabricate candidate facts.
-- Candidate confirmed `Andrew Weng` as the canonical identity for the supplied resume and LinkedIn profile; the decision is recorded without changing the no-submit boundary.
+- Candidate confirmed their name as the canonical identity for the supplied resume and LinkedIn profile; the decision is recorded without changing the no-submit boundary.
 - Completed the authorized open-source reference comparison for CareerWeaver, applyai, and ai-job-agent. Their MIT licenses, exact review commits/files, local treatment, and safety conflicts are recorded in `THIRD_PARTY_NOTICES.md` and `docs/OPEN_SOURCE_REFERENCE_COMPARISON.md`. Useful patterns were cleanly reimplemented; no upstream source was copied.
 
 ## Next

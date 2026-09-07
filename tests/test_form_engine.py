@@ -10,7 +10,7 @@ def test_resolves_known_fields_and_builds_submit_ready_transcript(tmp_path):
     repo, job, app_id = _repo_job_app(tmp_path)
     profile = _profile(
         facts={
-            "name.full": "Andrew Weng",
+            "name.full": "Test Candidate",
             "contact.email": "andrew@example.test",
             "contact.phone": "+1 555 010 2222",
         },
@@ -54,7 +54,7 @@ def test_resolves_known_fields_and_builds_submit_ready_transcript(tmp_path):
 
 def test_missing_required_profile_fact_opens_human_task(tmp_path):
     repo, job, app_id = _repo_job_app(tmp_path)
-    profile = _profile(facts={"name.full": "Andrew Weng"}, answers={})
+    profile = _profile(facts={"name.full": "Test Candidate"}, answers={})
     fields = [RawFormField("Email", InputKind.TEXT, "#email", required=True)]
 
     result = FormDryRunEngine(repo).build_transcript(
@@ -79,7 +79,7 @@ def test_missing_required_profile_fact_opens_human_task(tmp_path):
 
 
 def test_legal_unknown_and_required_custom_fields_are_human_required():
-    profile = _profile(facts={"name.full": "Andrew Weng"}, answers={})
+    profile = _profile(facts={"name.full": "Test Candidate"}, answers={})
     legal = resolve_form_field(
         RawFormField("Describe your immigration status", InputKind.LONG_TEXT, "#legal", required=True),
         profile,

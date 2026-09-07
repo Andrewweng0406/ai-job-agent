@@ -60,6 +60,9 @@ def test_no_tracked_file_contains_the_real_contact_details_from_the_local_profil
     needles = set(_EMAIL.findall(local_text))
     needles |= set(re.findall(r"https?://[^\s\"']+", local_text))
     needles |= set(re.findall(r"\+?\d[\d ().-]{9,}\d", local_text))
+    m = re.search(r"full_name:\s*(.+)", local_text) or re.search(r"name\.full[\s\S]{0,40}?value:\s*(.+)", local_text)
+    if m:
+        needles.add(m.group(1).strip())
     needles = {n.strip() for n in needles if len(n.strip()) >= 8}
     assert needles, "local profile has no detectable contact identifiers to check"
 

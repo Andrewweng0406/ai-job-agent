@@ -10,7 +10,7 @@ performed. Synthetic values must never be copied into this file or accepted by a
 
 Required facts currently missing: none.
 
-The candidate confirmed `Andrew Weng` as the canonical identity for the supplied resume and LinkedIn
+The candidate confirmed their name as the canonical identity for the supplied resume and LinkedIn
 profile. Contact data and the completed local profile are intentionally local-only and are not committed
 to the public repository. The profile still never authorizes submission: `would_submit=false` and real
 submission remains disabled.
