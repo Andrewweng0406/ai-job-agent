@@ -272,6 +272,14 @@ def _write_blocked_bundle(out, run_id, ats, job, application_id, worker_id,
         "submit_invocation_count": 0, "autofill_performed": False,
         "hard_stop": True,
     }, indent=2, sort_keys=True), encoding="utf-8")
+    blocking_reasons = list(capture.blocking_reasons)
+    for action in actions:
+        if action.get("success") is False and action.get("reason"):
+            reason = str(action["reason"])
+            if reason not in blocking_reasons:
+                blocking_reasons.append(reason)
+    if not blocking_reasons:
+        blocking_reasons = ["BROWSER_HARD_STOP"]
     (out / "report.json").write_text(json.dumps({
         "run_id": run_id, "captured_at": datetime.now(timezone.utc).isoformat(),
         "company": job.company_name, "role": job.title, "ats": ats,
@@ -280,7 +288,7 @@ def _write_blocked_bundle(out, run_id, ats, job, application_id, worker_id,
         "live_page": True, "real_browser": True, "application_id": application_id,
         "worker_id": worker_id, "lease_epoch": lease_epoch,
         "transcript_available": False, "status": "HUMAN_REQUIRED",
-        "blocking_reasons": list(capture.blocking_reasons),
+        "blocking_reasons": blocking_reasons,
         "field_count": 0, "auto_safe_count": 0, "human_required_count": 0,
         "hidden_fields_excluded_count": 0, "upload_performed": False,
         "post_fill_hard_stop": True, "would_submit": False,
