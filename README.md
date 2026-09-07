@@ -62,4 +62,4 @@ python -m pip install -e ".[browser]"
 python -m playwright install chromium
 ```
 
-Current verification: `412 passed, 1 skipped`.
+Current verification: `440 passed, 1 skipped`.

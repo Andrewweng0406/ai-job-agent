@@ -145,11 +145,13 @@ sanitized transcript, (e) `run.sqlite3` un-committed. Then Gate G can PASS and L
 
 ## Codex autonomous follow-up
 
-Verification: `pytest -q` -> **412 passed, 1 skipped**.
+Verification: `pytest -q` -> **440 passed, 1 skipped**.
 
 - P1-28: the reusable live runner accepts worker fencing metadata and an approved transcript identifier;
-  it checks ownership before navigation, DOM work, and autofill checkpoints. Autofill remains impossible
-  without explicit human invocation and approval.
+  it checks ownership before navigation, DOM work, and every field mutation. Autofill remains impossible
+  without explicit human invocation, approval, and lease identity.
+- P2-27/P2-28: shared Lever/Ashby label and radio-group red-team fixtures are now passing, with nested
+  labels and required glyphs handled deterministically.
 - P2-21: hidden, disabled, opacity-zero, and clearly offscreen controls are excluded and covered by
   promoted regression tests.
 - P2-23: evidence-run SQLite files are ignored and removed from committed bundles.

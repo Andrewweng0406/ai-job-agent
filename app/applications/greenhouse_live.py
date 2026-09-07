@@ -85,6 +85,8 @@ class GreenhouseLiveDryRunRunner:
     def run(self, payload: GreenhouseLiveDryRunInput) -> GreenhouseLiveDryRunResult:
         if self.adapter.real_submission_enabled:
             raise RuntimeError("Live dry-run runner refuses real_submission_enabled=True")
+        if payload.autofill and (payload.worker_id is None or payload.lease_epoch is None):
+            raise RuntimeError("Live autofill requires worker lease identity")
         self._assert_lease(payload)
         if payload.autofill and not payload.approved_transcript_id:
             raise RuntimeError("Live autofill requires approved_transcript_id")
@@ -121,6 +123,7 @@ class GreenhouseLiveDryRunRunner:
                             page,
                             adapter_result.dry_run.resolutions,
                             expected_resume_hash=payload.resume_hash,
+                            lease_check=lambda: self._assert_lease(payload),
                         )
                         self._assert_lease(payload)
                         post_fill = self.adapter.capture.capture(

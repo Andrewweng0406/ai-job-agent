@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
+from typing import Callable
 
 from app.applications.form_engine import FormFieldResolution, FormFieldStatus, InputKind
 
@@ -23,12 +24,15 @@ class DryRunBrowserAutofill:
         resolutions: list[FormFieldResolution],
         *,
         expected_resume_hash: str,
+        lease_check: Callable[[], None] | None = None,
     ) -> BrowserAutofillResult:
         filled: list[str] = []
         uploads = 0
         for resolution in resolutions:
             if resolution.status != FormFieldStatus.FILLED or resolution.value is None:
                 continue
+            if lease_check is not None:
+                lease_check()
             locator = page.locator(_playwright_selector(resolution.selector))
             value = resolution.value
             if resolution.kind == InputKind.FILE:

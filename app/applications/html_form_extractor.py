@@ -33,6 +33,8 @@ class _FormHtmlParser(HTMLParser):
         attrs = {key.lower(): value or "" for key, value in attrs_raw}
         if tag == "label":
             self._label_for = attrs.get("for")
+            if self._label_for is None:
+                self._label_for = "__implicit__"
             self._label_text = []
         elif tag in {"input", "select", "textarea"}:
             element = _Element(tag, attrs)
@@ -52,7 +54,11 @@ class _FormHtmlParser(HTMLParser):
     def handle_endtag(self, tag: str) -> None:
         if tag == "label":
             if self._label_for:
-                self.labels[self._label_for] = _clean_text(" ".join(self._label_text))
+                label = _clean_label(" ".join(self._label_text)) if self._label_for == "__implicit__" else _clean_text(" ".join(self._label_text))
+                if self._label_for == "__implicit__" and self.controls:
+                    self.controls[-1].text = label
+                else:
+                    self.labels[self._label_for] = label
             self._label_for = None
             self._label_text = []
         elif tag in {"select", "textarea"} and self._control_stack:
@@ -111,8 +117,8 @@ class HtmlFormFieldExtractor:
             )
         for index, (name, controls) in enumerate(radio_groups.items()):
             options = [_label_for(control, parser.labels, labelled_text) or control.attrs.get("value", "") for control in controls]
-            options = [_clean_text(option) for option in options if _clean_text(option)]
-            label = _radio_group_label(name, controls, options)
+            options = [_clean_label(option) for option in options if _clean_label(option)]
+            label = _radio_group_label(name, controls, options, html)
             fields.append(
                 RawFormField(
                     label=label,
@@ -192,7 +198,10 @@ def _is_required(control: _Element, label: str) -> bool:
     )
 
 
-def _radio_group_label(name: str, controls: list[_Element], options: list[str]) -> str:
+def _radio_group_label(name: str, controls: list[_Element], options: list[str], html: str) -> str:
+    group = re.search(r'class=["\'][^"\']*application-label[^"\']*["\'][^>]*>(.*?)</[^>]+>.*?name=["\']' + re.escape(name) + r'["\']', html, re.I | re.S)
+    if group:
+        return _clean_label(group.group(1))
     for control in controls:
         if control.attrs.get("data-group-label"):
             return _clean_text(control.attrs["data-group-label"])
@@ -204,6 +213,10 @@ def _radio_group_label(name: str, controls: list[_Element], options: list[str]) 
         if text:
             return text
     return _clean_text(name)
+
+
+def _clean_label(value: str) -> str:
+    return _clean_text(re.sub(r"[\*✱]+", " ", value))
 
 
 def _clean_text(value: str) -> str:

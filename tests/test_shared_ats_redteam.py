@@ -104,7 +104,6 @@ def test_unknown_required_free_text_is_human_required(ats, needle):
 
 # ---------------------------------------------------------------- P2-27: labels without <label for> are lost / bleed
 @pytest.mark.parametrize("ats", ["lever", "ashby"])
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P2-27: Lever .application-field>label (no for) and radio-group .application-label / role=radiogroup aria-labelledby are not captured; label bleeds to the required glyph")
 def test_identity_and_radio_labels_are_captured_not_bled(ats):
     fields = _fields(ats)
     degenerate = [f for f in fields if f.label.strip() in {"", "*", "✱", "Yes", "No"}]
@@ -115,7 +114,6 @@ def test_identity_and_radio_labels_are_captured_not_bled(ats):
 
 # ---------------------------------------------------------------- P2-28: Yes/No radio group options
 @pytest.mark.parametrize("ats", ["lever", "ashby"])
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P2-28: Yes/No radio groups extract options as ['*','Yes'] — required glyph leaks in, 'No' dropped")
 def test_yes_no_radio_group_options_are_yes_and_no(ats):
     fields = _fields(ats)
     groups = [f for f in fields if f.kind.value == "select" and any("yes" in o.lower() for o in f.options)]

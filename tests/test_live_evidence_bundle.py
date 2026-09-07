@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 def test_committed_live_evidence_bundle_has_required_files():
-    bundle = Path("artifacts/phase43-anthropic-4461450008-v4")
+    bundle = Path("artifacts/phase43-anthropic-4461450008-v5")
     required = {
         "report.json", "dom.sanitized.html", "field_map.json", "browser_actions.jsonl",
         "safety.json", "transcript.sanitized.json", "before_fill.png", "after_fill.png",
@@ -20,7 +20,7 @@ def test_committed_live_evidence_bundle_has_required_files():
 
 
 def test_live_evidence_field_map_is_dom_traceable():
-    bundle = Path("artifacts/phase43-anthropic-4461450008-v4")
+    bundle = Path("artifacts/phase43-anthropic-4461450008-v5")
     html = (bundle / "dom.sanitized.html").read_text()
     fields = json.loads((bundle / "field_map.json").read_text())
     assert fields
@@ -30,5 +30,5 @@ def test_live_evidence_field_map_is_dom_traceable():
 
 
 def test_live_evidence_action_log_contains_no_submit_action():
-    actions = Path("artifacts/phase43-anthropic-4461450008-v4/browser_actions.jsonl").read_text()
+    actions = Path("artifacts/phase43-anthropic-4461450008-v5/browser_actions.jsonl").read_text()
     assert not any(token in actions for token in ("PRESS_ENTER", "SUBMIT", "REQUEST_SUBMIT", "FORM_SUBMIT", "CLICK_SUBMIT"))
