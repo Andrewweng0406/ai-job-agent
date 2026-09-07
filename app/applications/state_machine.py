@@ -19,7 +19,7 @@ ALLOWED_TRANSITIONS: dict[ApplicationStatus, set[ApplicationStatus]] = {
         ApplicationStatus.HUMAN_REQUIRED,
         ApplicationStatus.CLOSED,
     },
-    ApplicationStatus.SUBMISSION_UNKNOWN: {ApplicationStatus.VERIFIED, ApplicationStatus.HUMAN_REQUIRED, ApplicationStatus.CLOSED},
+    ApplicationStatus.SUBMISSION_UNKNOWN: {ApplicationStatus.VERIFIED, ApplicationStatus.SKIPPED, ApplicationStatus.CLOSED},
     ApplicationStatus.RETRY_PENDING: {ApplicationStatus.APPLYING, ApplicationStatus.FAILED, ApplicationStatus.HUMAN_REQUIRED, ApplicationStatus.CLOSED},
     ApplicationStatus.HUMAN_REQUIRED: {ApplicationStatus.QUEUED, ApplicationStatus.READY, ApplicationStatus.SKIPPED, ApplicationStatus.CLOSED},
     ApplicationStatus.FAILED: {ApplicationStatus.RETRY_PENDING, ApplicationStatus.HUMAN_REQUIRED, ApplicationStatus.SKIPPED},

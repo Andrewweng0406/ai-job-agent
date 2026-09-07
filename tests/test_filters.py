@@ -46,3 +46,8 @@ def test_no_sponsorship_depends_on_candidate_configuration():
     assert allowed.allowed
     assert not blocked.allowed and blocked.reason == "NO_VISA_SPONSORSHIP"
     assert not incomplete.allowed and incomplete.reason == "WORK_AUTHORIZATION_PROFILE_INCOMPLETE"
+
+
+def test_unknown_job_family_is_kept_for_later_review():
+    result = apply_hard_filters(make_job("Analyst", "Ambiguous but not disqualified.", JobFamily.UNKNOWN), {"DATA_ANALYTICS"})
+    assert result.allowed

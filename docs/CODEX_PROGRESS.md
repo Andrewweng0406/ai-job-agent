@@ -7,7 +7,7 @@ Codex remains the primary implementation owner. Claude Round 1 P0/P1 findings ha
 Latest local verification:
 
 - `python3 -m pytest -q`
-- Result: `64 passed`
+- Result: `140 passed`
 
 ## Claude Round 1 Findings
 
@@ -24,12 +24,23 @@ Latest local verification:
 - P1-5: Replaced exact-string-only truth validation with deterministic semantic support checks, required-field checks, legal-question routing, and provenance validation.
 - P1-6: Added candidate fact IDs, literal-only authorization facts, and `profile_completeness_gate()`.
 - P1-7: Added conservative US/remote location handling and clearly non-US skip behavior.
+- P1-8: Added `SUBMISSION_UNKNOWN -> VERIFIED` for async evidence discovery.
+- P1-9: Added posted-date parsing for Greenhouse `updated_at`, Lever `createdAt`, and Ashby `publishedAt`.
+- P1-9a: Expanded experience range parsing for en dash, em dash, spaced hyphen, and `to` separators.
+- P1-10: Expanded no-sponsorship detection for additional common phrasings.
+- P1-11: Added ITAR/export-control/U.S. Person filtering.
+- P1-12: Added deterministic overreach and unsupported-number guards to provenance validation.
+- P2-1: Broadened `upsert_job` so mutable columns are refreshed on rediscovery.
+- P2-2: Removed `UNIQUE(apply_url)` from the fresh schema and added a legacy-DB fallback for old apply-url uniqueness conflicts.
+- P2-3: Added `human_tasks`, `insert_resume_artifact()`, and `attach_resume_to_application()`.
+- P2-4: Added missing failure categories from the failure model.
+- P2-5: Added YAML taxonomy title classification and changed deterministic filtering so `UNKNOWN` family is kept for later review instead of dropped.
+- P2-6: Normalized adapters to pass visible text into `Job`, so description hashes are not based on raw HTML markup for supported sources.
+- Round 2 source contracts: Added read-only SmartRecruiters and Workday source adapters against fixtures.
 
 ### Deferred
 
-- P2-1: Full mutable-column refresh on `upsert_job` should be broadened before high-volume discovery.
-- P2-2: `jobs.apply_url` uniqueness should be revisited for ATSes that reuse a generic application URL.
-- Workday/iCIMS/Taleo discovery and application adapters remain deferred until Greenhouse/Lever/Ashby read-only discovery is stable.
+- Workday application automation and iCIMS/Taleo discovery/application adapters remain deferred until no-account ATS discovery and verification are stable.
 - Browser automation and live submission remain deferred; `real_submission_enabled` is still `false`.
 - LLM-based extraction, tailoring, and entailment judging remain deferred behind deterministic gates and cost controls.
 
@@ -49,11 +60,11 @@ Latest local verification:
 - `--check-profile`, `--discover`, `--queue-eligible`, and `--daily-report` CLI commands.
 - ATS-agnostic form field taxonomy resolver with fail-closed handling for legal/authorization fields.
 - Human task schema and idempotent task creation for application/category blocking cases.
+- Read-only SmartRecruiters and Workday fixture-backed source contracts.
 
 ## Next
 
-1. Broaden `upsert_job` update behavior and handle shared apply URLs safely.
-2. Add artifact cache reuse by persona/skill/profile signature.
-3. Add verification worker evidence-tier persistence.
-4. Add seeded company registry entries for read-only discovery testing.
-5. Add non-submitting ATS form inspection/canary tests.
+1. Add artifact cache reuse by persona/skill/profile signature.
+2. Add verification worker evidence-tier persistence.
+3. Add seeded company registry entries for read-only discovery testing.
+4. Add non-submitting ATS form inspection/canary tests.

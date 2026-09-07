@@ -31,6 +31,9 @@ Completed additional foundation work:
 - Updated discovery to use explicit candidate sponsorship configuration and ATS/requisition-derived application dedupe keys.
 - Added ATS-agnostic form field classification/resolution for common fields and legal fail-closed handling.
 - Added `human_tasks` schema and idempotent task creation.
+- Added SmartRecruiters and Workday read-only discovery adapters against source-contract fixtures.
+- Expanded hard-filter coverage for Round 1.5 sponsorship, experience, ITAR/export-control, and posted-date contracts.
+- Full test suite is now clean with no expected-failure markers: `140 passed`.
 
 Next engineering phase:
 

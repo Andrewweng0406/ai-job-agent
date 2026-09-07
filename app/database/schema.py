@@ -41,8 +41,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     status TEXT NOT NULL,
     raw_data_json TEXT NOT NULL DEFAULT '{}',
     metadata_json TEXT NOT NULL DEFAULT '{}',
-    UNIQUE(source, external_job_id),
-    UNIQUE(apply_url)
+    UNIQUE(source, external_job_id)
 );
 
 CREATE TABLE IF NOT EXISTS applications (
@@ -79,7 +78,7 @@ CREATE TABLE IF NOT EXISTS application_state_transitions (
     from_status TEXT NOT NULL,
     to_status TEXT NOT NULL,
     reason TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TEXT NOT NULL,
     FOREIGN KEY(application_id) REFERENCES applications(application_id)
 );
 

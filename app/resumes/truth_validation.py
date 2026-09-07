@@ -48,6 +48,11 @@ STOPWORDS = {
 }
 LEGAL_QUESTION_PATTERN = re.compile(r"\b(immigration|visa|sponsorship|work authorization|authorized to work|citizenship)\b", re.I)
 DATE_PATTERN = re.compile(r"\b(20\d{2}[-/]\d{1,2}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+20\d{2}|20\d{2})\b", re.I)
+OVERREACH_PATTERN = re.compile(
+    r"\b(production|millions?|professional|external clients?|institutional|managed a team|engineers?|"
+    r"performance reviews?|hiring|senior|expert|expert-level|years of|full-time|company-wide|business units?)\b",
+    re.I,
+)
 
 
 def validate_claims_against_profile(claims: list[str], supported_facts: list[str]) -> TruthValidationResult:
@@ -96,8 +101,10 @@ def validate_with_provenance(items: list[dict[str, object]], profile_fact_ids: s
             if fact_id not in profile_fact_ids:
                 unknown_ids.append(fact_id)
         numbers = [str(number) for number in item.get("numbers", [])]
-        if numbers and any(fact_id not in profile_fact_ids for fact_id in fact_ids):
+        if numbers:
             unsupported_numbers.extend(numbers)
+        if OVERREACH_PATTERN.search(text):
+            unsupported_claims.append(text)
         if not fact_ids:
             unsupported_claims.append(text)
     return ProvenanceValidationResult(

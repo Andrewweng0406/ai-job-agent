@@ -48,7 +48,7 @@ on application entering SUBMITTED or SUBMISSION_UNKNOWN:
         - backoff between polls (e.g. 2,5,10,15 min)
     window elapsed with no tier met:
         SUBMITTED           -> SUBMISSION_UNKNOWN
-        SUBMISSION_UNKNOWN   -> open human_task(category=SUBMISSION_UNKNOWN)
+        SUBMISSION_UNKNOWN   -> open human_task(category=SUBMISSION_UNKNOWN) while keeping application in SUBMISSION_UNKNOWN
 ```
 
 - The apply worker never blocks on verification; it hands off and moves to the next application.
@@ -64,7 +64,7 @@ on application entering SUBMITTED or SUBMISSION_UNKNOWN:
 |---|---|
 | `FAILED` before any submit POST, transient (network/5xx/rate-limit), `attempt_count < 3` | `FAILED → RETRY_PENDING → APPLYING`, backoff + jitter. Same `dedupe_key`, same application row. |
 | `FAILED` before submit, non-transient (form mapping, unsupported field) | `→ HUMAN_REQUIRED`. No blind retry. |
-| `SUBMISSION_UNKNOWN` (any cause) | **No automated retry, ever.** Verify worker → if evidence found, `→ VERIFIED`. Else → `human_task`. Human resolves to `VERIFIED` (they confirmed in the ATS) or `SKIPPED`. |
+| `SUBMISSION_UNKNOWN` (any cause) | **No automated retry, ever.** Verify worker → if evidence found, `→ VERIFIED`. Else → `human_task` while the application remains `SUBMISSION_UNKNOWN`. Human resolves to `VERIFIED` (they confirmed in the ATS) or `SKIPPED`. |
 | Submit POST fired then process crashed | On recovery, the `applications` row is in `APPLYING` or `SUBMISSION_UNKNOWN` (written **before** the POST per P0-2). Recovery routes it to the verify worker, never re-drives the form. |
 | ATS shows "you have already applied" | Treat as evidence of a prior submission: if a prior `VERIFIED`/`SUBMITTED` row exists → close as `VERIFIED`; else `→ SKIPPED` (`DUPLICATE`). Never submit again. |
 | `attempt_count` hits cap (3) in any transient loop | `→ HUMAN_REQUIRED`. |

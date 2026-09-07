@@ -60,57 +60,18 @@ class JobAgentRepository:
 
     def upsert_job(self, job: Job) -> int:
         with self.connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO jobs (
-                    external_job_id, company_id, company_name, title, normalized_title, job_family,
-                    location, remote_status, employment_type, salary_min, salary_max, currency,
-                    description, requirements_json, preferred_qualifications_json, posted_at,
-                    discovered_at, source, source_url, apply_url, ats_type, description_hash,
-                    status, raw_data_json, metadata_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(source, external_job_id) DO UPDATE SET
-                    title=excluded.title,
-                    normalized_title=excluded.normalized_title,
-                    job_family=excluded.job_family,
-                    location=excluded.location,
-                    description=excluded.description,
-                    description_hash=excluded.description_hash,
-                    status=excluded.status,
-                    metadata_json=excluded.metadata_json
-                """,
-                (
-                    job.external_job_id,
-                    job.company_id,
-                    job.company_name,
-                    job.title,
-                    job.normalized_title,
-                    job.job_family.value,
-                    job.location,
-                    job.remote_status,
-                    job.employment_type,
-                    job.salary_min,
-                    job.salary_max,
-                    job.currency,
-                    job.description,
-                    json.dumps(job.requirements),
-                    json.dumps(job.preferred_qualifications),
-                    dt(job.posted_at),
-                    dt(job.discovered_at),
-                    job.source,
-                    job.source_url,
-                    job.apply_url,
-                    job.ats_type,
-                    job.description_hash,
-                    job.status.value,
-                    json.dumps(job.raw_data, sort_keys=True),
-                    json.dumps(job.metadata, sort_keys=True),
-                ),
-            )
+            try:
+                conn.execute(_UPSERT_JOB_SQL, _job_values(job))
+            except sqlite3.IntegrityError as exc:
+                if "apply_url" not in str(exc).lower():
+                    raise
+                conn.execute(_UPDATE_JOB_BY_APPLY_URL_SQL, _job_update_values(job) + (job.apply_url,))
             row = conn.execute(
                 "SELECT id FROM jobs WHERE source = ? AND external_job_id = ?",
                 (job.source, job.external_job_id),
             ).fetchone()
+            if row is None:
+                row = conn.execute("SELECT id FROM jobs WHERE apply_url = ?", (job.apply_url,)).fetchone()
             return int(row["id"])
 
     def insert_application(self, application: Application) -> str:
@@ -227,6 +188,13 @@ class JobAgentRepository:
             )
             return artifact.resume_id
 
+    def attach_resume_to_application(self, application_id: str, resume_id: str) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "UPDATE applications SET resume_id = ? WHERE application_id = ?",
+                (resume_id, application_id),
+            )
+
     def open_human_task(self, task: HumanTask) -> str:
         now = datetime.now(timezone.utc)
         created_at = dt(task.created_at or now)
@@ -295,13 +263,118 @@ class JobAgentRepository:
                 raise RuntimeError(f"Concurrent status modification for application_id: {application_id}")
             conn.execute(
                 """
-                INSERT INTO application_state_transitions (application_id, from_status, to_status, reason)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO application_state_transitions (application_id, from_status, to_status, reason, created_at)
+                VALUES (?, ?, ?, ?, ?)
                 """,
-                (application_id, transition.from_status.value, transition.to_status.value, transition.reason),
+                (
+                    application_id,
+                    transition.from_status.value,
+                    transition.to_status.value,
+                    transition.reason,
+                    dt(datetime.now(timezone.utc)),
+                ),
             )
             conn.execute("COMMIT")
 
 
 def _application_dedupe_key(job_id: int) -> str:
     return stable_hash(f"default_candidate|job:{job_id}")
+
+
+_UPSERT_JOB_SQL = """
+INSERT INTO jobs (
+    external_job_id, company_id, company_name, title, normalized_title, job_family,
+    location, remote_status, employment_type, salary_min, salary_max, currency,
+    description, requirements_json, preferred_qualifications_json, posted_at,
+    discovered_at, source, source_url, apply_url, ats_type, description_hash,
+    status, raw_data_json, metadata_json
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(source, external_job_id) DO UPDATE SET
+    company_id=excluded.company_id,
+    company_name=excluded.company_name,
+    title=excluded.title,
+    normalized_title=excluded.normalized_title,
+    job_family=excluded.job_family,
+    location=excluded.location,
+    remote_status=excluded.remote_status,
+    employment_type=excluded.employment_type,
+    salary_min=excluded.salary_min,
+    salary_max=excluded.salary_max,
+    currency=excluded.currency,
+    description=excluded.description,
+    requirements_json=excluded.requirements_json,
+    preferred_qualifications_json=excluded.preferred_qualifications_json,
+    posted_at=excluded.posted_at,
+    source_url=excluded.source_url,
+    apply_url=excluded.apply_url,
+    ats_type=excluded.ats_type,
+    description_hash=excluded.description_hash,
+    status=excluded.status,
+    raw_data_json=excluded.raw_data_json,
+    metadata_json=excluded.metadata_json
+"""
+
+_UPDATE_JOB_BY_APPLY_URL_SQL = """
+UPDATE jobs SET
+    external_job_id=?,
+    company_id=?,
+    company_name=?,
+    title=?,
+    normalized_title=?,
+    job_family=?,
+    location=?,
+    remote_status=?,
+    employment_type=?,
+    salary_min=?,
+    salary_max=?,
+    currency=?,
+    description=?,
+    requirements_json=?,
+    preferred_qualifications_json=?,
+    posted_at=?,
+    discovered_at=?,
+    source=?,
+    source_url=?,
+    ats_type=?,
+    description_hash=?,
+    status=?,
+    raw_data_json=?,
+    metadata_json=?
+WHERE apply_url=?
+"""
+
+
+def _job_values(job: Job) -> tuple[object, ...]:
+    return (
+        job.external_job_id,
+        job.company_id,
+        job.company_name,
+        job.title,
+        job.normalized_title,
+        job.job_family.value,
+        job.location,
+        job.remote_status,
+        job.employment_type,
+        job.salary_min,
+        job.salary_max,
+        job.currency,
+        job.description,
+        json.dumps(job.requirements),
+        json.dumps(job.preferred_qualifications),
+        dt(job.posted_at),
+        dt(job.discovered_at),
+        job.source,
+        job.source_url,
+        job.apply_url,
+        job.ats_type,
+        job.description_hash,
+        job.status.value,
+        json.dumps(job.raw_data, sort_keys=True),
+        json.dumps(job.metadata, sort_keys=True),
+    )
+
+
+def _job_update_values(job: Job) -> tuple[object, ...]:
+    values = list(_job_values(job))
+    values.pop(19)
+    return tuple(values)

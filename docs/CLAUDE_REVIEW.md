@@ -262,20 +262,30 @@ job to `NEW`; nothing compares old vs new `description_hash` to emit `UPDATED`/`
 values are currently dead). **Required:** update all mutable columns; compute status by comparing stored
 `description_hash`; emit a job-updated event that re-runs eligibility.
 
+**Codex update:** `upsert_job` now refreshes mutable columns on rediscovery. Incremental status is computed in
+the discovery pipeline before persistence.
+
 ### P2-2 — `UNIQUE(apply_url)` on `jobs` can crash discovery.
 **File:** `app/database/schema.py:45`. Only `ON CONFLICT(source, external_job_id)` is handled in
 `upsert_job`. Any two postings that normalize to the same apply URL (career-portal root, shared apply
 landing) raise an unhandled `IntegrityError`. **Required:** drop `UNIQUE(apply_url)` (dedupe belongs in
 the pipeline, P1-3) or handle that conflict explicitly.
 
+**Codex update:** Fresh schema no longer declares `UNIQUE(apply_url)`. Repository also handles legacy local
+databases that still have an old apply-url uniqueness constraint.
+
 ### P2-3 — No `human_tasks` table / no `resumes` write path.
 `HUMAN_REQUIRED` is central but there is nowhere to enqueue the task (owner, reason, snapshot path,
 created/closed, blocking question text). `SCHEMA.md` names `resumes` but `repository.py` has no insert for
 it. **Required:** add `human_tasks` now; add `insert_resume` + `attach_resume_to_application`.
 
+**Codex update:** Added `human_tasks`, `insert_resume_artifact()`, and `attach_resume_to_application()`.
+
 ### P2-4 — `FailureCategory` gaps.
 Add `STALE_POSTING`, `POSTING_CLOSED`, `DUPLICATE`, `PROFILE_INCOMPLETE`, `TRUTH_VALIDATION_FAILED`,
 `LOCATION_INELIGIBLE`, `WORK_AUTH_INELIGIBLE`. Align 1:1 with `FAILURE_MODEL.md` categories.
+
+**Codex update:** Added these enum values.
 
 ### P2-5 — Job family classification is unimplemented; filters depend on it.
 `role_taxonomy.yaml` keywords are loaded by nothing. `apply_hard_filters` first checks
@@ -284,9 +294,15 @@ This is the crux of "belongs to an accepted target family" from the PRIMARY PRIN
 implement deterministic title/JD keyword classification with an `UNKNOWN` → keep-and-LLM path (do not drop
 UNKNOWN).
 
+**Codex update:** YAML taxonomy classification is implemented. Deterministic hard filters keep `UNKNOWN`
+family jobs for later review rather than dropping them.
+
 ### P2-6 — `description_hash` over raw HTML is noisy.
 **File:** `app/models/job.py:17,53`. Hash normalized visible text with collapsed internal whitespace, not
 raw HTML, or trivial markup changes create false `UPDATED`.
+
+**Codex update:** Supported source adapters now strip HTML before constructing `Job`, so the hash is based on
+visible text for those sources.
 
 ---
 

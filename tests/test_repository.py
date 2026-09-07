@@ -2,8 +2,9 @@ import pytest
 
 from app.database.repository import JobAgentRepository
 from app.models.application import Application
-from app.models.enums import ApplicationStatus, JobFamily
+from app.models.enums import ApplicationStatus, JobFamily, Persona
 from app.models.job import Job
+from app.resumes.generator import ResumeArtifact
 
 
 def test_repository_initializes_and_logs_state_transition(tmp_path):
@@ -107,3 +108,101 @@ def test_foreign_keys_are_enforced(tmp_path):
 
     with pytest.raises(sqlite3.IntegrityError):
         repo.insert_application(app)
+
+
+def test_upsert_job_updates_mutable_columns(tmp_path):
+    repo = JobAgentRepository(tmp_path / "agent.sqlite3")
+    repo.initialize()
+    job_id = repo.upsert_job(
+        Job(
+            external_job_id="job-1",
+            company_id="acme",
+            company_name="Acme",
+            title="Data Analyst",
+            location="Remote",
+            description="SQL",
+            source="fixture",
+            source_url="https://example.test/job",
+            apply_url="https://example.test/apply",
+            ats_type="fixture",
+            job_family=JobFamily.DATA_ANALYTICS,
+            salary_min=80000,
+        )
+    )
+    updated_id = repo.upsert_job(
+        Job(
+            external_job_id="job-1",
+            company_id="acme",
+            company_name="Acme",
+            title="Data Analyst",
+            location="New York, NY",
+            description="SQL and Python",
+            source="fixture",
+            source_url="https://example.test/job-updated",
+            apply_url="https://example.test/apply-updated",
+            ats_type="fixture",
+            job_family=JobFamily.DATA_ANALYTICS,
+            salary_min=90000,
+            requirements=["Python"],
+        )
+    )
+
+    with repo.connect() as conn:
+        row = conn.execute(
+            "SELECT location, salary_min, requirements_json, source_url, apply_url FROM jobs WHERE id = ?",
+            (job_id,),
+        ).fetchone()
+    assert updated_id == job_id
+    assert row["location"] == "New York, NY"
+    assert row["salary_min"] == 90000
+    assert row["requirements_json"] == '["Python"]'
+    assert row["source_url"] == "https://example.test/job-updated"
+    assert row["apply_url"] == "https://example.test/apply-updated"
+
+
+def test_resume_artifact_can_attach_to_application(tmp_path):
+    repo = JobAgentRepository(tmp_path / "agent.sqlite3")
+    repo.initialize()
+    job_id = repo.upsert_job(
+        Job(
+            external_job_id="job-1",
+            company_id="acme",
+            company_name="Acme",
+            title="Data Analyst",
+            location="Remote",
+            description="SQL",
+            source="fixture",
+            source_url="https://example.test/job",
+            apply_url="https://example.test/apply",
+            ats_type="fixture",
+            job_family=JobFamily.DATA_ANALYTICS,
+        )
+    )
+    app_id = repo.insert_application(
+        Application(
+            job_id=job_id,
+            company="Acme",
+            position="Data Analyst",
+            location="Remote",
+            job_family=JobFamily.DATA_ANALYTICS,
+            source="fixture",
+            ats_type="fixture",
+        )
+    )
+    artifact = ResumeArtifact(
+        resume_id="resume-1",
+        job_id=job_id,
+        persona=Persona.DATA,
+        base_version="test",
+        generated_at="2026-09-07T00:00:00+00:00",
+        changes={},
+        validation_status="VALIDATED",
+        file_path="data/resumes/resume-1.txt",
+        file_hash="abc",
+    )
+    repo.insert_resume_artifact(artifact)
+    repo.attach_resume_to_application(app_id, artifact.resume_id)
+
+    with repo.connect() as conn:
+        row = conn.execute("SELECT resume_id FROM applications WHERE application_id = ?", (app_id,)).fetchone()
+    assert row["resume_id"] == "resume-1"

@@ -4,11 +4,13 @@ from dataclasses import dataclass
 import re
 
 from app.models.job import Job
+from app.models.enums import JobFamily
 
 
 SENIORITY_PATTERN = re.compile(r"\b(senior|sr\.?|staff|principal|director|vp|executive|head of)\b", re.I)
 CLEARANCE_PATTERN = re.compile(
-    r"\b(active\s+)?(top secret|ts/sci|secret)\s+clearance\b|\bsecurity clearance\b",
+    r"\b(active\s+)?(top secret|ts/sci|secret)\s+clearance\b|\bsecurity clearance\b|"
+    r"\bability\s+to\s+obtain\s+(a\s+)?security\s+clearance\b",
     re.I,
 )
 US_CITIZEN_PATTERN = re.compile(
@@ -19,8 +21,14 @@ US_CITIZEN_PATTERN = re.compile(
 )
 NO_SPONSORSHIP_PATTERN = re.compile(
     r"\b(unable|not able)\s+to\s+provide\s+(visa\s+)?sponsorship\b|"
+    r"\bnot\s+able\s+to\s+sponsor\s+or\s+transfer\s+visas?\b|"
     r"\bdoes\s+not\s+offer\s+sponsorship\b|"
+    r"\bmust\s+not\s+require\s+sponsorship\b|"
     r"\bwithout\s+sponsorship\b|"
+    r"\bunrestricted\s+authorization\s+to\s+work\s+in\s+the\s+us\b|"
+    r"\bwill\s+require\s+sponsorship\s+now\s+or\s+in\s+the\s+future\s+will\s+not\s+be\s+considered\b|"
+    r"\bsponsorship\s+is\s+not\s+available\b|"
+    r"\bnot\s+eligible\s+for\s+visa\s+sponsorship\b|"
     r"\bno\s+visa\s+sponsorship\s+is\s+available\b",
     re.I,
 )
@@ -66,6 +74,7 @@ US_LOCATION_TERMS = {
     "atlanta",
 }
 NON_US_LOCATION_PATTERN = re.compile(r"\b(london|united kingdom|uk|canada|toronto|vancouver|india|singapore|germany)\b", re.I)
+EXPORT_CONTROL_PATTERN = re.compile(r"\b(itar|export-controlled|export controlled|u\.s\.\s+persons?)\b", re.I)
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,7 +90,7 @@ def apply_hard_filters(
     requires_visa_sponsorship: bool | None = True,
 ) -> FilterResult:
     text = f"{job.title}\n{job.description}"
-    if job.job_family.value not in accepted_families:
+    if job.job_family != JobFamily.UNKNOWN and job.job_family.value not in accepted_families:
         return FilterResult(False, "ROLE_OUTSIDE_TARGET_FAMILIES")
     if _location_ineligible(job.location):
         return FilterResult(False, "LOCATION_INELIGIBLE")
@@ -91,6 +100,8 @@ def apply_hard_filters(
         return FilterResult(False, "EXPERIENCE_REQUIREMENT_TOO_HIGH")
     if US_CITIZEN_PATTERN.search(text):
         return FilterResult(False, "US_CITIZEN_ONLY")
+    if EXPORT_CONTROL_PATTERN.search(text):
+        return FilterResult(False, "EXPORT_CONTROL_RESTRICTED")
     has_negative_sponsorship = _has_negative_sponsorship(text)
     if requires_visa_sponsorship is None and has_negative_sponsorship:
         return FilterResult(False, "WORK_AUTHORIZATION_PROFILE_INCOMPLETE")
@@ -108,7 +119,7 @@ def _requires_high_experience(description: str) -> bool:
     for match in HIGH_EXPERIENCE_PATTERN.finditer(required_text):
         start = max(0, match.start() - 4)
         prefix = required_text[start : match.start()]
-        if "-" in prefix:
+        if "-" in prefix or "–" in prefix or "—" in prefix or "to" in prefix:
             continue
         return True
     return False
