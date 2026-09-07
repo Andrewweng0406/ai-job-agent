@@ -929,3 +929,46 @@ runner-side approval/lease path are still unexercised.
   silently dropped by the extractor.
 
 ### No new P0. May NOT proceed to Lever/Ashby. `real_submission_enabled` stays `false`.
+
+---
+
+## Review round 3.4b — audit of Codex `6020308` ("Harden auditable Greenhouse evidence runs")
+
+Suite: 437 passed / 1 skipped / 4 xfailed / 1 xpassed. Reviewer test: `tests/test_gate_g_remaining_gaps.py`.
+
+### Verified FIXED
+- **P2-23** — `.gitignore += artifacts/**/run.sqlite3`; all 4 `run.sqlite3` removed from git.
+- **P2-25** — `scripts/live_dry_run.py::_sanitize_payload` redacts `legal_sensitive` + email/phone
+  values and stamps `transcript.sanitized.json` with `"sanitized": true`.
+- **P2-26** — `_sanitize_html` phone regex anchored to real phone shapes; v5 `dom.sanitized.html`
+  keeps the job id `4461450008` and has **0** `REDACTED_PHONE` (was over-redacting the req id + CDN
+  cache-busters).
+- **P2-27 / P2-28** (shared-ATS) — Codex un-xfailed the Lever/Ashby label-bleed + radio-option tests;
+  `tests/test_shared_ats_redteam.py` now passes.
+- **P1-28 (plumbing)** — `GreenhouseLiveDryRunRunner` now: `_assert_lease()` → `lease_still_mine()` →
+  `RuntimeError("LEASE_LOST")` at start / before nav / after nav / before autofill / after autofill;
+  and autofill **requires** `approved_transcript_id`, validated via `ApprovedAutofillPreviewBuilder.build()`.
+
+### Still open
+- **P1-28b (P2)** — `_assert_lease` returns silently when `worker_id`/`lease_epoch` are `None`, so the
+  fencing is opt-in. When `autofill=True` the runner should **require** a lease identity, not skip the
+  check. Test: `test_gate_g_remaining_gaps.py::test_autofill_path_requires_a_lease_identity` (xfail).
+- **P1-28c (P2)** — `DryRunBrowserAutofill.apply()` has no per-field/per-batch lease callback; a lease
+  lost mid-fill still fills the remaining fields (`_assert_lease` only brackets the whole `apply()`).
+- **GATE G (still FAIL — one blocker)** — every committed bundle (base/v2/v3/v4/v5) is
+  `approval_status: not_approved_capture_only`, `attempted_field_count: 0`, `upload_performed: false`.
+  The approved-autofill path is now built and gated but **has never been exercised on the live page**,
+  so lease-fencing-during-fill, the transcript↔browser differential (`mismatch_count` is trivially 0),
+  and a real before/after form screenshot pair are all still unevidenced. Test:
+  `::test_an_approved_autofill_bundle_exists_with_exercised_differential` (xfail).
+- **P2-24b** — v5 `before_fill.png` (141 KB) is a plain viewport shot, not a `#application_form` region
+  capture (`after_fill.png` is 1.8 MB full-page ✓). And capture-only runs have no real before/after.
+- **P3** — pre-fix bundles (base/v2/v3/v4) still carry the over-redacted DOM / unsanitized transcript;
+  keep only the fixed v5 (or regenerate all). Base bundle also lacks `report.json` and a traceable job
+  id in its DOM.
+- **P3** — `_sanitize_payload` does not redact `name.full` / `contact.address.*` (not `legal_sensitive`,
+  not in the key list).
+
+### Gate G verdict: **FAIL — one substantive blocker left** (an *exercised* approved-autofill live run).
+Everything else for Greenhouse is in place. **Not yet clear to start Lever/Ashby live work.**
+`real_submission_enabled` stays `false`.
