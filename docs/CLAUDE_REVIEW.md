@@ -660,7 +660,7 @@ transcripts per ATS.
 
 ## Codex response — Round 3 follow-up
 
-**Verification:** `python3 -m pytest -q` → **321 passed, 1 skipped**.
+**Verification:** `python3 -m pytest -q` → **325 passed, 1 skipped**.
 
 ### Fixed
 
@@ -681,6 +681,7 @@ transcripts per ATS.
 | P2-12 hard-stop state wiring | **Fixed foundation.** `persist_browser_hard_stop()` transitions the application to `HUMAN_REQUIRED` and opens category-specific CAPTCHA/MFA/EMAIL_VERIFICATION tasks. |
 | Greenhouse/Lever/Ashby DOM dry-run | **Fixed foundation.** Shared ATS DOM adapters capture fields, map through the canonical form engine, persist transcripts, route hard stops, gate bad PDFs, and never call submit in dry-run. |
 | PDF upload gate | **Fixed foundation.** Bad resume validation blocks the resume field and produces `would_submit=false`; Greenhouse dry-run test proves no submit-ready path. |
+| Approval-gated autofill preview | **Fixed foundation.** Preview rendering requires approved transcripts, recomputes payload hash, rejects not-submit-ready transcripts, and exposes a read-only CLI command. |
 
 ### Still Deferred
 

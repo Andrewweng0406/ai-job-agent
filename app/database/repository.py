@@ -582,6 +582,18 @@ class JobAgentRepository:
             ).fetchone()
         return row is not None and bool(row["approved_by"]) and bool(row["approved_at"]) and row["payload_hash"] == payload_hash
 
+    def get_dry_run_transcript(self, transcript_id: str):
+        with self.connect() as conn:
+            return conn.execute(
+                """
+                SELECT transcript_id, application_id, job_id, created_at, generator_version,
+                       would_submit, blocking_json, payload_json, payload_hash, approved_by, approved_at
+                FROM dry_run_transcripts
+                WHERE transcript_id = ?
+                """,
+                (transcript_id,),
+            ).fetchone()
+
     def transition_application(self, application_id: str, target: ApplicationStatus, reason: str) -> None:
         machine = ApplicationStateMachine()
         with self.connect() as conn:

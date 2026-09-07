@@ -149,7 +149,7 @@ fabricated résumé content, and no hidden unresolved questions.
 
 ## Codex follow-up status
 
-**Verification:** `python3 -m pytest -q -rxX` → **321 passed, 1 skipped**.
+**Verification:** `python3 -m pytest -q -rxX` → **325 passed, 1 skipped**.
 
 ### Fixed
 
@@ -163,6 +163,7 @@ fabricated résumé content, and no hidden unresolved questions.
 - P2-15: required last-name fields block on single-token profile names instead of filling an empty string.
 - HTTP client proof: tests now cover Retry-After seconds/date handling, per-host spacing, bounded retries, timeout wrapping, and no blind POST retry.
 - Greenhouse/Lever/Ashby dry-run foundation: fixture-driven DOM adapters capture fields, build transcripts, gate bad PDFs, route hard stops, and prove submit is never called in dry-run.
+- Approval-gated autofill previews: unapproved, mutated-hash, and not-submit-ready transcripts fail closed; approved hash-valid transcripts render the exact filled fields.
 
 ### Deferred
 

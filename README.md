@@ -50,6 +50,7 @@ python "apply company.py" --discover --company-id <company_id> --show-new-jobs
 python "apply company.py" --queue-eligible
 python "apply company.py" --prepare-next --tailoring-mode FAST
 python "apply company.py" --dry-run-next
+python "apply company.py" --autofill-preview <dry_run_transcript_id>
 python "apply company.py" --daily-report
 ```
 
@@ -60,4 +61,4 @@ python -m pip install -e ".[browser]"
 python -m playwright install chromium
 ```
 
-Current verification: `321 passed, 1 skipped`.
+Current verification: `325 passed, 1 skipped`.
