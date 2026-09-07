@@ -12,6 +12,7 @@ from app.reporting.daily_report import build_daily_report
 from app.resumes.profile import CandidateProfile, profile_completeness_gate
 from app.services.company_registry import load_company_registry
 from app.services.application_preparer import ApplicationPreparer
+from app.services.dry_run_preparer import ApplicationDryRunPreparer
 from app.llm.tailoring import TailoringMode
 from app.utils.config import load_yaml
 from app.utils.logging import configure_logging
@@ -29,6 +30,7 @@ def main() -> int:
     parser.add_argument("--daily-report", action="store_true", help="Print today's daily KPI report.")
     parser.add_argument("--check-profile", action="store_true", help="Validate required candidate profile facts.")
     parser.add_argument("--prepare-next", action="store_true", help="Tailor a resume, generate a PDF, and print a safe application preview for one queued application.")
+    parser.add_argument("--dry-run-next", action="store_true", help="Build and persist a no-submit dry-run transcript for one ready application.")
     parser.add_argument("--tailoring-mode", choices=["FAST", "DEEP"], default="FAST", help="Resume tailoring mode.")
     parser.add_argument("--limit", type=int, default=100, help="Limit for queueing operations.")
     parser.add_argument("--settings", default="config/settings.yaml", help="Path to settings YAML.")
@@ -123,6 +125,23 @@ def main() -> int:
             return 0
         print(f"Prepare result: status={result.status.value}, reason={result.reason}")
         return 1 if result.status == ApplicationStatus.HUMAN_REQUIRED else 0
+
+    if args.dry_run_next:
+        repo.initialize()
+        profile = CandidateProfile.from_yaml(args.candidate_profile)
+        result = ApplicationDryRunPreparer(repo).dry_run_next(profile)
+        if result.dry_run is None:
+            print(f"Dry-run result: status={result.status.value}, reason={result.reason}")
+            return 1 if result.status == ApplicationStatus.HUMAN_REQUIRED else 0
+        transcript = result.dry_run.transcript
+        payload = transcript.payload
+        print(f"Dry-run transcript: {transcript.transcript_id}")
+        print(f"Application status: {result.status.value}")
+        print(f"Would submit: {str(transcript.would_submit).lower()}")
+        print(f"Blocking reasons: {', '.join(transcript.blocking_reasons) if transcript.blocking_reasons else 'none'}")
+        print(f"Fields: {len(payload['fields'])}")
+        print(f"Unresolved: {len(payload['unresolved'])}")
+        return 0
 
     parser.print_help()
     return 0

@@ -125,13 +125,15 @@ class JobAgentRepository:
             return conn.execute(
                 """
                 SELECT
-                    a.application_id, a.company, a.position, a.persona,
+                    a.application_id, a.company, a.position, a.persona, a.resume_id,
+                    r.file_path AS resume_file_path, r.file_hash AS resume_file_hash,
                     j.id AS job_id, j.external_job_id, j.company_id, j.company_name,
                     j.title, j.normalized_title, j.job_family, j.location, j.remote_status,
                     j.employment_type, j.salary_min, j.salary_max, j.currency, j.description,
                     j.source, j.source_url, j.apply_url, j.ats_type, j.description_hash
                 FROM applications a
                 JOIN jobs j ON j.id = a.job_id
+                LEFT JOIN resumes r ON r.resume_id = a.resume_id
                 WHERE a.status = ?
                   AND (a.lease_expires_at IS NULL OR a.lease_expires_at < ?)
                 ORDER BY a.queued_at ASC, a.application_id ASC
