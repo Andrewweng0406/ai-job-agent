@@ -1,0 +1,148 @@
+<!--
+  Representative Greenhouse hosted application form.
+  Modeled on the structure of a real job-boards.greenhouse.io / boards.greenhouse.io apply page:
+  - #application_form / action="/applications"
+  - #first_name #last_name #email #phone with <label for>
+  - resume file input (#resume / #s3_upload_for_resume)
+  - custom questions as .field blocks with job_application[answers_attributes][N][...] names
+  - a Yes/No custom question rendered as a radio group in a <fieldset><legend>
+  - a select custom question
+  - a checkbox custom question (with the paired hidden boolean input Greenhouse emits)
+  - a long-text custom question labelled via aria-labelledby (no <label for>)
+  - a conditional field that is only shown after a select choice (present but data-conditional)
+  - the EEO / demographic fieldset (#demographic_questions)
+  - a honeypot field Greenhouse hides from users
+  NOTE: this is a hand-built representative fixture, NOT a capture of a live page.
+  It exists so field extraction can be red-teamed against a realistic shape.
+-->
+<html><head><title>Apply - Data Analyst</title></head><body>
+<div id="main">
+  <h1 class="app-title">Data Analyst</h1>
+  <form id="application_form" action="/applications" method="post" enctype="multipart/form-data">
+
+    <div class="field">
+      <label for="first_name">First Name <span class="req">*</span></label>
+      <input type="text" id="first_name" name="job_application[first_name]" aria-required="true" required>
+    </div>
+    <div class="field">
+      <label for="last_name">Last Name <span class="req">*</span></label>
+      <input type="text" id="last_name" name="job_application[last_name]" aria-required="true" required>
+    </div>
+    <div class="field">
+      <label for="email">Email <span class="req">*</span></label>
+      <input type="email" id="email" name="job_application[email]" aria-required="true" required>
+    </div>
+    <div class="field">
+      <label for="phone">Phone</label>
+      <input type="tel" id="phone" name="job_application[phone]">
+    </div>
+
+    <div class="field">
+      <label for="resume">Resume/CV <span class="req">*</span></label>
+      <input type="file" id="resume" name="job_application[resume]" class="s3_upload_for_resume" aria-required="true" required>
+      <span id="resume_filename" class="filename"></span>
+    </div>
+    <div class="field">
+      <label for="cover_letter">Cover Letter</label>
+      <input type="file" id="cover_letter" name="job_application[cover_letter]">
+    </div>
+
+    <div class="field">
+      <label for="job_application_answers_attributes_0_text_value">LinkedIn Profile</label>
+      <input type="text" id="job_application_answers_attributes_0_text_value"
+             name="job_application[answers_attributes][0][text_value]">
+    </div>
+
+    <fieldset class="field" id="q_sponsorship">
+      <legend>Will you now or in the future require sponsorship for employment visa status? <span class="req">*</span></legend>
+      <label for="spon_yes">Yes</label>
+      <input type="radio" id="spon_yes" name="job_application[answers_attributes][1][boolean_value]" value="1" required>
+      <label for="spon_no">No</label>
+      <input type="radio" id="spon_no" name="job_application[answers_attributes][1][boolean_value]" value="0" required>
+    </fieldset>
+
+    <fieldset class="field" id="q_authorized">
+      <legend>Are you legally authorized to work in the United States? <span class="req">*</span></legend>
+      <label for="auth_yes">Yes</label>
+      <input type="radio" id="auth_yes" name="job_application[answers_attributes][2][boolean_value]" value="1" required>
+      <label for="auth_no">No</label>
+      <input type="radio" id="auth_no" name="job_application[answers_attributes][2][boolean_value]" value="0" required>
+    </fieldset>
+
+    <div class="field">
+      <label for="job_application_answers_attributes_3_single_value">How did you hear about us? <span class="req">*</span></label>
+      <select id="job_application_answers_attributes_3_single_value"
+              name="job_application[answers_attributes][3][single_value]" required>
+        <option value="">-- Select --</option>
+        <option>Company website</option>
+        <option>LinkedIn</option>
+        <option>Referral</option>
+      </select>
+    </div>
+
+    <div class="field" data-conditional="job_application_answers_attributes_3_single_value=Referral">
+      <label for="job_application_answers_attributes_4_text_value">Referral name</label>
+      <input type="text" id="job_application_answers_attributes_4_text_value"
+             name="job_application[answers_attributes][4][text_value]">
+    </div>
+
+    <div class="field">
+      <input type="hidden" name="job_application[answers_attributes][5][boolean_value]" value="0">
+      <label for="job_application_answers_attributes_5_boolean_value">
+        I certify that the information provided is true and complete. <span class="req">*</span>
+      </label>
+      <input type="checkbox" id="job_application_answers_attributes_5_boolean_value"
+             name="job_application[answers_attributes][5][boolean_value]" value="1" required>
+    </div>
+
+    <div class="field">
+      <span id="q6_label" class="question-label">Describe a project you are proud of and your specific contribution. <span class="req">*</span></span>
+      <textarea id="job_application_answers_attributes_6_text_value"
+                name="job_application[answers_attributes][6][text_value]"
+                aria-labelledby="q6_label" aria-required="true" required></textarea>
+    </div>
+
+    <div class="field">
+      <label for="job_application_answers_attributes_7_text_value">Desired annual compensation (USD) <span class="req">*</span></label>
+      <input type="text" id="job_application_answers_attributes_7_text_value"
+             name="job_application[answers_attributes][7][text_value]" required>
+    </div>
+
+    <fieldset id="demographic_questions">
+      <legend>U.S. Equal Employment Opportunity information (Completion is voluntary)</legend>
+      <div class="field">
+        <label for="gender">Gender</label>
+        <select id="gender" name="job_application[demographic_answers_attributes][0][single_value]">
+          <option value="">Decline To Self Identify</option>
+          <option>Male</option><option>Female</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="race">Race / Ethnicity</label>
+        <select id="race" name="job_application[demographic_answers_attributes][1][single_value]">
+          <option value="">Decline To Self Identify</option>
+          <option>Asian</option><option>White</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="veteran">Veteran Status</label>
+        <select id="veteran" name="job_application[demographic_answers_attributes][2][single_value]">
+          <option value="">I don't wish to answer</option>
+          <option>I am a veteran</option><option>I am not a veteran</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="disability">Disability Status</label>
+        <select id="disability" name="job_application[demographic_answers_attributes][3][single_value]">
+          <option value="">I do not want to answer</option>
+          <option>Yes</option><option>No</option>
+        </select>
+      </div>
+    </fieldset>
+
+    <input type="text" name="job_application[hp_email]" id="hp_email" class="hidden" tabindex="-1" autocomplete="off" aria-hidden="true" style="display:none">
+
+    <button id="submit_app" type="submit">Submit Application</button>
+  </form>
+</div>
+</body></html>

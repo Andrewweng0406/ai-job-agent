@@ -689,3 +689,93 @@ transcripts per ATS.
 - Controlled real submission remains deferred. `real_submission_enabled` stays `false`.
 - Greenhouse live Playwright navigation foundation is implemented; exercising it against reviewed public postings is next.
 - Live Lever and Ashby navigation remains deferred until Greenhouse live dry-run navigation is stable.
+
+---
+
+## Review round 3.1 — Greenhouse real-DOM red team
+
+**Reviewed at `34902ed` + uncommitted WIP** (`browser_autofill.py`, extractor/hard-stop refactor).
+Suite: 360 passed, 1 skipped, 8 xfailed, **3 failing on Codex WIP** (`test_ats_dom_dry_run`,
+`test_autofill_preview`, `test_browser_hard_stop_state` — Codex mid-refactor). New reviewer tests:
+`tests/test_greenhouse_realdom_redteam.py`, `tests/test_submit_guard.py`,
+`tests/test_submission_boundary.py`, fixture `tests/fixtures/ats_forms/greenhouse_application.html`.
+Checklist: `docs/ROUND3_1_CHECKLIST.md`.
+
+### Verified PASS
+- **P1-24** submission boundary: durable `applications.submit_attempted_at` column; reaper routes
+  `APPLYING`+`submit_attempted_at` → `SUBMISSION_UNKNOWN`, else → `RETRY_PENDING`; `SUBMISSION_UNKNOWN`
+  reaches no submit-permitting state. `tests/test_submission_boundary.py`.
+- **HTTP client**: `tests/test_http_client.py` proves `Retry-After` (numeric + HTTP-date), 429/5xx retry,
+  bounded retries, per-host spacing, timeout wrap, and **POST is never blind-retried**.
+- **PDF→upload gate** (form-engine level): non-`VALIDATED` résumé → field `BLOCKED`, `would_submit=False`,
+  `submit_call_count==0`. Autofill also hash-checks the file before `set_input_files`.
+- **radio→select coalescing** and **`<legend>` labels**: Yes/No group → one `select`, not two BOOLs.
+- **submit guard**: `AtsDomDryRunAdapter.submit()` raises+counts; `FormDryRunEngine` never submits; live
+  runner refuses `real_submission_enabled=True`; `DryRunBrowserAutofill` has no submit method; and it
+  runs a **transcript↔browser differential** (`BROWSER_TRANSCRIPT_MISMATCH` if the field's post-fill
+  value ≠ the resolved value).
+- **bot-wall**: CAPTCHA/MFA/Turnstile/`cf-challenge` → 0 fields + `persist_browser_hard_stop` →
+  `mark_human_required(category, task)` + screenshot path. No solver, no retry.
+- **lease/reaper in the dry-run worker**: `lease_still_mine` re-checked around navigation and before the
+  final transition; `LEASE_LOST` → no side effect.
+- **transcript**: `persona` now in payload; `ApprovedAutofillPreviewBuilder` enforces approval +
+  `sha256(payload_json)==payload_hash` + `would_submit` before surfacing autofill values.
+
+### Rejected / not demonstrated
+- **Greenhouse real-DOM milestone: NOT genuinely complete.** `GreenhouseLiveDryRunRunner` *can* drive
+  real Playwright and refuses `real_submission_enabled`, but **every test injects a fake page** and there
+  is **no capture/fixture from a live Greenhouse apply page** and no artifact proving a real navigation.
+  Architecturally ready; not proven. Do not accept as the milestone.
+
+### New findings — open
+
+#### P1-25 — `submit_attempted_at` is never cleared; `claim_next_application` doesn't guard on it. **(latent P1)**
+Only the reaper consumes the column. When a real submit worker lands it must (a) set it transactionally
+immediately before the submit click, and (b) the claim/worker must refuse any row where it is non-null
+(except via the verify path). Otherwise a stale non-null value on a row that later returns to a
+claimable state permits a second submit. `tests/test_submission_boundary.py::test_stale_submit_attempted_on_a_reREADY_row_is_guarded` (xfail).
+
+#### P1-26 — Honeypot / hidden field is extracted (and mislabeled). **(open)**
+**File:** `app/applications/html_form_extractor.py`. `extract()` skips only `type ∈ {hidden, submit,
+button, reset}`. A Greenhouse honeypot `<input name="job_application[hp_email]" style="display:none"
+aria-hidden="true" tabindex="-1">` is extracted as a fillable `text` field (label bleeds to `'No'` from
+the preceding radio). Filling a honeypot = instant bot flag / auto-reject. **Fix:** skip inputs with
+`aria-hidden="true"`, `type="hidden"`, `tabindex="-1"`, or `style` containing `display:none`/
+`visibility:hidden`, or a `hidden` attribute, or a class Greenhouse uses for hidden fields.
+**Test:** `tests/test_greenhouse_realdom_redteam.py::test_honeypot_field_is_excluded` (xfail).
+
+#### P1-27 — Dry-run autofill sends `locator.press("Enter")` on a live form. **(open)**
+**File:** `app/applications/browser_autofill.py` — combobox branch does `locator.fill(value);
+locator.press("Enter")`. `Enter` in a field inside `<form>` can trigger implicit submission. The dry run
+must never send a submitting keypress. **Fix:** use `select_option` / an explicit option-element click /
+JS `value` set + `dispatchEvent('change')`; never `press("Enter")`/`press("Return")` on a live page.
+**Test:** `tests/test_submit_guard.py::test_dry_run_autofill_never_presses_enter_or_keys_that_can_submit` (xfail).
+
+#### P1-28 — Autofill path is unfenced and runs on an unapproved transcript. **(open)**
+`GreenhouseLiveDryRunRunner` → `DryRunBrowserAutofill.apply(...)` runs **outside** the lease-fenced
+`DryRunApplicationWorker`, on `adapter_result.dry_run.resolutions` directly (no `approved_by/at` check —
+`ApprovedAutofillPreviewBuilder` is a different path), and does **no post-fill hard-stop re-check**
+(typing can trigger a behavioral bot challenge). **Fix:** fold autofill into the fenced worker + require
+an approved transcript, or demote this path to an explicit human-invoked preview with a re-check after
+fill.
+
+#### P2-16 / P2-17 — `aria-labelledby` resolved only positionally; unlabeled inputs bleed the previous
+control's text (`'*'`, `'No'`). Resolve `aria-labelledby` / `aria-describedby` by id; when no label can
+be found, emit an empty label (→ HUMAN_REQUIRED) rather than the neighbour's text.
+
+#### P2-18 — EEO decline doesn't match real ATS option wording. **(open)**
+`"Decline to self-identify"` ≠ `"Decline To Self Identify"` / `"I don't wish to answer"` /
+`"I do not want to answer"`, so P1-23 option-mapping sends **every EEO field → HUMAN_REQUIRED**,
+defeating the always-auto-decline default and paging the operator on every application. **Fix:** map
+decline intent to whichever option contains `decline|wish|want|prefer not` or the empty-value option,
+case-insensitively. **Test:** `tests/test_greenhouse_realdom_redteam.py::test_eeo_fields_auto_decline_against_real_option_wording` (xfail).
+
+#### P2-20 — HTTP `get_json` retries on all `HTTPError` incl. 4xx; retry only 429/500/502/503/504.
+
+#### P3 — extractor: field order not preserved (radio-group fields appended); placeholder `-- Select --`
+kept in `options`; trailing ` *` left in labels.
+
+### May Codex proceed to Lever?
+Not yet. Close the Greenhouse P1s (P1-26, P1-27, P1-28) and demonstrate a real capture first. Lever/Ashby
+already share `AtsDomDryRunAdapter` + `HtmlFormFieldExtractor`, so every finding here applies to them.
+`real_submission_enabled` stays `false`.
