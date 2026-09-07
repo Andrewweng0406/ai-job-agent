@@ -794,3 +794,45 @@ kept in `options`; trailing ` *` left in labels.
 Not yet. Close the Greenhouse P1s (P1-26, P1-27, P1-28) and demonstrate a real capture first. Lever/Ashby
 already share `AtsDomDryRunAdapter` + `HtmlFormFieldExtractor`, so every finding here applies to them.
 `real_submission_enabled` stays `false`.
+
+---
+
+## Review round 3.2 — verifying the "first live Greenhouse run"
+
+**At `dc766fc`, clean tree, 392 passed / 1 skipped / 4 xfailed.** New reviewer tests:
+`tests/test_round32_regressions.py`. Checklist: `docs/ROUND3_2_CHECKLIST.md`.
+
+### Verified FIXED
+- **P1-25** — `claim_next_application` now has `AND submit_attempted_at IS NULL` (READY + RETRY_PENDING);
+  only `-> SKIPPED` clears the marker. A row that may have crossed the submission boundary cannot be
+  re-claimed for a fresh attempt. `tests/test_round32_regressions.py`.
+- **P1-27** — `locator.press("Enter")` removed from `browser_autofill.py`; no `press`/`Return`/
+  `requestSubmit`/`form.submit()`/submit-event/`keyboard.press` anywhere in the browser/autofill path.
+- **P2-18** — `_map_select_value` `eeo_decline` branch matches `decline|prefer not|wish|want`; verified
+  against 5 real ATS wordings; a field with no safe decline option is never `FILLED` with a real value.
+- **P2-20** — HTTP client retries only 429/500/502/503/504; 400/401/403/404/422 -> exactly 1 call.
+
+### Partial / still open
+- **P1-26 -> P2-21** — `_is_noninteractive` catches `display:none`/`visibility:hidden`/`aria-hidden`/
+  `tabindex=-1` (the common Greenhouse honeypot is now excluded) but misses bare `hidden` attr,
+  `disabled`, offscreen (`left:-9999px`), `opacity:0`. `tests/test_round32_regressions.py::test_other_hidden_field_techniques_are_also_excluded` (xfail).
+- **P1-28 (still open)** — live-autofill path (`GreenhouseLiveDryRunRunner` -> `DryRunBrowserAutofill`)
+  gained a `human_invoked=True` gate and a **post-fill hard-stop re-check** (good), but still has **no
+  lease fencing** (no `lease_still_mine` checks; `autofill.apply` loops all fields with no re-check) and
+  drives from an **unapproved** transcript (`ApprovedAutofillPreviewBuilder` is a separate unused path).
+- **P2-22 (new)** — the "first live run" is a manual non-reproducible one-off. No committed script,
+  `test_greenhouse_live.py` still mocks, nothing in CI navigates a real page, and the run archived only
+  `docs/greenhouse_live_dry_run_report.json` (aggregate, hand-writable) + one JD-fold screenshot. No
+  sanitized DOM capture, no field map, no browser-action log, no `run_id`/ISO `captured_at`.
+
+### Gate G — **FAIL (real navigation, not independently auditable)**
+The screenshot `artifacts/greenhouse_anthropic_4461450008.png` is a genuine render of the live Anthropic
+Greenhouse posting (Account Executive, AI Native) -> a real browser navigated a real current page, and
+the Playwright code path is genuine. But the evidence bundle Gate G requires does **not** exist: no
+sanitized DOM/HTML, no field map, no browser-action log, no safety report. Field-origin audit (§11) and
+browser-action audit (§12) cannot be performed. `final_submit_invocation_count: 0` and no implicit
+submission vector remain in the code, but "reviewable evidence" is missing. **Gate G is not closed.**
+
+### May Codex proceed to Lever?
+**No.** Close P1-28, land P2-21, and produce a reproducible live-run script + full archived artifact
+bundle (P2-22). No new P0. `real_submission_enabled` stays `false`.
