@@ -41,10 +41,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 "SELECT id, company_name, title, location, status, source, apply_url FROM jobs ORDER BY discovered_at DESC LIMIT 100"
             )]
             applications = [dict(row) for row in conn.execute(
-                "SELECT application_id, company, position, status, human_required_reason FROM applications ORDER BY created_at DESC LIMIT 100"
+                "SELECT application_id, company, position, status, human_required_reason FROM applications ORDER BY COALESCE(queued_at, discovered_at) DESC LIMIT 100"
             )]
             tasks = [dict(row) for row in conn.execute(
-                "SELECT task_id, category, status, title FROM human_tasks WHERE status != 'DONE' ORDER BY created_at DESC LIMIT 100"
+                "SELECT task_id, category, status, prompt AS title FROM human_tasks WHERE status != 'DONE' ORDER BY created_at DESC LIMIT 100"
             )]
         return {"profile": {"candidate_id": profile.candidate_id,
                              "complete": profile_completeness_gate(profile).complete,
