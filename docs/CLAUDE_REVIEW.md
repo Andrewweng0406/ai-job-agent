@@ -1078,3 +1078,58 @@ Lever or Ashby evidence bundle exists** (the `phase-lever-slate` / `phase-ashby-
 transient and discarded). IMPLEMENTED (dispatch) but not TESTED against a live page, not LIVE-EVIDENCED.
 
 `real_submission_enabled` stays `false`.
+
+---
+
+## Review round 3.6 — PII safety, first approved-autofill attempt (CAPTCHA), LLM router
+
+### PII — RESOLVED
+The candidate filled `config/candidate_profile.yaml` (name/email/phone/LinkedIn/school) — a tracked
+file in a repo that pushes to GitHub. Fixed in `155f8e3`/`f9992ea`: real values moved to a gitignored
+`config/candidate_profile.local.yaml`; tracked profile restored to the all-TODO template;
+`apply company.py` + `scripts/live_dry_run.py` auto-prefer `.local.yaml` when no explicit path given;
+`tests/test_pii_guard.py` (5 guards). Verified: git history contains **no** prior commit of the real
+values; no tracked file contains the real email / phone / LinkedIn / address. **P3:**
+`tests/test_form_engine.py` uses the literal string "Andrew Weng" as a fixture name (name-only, no
+linkage) — Codex should switch it to an obviously-fake name.
+
+### First approved-autofill Gate-G attempt — hit a CAPTCHA, stopped correctly, NO PII typed
+`artifacts/phase-greenhouse-anthropic-approved-20260907/` (uncommitted, incomplete). The run seeded a
+Greenhouse "Software Engineer" application, claimed a lease, navigated — and **Anthropic's Greenhouse
+served a CAPTCHA / bot-wall to headless Chromium**. `run.sqlite3` shows `APPLYING -> HUMAN_REQUIRED`
+(reason CAPTCHA) 2 s after nav, one open `CAPTCHA` human task, **0 dry_run_transcripts** — so
+`DryRunBrowserAutofill().apply()` was never reached and **no candidate PII was typed into the live
+form**. `dom.sanitized.html` contains 0 PII (captured pre-fill). The hard-stop safety worked.
+
+**Findings from this attempt:**
+- **P2** — `scripts/live_dry_run.py::_write_blocked_bundle` (added in `8d73220` to persist evidence on a
+  hard stop) is **dead code**: the earlier `if transcript is None: raise SystemExit(...)` (inside the
+  `with sync_playwright()` block) pre-empts the `_write_blocked_bundle` call that follows the block. On
+  a CAPTCHA you get a `SystemExit` and a partial dir (`before_fill.png` + `dom.sanitized.html` +
+  `run.sqlite3`), not the intended blocked-evidence bundle. Fix: replace the `raise SystemExit` with the
+  `_write_blocked_bundle` path (or move the block-write inside the `with`).
+- **Operational** — Anthropic's `job-boards.greenhouse.io` now bot-walls headless Chromium. A live
+  *approved-autofill* Gate-G run must target a **non-bot-walled** Greenhouse posting (or accept that
+  this provider is HUMAN_REQUIRED end-to-end). The reviewer's earlier plain navigations succeeded, so
+  the wall is intermittent / heuristic.
+- The incomplete `phase-greenhouse-anthropic-approved-20260907/` dir should be deleted (it holds an
+  uncommitted `run.sqlite3`).
+- **Gate G — still FAIL.** No exercised approved-autofill bundle exists. P1-29/30/31 (script bypasses
+  the fenced runner + fakes `safety.json` zeros) remain open and MUST be fixed before a real approved
+  run, because that run WILL type the real `.local.yaml` name/email/phone into a live employer form.
+
+### `app/llm/router.py` (`a258faf`) — IMPLEMENTED + TESTED, no live provider
+Fail-closed boundary. **Working guards** (`tests/test_llm_router_audit.py`, 6 pass): mandatory Stage-0
+gate (`LLM_STAGE0_GATE_REQUIRED`), empty/oversized prompt rejection, output-token cap to policy,
+fail-closed daily budget when a cost is declared, negative-cost rejection.
+**Gaps (xfail):**
+- **P2** — cost is **caller-supplied**; `estimated_cost_usd=0.0` bypasses the budget entirely
+  (`0 + 0 > limit` is False). The router should derive cost from `(model, input_chars, output_tokens)`
+  via a price table, not trust the caller.
+- **P2** — `spent_usd` is per-instance/in-memory; the "daily" budget resets every process. Needs
+  date-keyed persistence (DB).
+- **P3** — `stage` / `model` are free strings; no model-tier enforcement (a cheap "stage 1" can be
+  routed to an expensive model — `LLM_COST_STRATEGY.md`: never invert tiers). No provider-side rate
+  limiting / Retry-After. No per-stage sub-budgets. No `LLMRouter` consumer exists yet.
+
+`real_submission_enabled` stays `false`.
