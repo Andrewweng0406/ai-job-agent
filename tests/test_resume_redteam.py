@@ -75,7 +75,6 @@ def test_fabricated_number_with_valid_fact_ids_is_flagged():
     assert "5,000,000" in r.unsupported_numbers
 
 
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P1-15: entailment fix over-blocks — ALL numeric claims are rejected")
 def test_legit_cited_number_is_accepted():
     """A number that appears in the text of a cited fact must NOT be flagged."""
     item = {

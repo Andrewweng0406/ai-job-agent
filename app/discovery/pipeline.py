@@ -76,18 +76,18 @@ class DiscoveryPipeline:
                         self.repository.record_job_filter_result(job_id, filter_result.allowed, filter_result.reason)
                         if filter_result.allowed:
                             eligible_count += 1
-                            if not self.repository.application_exists_for_job(job_id):
-                                application = Application(
-                                    job_id=job_id,
-                                    company=job.company_name,
-                                    position=job.title,
-                                    location=job.location,
-                                    job_family=job.job_family,
-                                    source=job.source,
-                                    ats_type=job.ats_type,
-                                    dedupe_key=application_dedupe_key_for_job(job, self.candidate_id),
-                                )
-                                self.repository.insert_application(application)
+                            application = Application(
+                                job_id=job_id,
+                                company=job.company_name,
+                                position=job.title,
+                                location=job.location,
+                                job_family=job.job_family,
+                                source=job.source,
+                                ats_type=job.ats_type,
+                                dedupe_key=application_dedupe_key_for_job(job, self.candidate_id),
+                            )
+                            inserted_id = self.repository.insert_application(application)
+                            if inserted_id == application.application_id:
                                 self.repository.transition_application(
                                     application.application_id,
                                     ApplicationStatus.ELIGIBLE,
@@ -106,7 +106,8 @@ class DiscoveryPipeline:
                                 dedupe_key=application_dedupe_key_for_job(job, self.candidate_id),
                             )
                             app_id = self.repository.insert_application(application)
-                            self.repository.mark_human_required(app_id, filter_result.reason)
+                            if app_id == application.application_id:
+                                self.repository.mark_human_required(app_id, filter_result.reason)
                             skipped_count += 1
                         else:
                             skipped_count += 1

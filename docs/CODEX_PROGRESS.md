@@ -7,7 +7,7 @@ Codex remains the primary implementation owner. Claude Round 1 P0/P1 findings ha
 Latest local verification:
 
 - `python3 -m pytest -q`
-- Result: `143 passed`
+- Result: `237 passed`
 
 ## Claude Round 1 Findings
 
@@ -48,6 +48,32 @@ Latest local verification:
 
 - None. All P0/P1 Claude findings were accepted and implemented.
 
+## Claude Round 2 / 2.5 Findings
+
+### Fixed
+
+- P1-13: `ApplicationWorkflowRunner` now treats the database row as source of truth when a repository is supplied, refuses non-runnable states, persists transitions, increments `attempt_count`, sets `applied_at`, and separates pre-submit `FAILED` from post-submit `SUBMISSION_UNKNOWN`.
+- P1-14: Discovery no longer performs unsafe application check-then-act. It uses conflict-safe application insert by requisition-derived dedupe key and transitions only the winning insert.
+- P1-15: Numeric resume provenance now supports exact integers, percentages, currency-like values, decimals, `k` shorthand, `15+`-style facts, years/dates, and matching ranges such as `1-3` / `1–3`; unsupported numbers fail closed.
+- P1-16/P1-17: Sponsorship and citizenship filtering now uses explicit hard-negative rules plus a negation-window sponsorship detector while preserving ambiguous/positive sponsorship language.
+- Profile gate: Required `TODO` facts block preparation/submission regardless of `real_submission_enabled`.
+- Verification API: Application adapters may return structured `VerificationEvidence`; T1-T4 evidence can promote to `VERIFIED`, while weak evidence is stored without counting as success.
+- HTTP safety: Shared HTTP client now applies timeouts, bounded retries, `Retry-After`, jittered backoff, per-host rate limiting, and a user agent.
+- DB/worker safety: Added queue/status indexes, idempotent `human_tasks`, `worker_id`, `claimed_at`, `lease_expires_at`, `lease_epoch`, transactional worker claim, lease fencing helpers, and dry-run transcript persistence.
+- P1-19: `mark_human_required()` now synthesizes a minimal human task when callers omit one, so `HUMAN_REQUIRED` rows remain visible to the operator queue.
+- P1-20: Application dedupe no longer varies with source labels when a canonical URL/requisition identity is available.
+
+### Deferred
+
+- Live Playwright form automation for Greenhouse/Lever/Ashby remains deferred behind dry-run/preview and human-review gates.
+- Real submission remains disabled; `real_submission_enabled` is still `false`.
+- Provider-backed LLM tailoring remains deferred. The current tailoring planner is deterministic and fact/provenance gated until provider configuration and evals are added.
+- Workday application automation and iCIMS/Taleo adapters remain deferred until the Greenhouse/Lever/Ashby no-submit pipeline is stable.
+
+### Rejected
+
+- None. The blocking/high-priority Round 2 findings were accepted. Items not implemented yet are deferred for safety, not rejected.
+
 ## Implemented Since Phase 1
 
 - Read-only Greenhouse, Lever, and Ashby discovery adapters.
@@ -62,9 +88,15 @@ Latest local verification:
 - Human task schema and idempotent task creation for application/category blocking cases.
 - Read-only SmartRecruiters and Workday fixture-backed source contracts.
 - Verification evidence-tier persistence with T1-T4 strong evidence promotion and T5 weak-evidence storage.
+- Deterministic PDF resume generation with structured JSON intermediates and stable artifact hashes.
+- JD-aware FAST/DEEP tailoring planner constrained to candidate fact IDs.
+- `ApplicationPreparer` for QUEUED -> TAILORING -> READY with preview output.
+- Dry-run transcript model/table for non-submitting form/application payload review.
+- Worker lease claim/fencing primitives for future concurrent application workers.
 
 ## Next
 
-1. Add artifact cache reuse by persona/skill/profile signature.
-2. Add seeded company registry entries for read-only discovery testing.
-3. Add non-submitting ATS form inspection/canary tests.
+1. Build the browser dry-run form inspector for Greenhouse, Lever, and Ashby.
+2. Add approval-gated autofill previews backed by persisted dry-run transcripts.
+3. Add worker reaping/recovery and then raise application concurrency cautiously.
+4. Add provider-backed LLM tailoring only after deterministic prompt contracts and evals are in place.

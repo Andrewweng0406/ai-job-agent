@@ -63,6 +63,10 @@ CREATE TABLE IF NOT EXISTS applications (
     submission_verified_at TEXT,
     status TEXT NOT NULL,
     attempt_count INTEGER NOT NULL DEFAULT 0,
+    worker_id TEXT,
+    claimed_at TEXT,
+    lease_expires_at TEXT,
+    lease_epoch INTEGER NOT NULL DEFAULT 0,
     failure_category TEXT,
     failure_reason TEXT,
     human_required_reason TEXT,
@@ -129,4 +133,28 @@ CREATE INDEX IF NOT EXISTS idx_human_tasks_app ON human_tasks(application_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_human_tasks_open_unique
 ON human_tasks(application_id, category)
 WHERE status IN ('OPEN', 'IN_PROGRESS');
+
+CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status, queued_at);
+CREATE INDEX IF NOT EXISTS idx_transitions_app ON application_state_transitions(application_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_jobs_company_status ON jobs(company_id, status);
+CREATE INDEX IF NOT EXISTS idx_jobs_incremental ON jobs(source, external_job_id, description_hash, status);
+CREATE INDEX IF NOT EXISTS idx_jobs_source_company ON jobs(source, company_id);
+
+CREATE TABLE IF NOT EXISTS dry_run_transcripts (
+    transcript_id TEXT PRIMARY KEY,
+    application_id TEXT NOT NULL,
+    job_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    generator_version TEXT NOT NULL,
+    would_submit INTEGER NOT NULL,
+    blocking_json TEXT NOT NULL DEFAULT '[]',
+    payload_json TEXT NOT NULL,
+    payload_hash TEXT NOT NULL,
+    approved_by TEXT,
+    approved_at TEXT,
+    FOREIGN KEY(application_id) REFERENCES applications(application_id),
+    FOREIGN KEY(job_id) REFERENCES jobs(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_dryrun_app ON dry_run_transcripts(application_id, created_at);
 """

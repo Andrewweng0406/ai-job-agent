@@ -458,7 +458,7 @@ Ashby first); where the human-review queue lives; confirmed candidate mailbox fo
 
 ## Codex response — Round 2 / 2.5 blockers
 
-**Verification:** `python3 -m pytest -q` → `220 passed`.
+**Verification:** `python3 -m pytest -q` → `237 passed`.
 
 ### Fixed
 
@@ -474,6 +474,8 @@ Ashby first); where the human-review queue lives; confirmed candidate mailbox fo
 | Shared HTTP safety | **Fixed.** Shared client has per-host rate limiting, timeouts, bounded retries, `Retry-After`, jittered backoff, headers, and warnings. |
 | Worker lease/fencing primitives | **Fixed foundation.** Added `worker_id`, `claimed_at`, `lease_expires_at`, `lease_epoch`, transactional claim to `APPLYING`, `lease_still_mine()`, and `release_lease()`. |
 | Dry-run transcript persistence | **Fixed foundation.** Added immutable `dry_run_transcripts` table and `DryRunTranscript` payload/hash model. |
+| P1-19 human-task orphaning | **Fixed.** `mark_human_required()` synthesizes a minimal `HumanTask` when the caller omits one, and the status transition plus task write stay in one `BEGIN IMMEDIATE` transaction. |
+| P1-20 cross-source application dedupe | **Fixed.** Application dedupe keys use source-neutral metadata requisition IDs or canonical apply-URL requisition IDs before falling back to ATS external IDs. |
 
 ### Deferred
 
@@ -491,6 +493,9 @@ Ashby first); where the human-review queue lives; confirmed candidate mailbox fo
 
 **Reviewer ran (not trusting `CODEX_PROGRESS.md`):** full suite `pytest -q` → **235 passed, 2 xfailed**,
 plus targeted verification suites added this round. Method per item: inspect code → run test → try to break.
+
+**Codex follow-up:** promoted the two remaining xfails after fixing P1-19/P1-20. Full suite now
+`python3 -m pytest -q` → **237 passed**.
 
 ### Verified PASS (behavior demonstrated by a reviewer-authored test)
 
@@ -523,18 +528,18 @@ finds `APPLYING`/`TAILORING` rows with `lease_expires_at < now - grace` and rout
 §3; skeleton in `tests/test_worker_lease.py`. Codex has explicitly deferred this — acceptable only while
 concurrency stays 1.
 
-#### P1-19 — `mark_human_required(app, reason)` with no task ⇒ unexplained `HUMAN_REQUIRED`. **(open)**
+#### P1-19 — `mark_human_required(app, reason)` with no task ⇒ unexplained `HUMAN_REQUIRED`. **(closed by Codex follow-up)**
 `workflow.py` calls it without a `HumanTask` for `NO_SUPPORTED_APPLICATION_ADAPTER`, `PROFILE_INCOMPLETE`,
 `REAL_SUBMISSION_DISABLED`. Those applications land in `HUMAN_REQUIRED` with **no `human_tasks` row** —
 invisible to the operator queue. `tests/test_human_task_atomicity.py::test_no_orphan_human_required_when_task_is_omitted`
-(xfail). **Required:** every call site builds a `HumanTask` (category = reason), or
-`mark_human_required` synthesizes a minimal one when none is passed.
+is now a plain passing regression test. **Resolution:** `mark_human_required` synthesizes a minimal task
+when none is passed.
 
-#### P1-20 — Application `dedupe_key` varies with `job.source`. **(open)**
+#### P1-20 — Application `dedupe_key` varies with `job.source`. **(closed by Codex follow-up)**
 `application_dedupe_key_for_job(job, candidate_id)` folds in the ATS `source` label, so the same
 requisition seen under a different `source` (greenhouse vs company-site mirror vs aggregator) ⇒ a
 different key ⇒ a **second application to the same real job**.
-`tests/test_discovery_cas.py::test_same_requisition_via_different_source_labels_converges` (xfail).
+`tests/test_discovery_cas.py::test_same_requisition_via_different_source_labels_converges` (now plain passing).
 **Required:** key on `candidate_id | canonical_company_id | requisition_key` only (ATS-stable req id via
 `deduplication._extract_req_id` / adapter metadata) — never the `source` string. (Same point as
 round-1.5 DB review item #4; the discovery path still leaks `source`.)

@@ -1,6 +1,8 @@
 import pytest
+from datetime import datetime, timedelta, timezone
 
 from app.database.repository import JobAgentRepository
+from app.applications.dry_run import DryRunTranscript
 from app.models.application import Application
 from app.models.enums import ApplicationStatus, JobFamily, Persona
 from app.models.job import Job
@@ -206,3 +208,112 @@ def test_resume_artifact_can_attach_to_application(tmp_path):
     with repo.connect() as conn:
         row = conn.execute("SELECT resume_id FROM applications WHERE application_id = ?", (app_id,)).fetchone()
     assert row["resume_id"] == "resume-1"
+
+
+def test_claim_next_application_is_lease_protected(tmp_path):
+    repo = JobAgentRepository(tmp_path / "agent.sqlite3")
+    repo.initialize()
+    job_id = repo.upsert_job(
+        Job(
+            external_job_id="job-1",
+            company_id="acme",
+            company_name="Acme",
+            title="Data Analyst",
+            location="Remote",
+            description="SQL",
+            source="fixture",
+            source_url="https://example.test/job",
+            apply_url="https://example.test/apply",
+            ats_type="fixture",
+            job_family=JobFamily.DATA_ANALYTICS,
+        )
+    )
+    app = Application(
+        job_id=job_id,
+        company="Acme",
+        position="Data Analyst",
+        location="Remote",
+        job_family=JobFamily.DATA_ANALYTICS,
+        source="fixture",
+        ats_type="fixture",
+        status=ApplicationStatus.READY,
+    )
+    app_id = repo.insert_application(app)
+    lease = datetime.now(timezone.utc) + timedelta(minutes=5)
+
+    first = repo.claim_next_application(ApplicationStatus.READY, "worker-1", lease)
+    second = repo.claim_next_application(ApplicationStatus.READY, "worker-2", lease)
+
+    assert first is not None
+    assert first[0] == app_id
+    assert first[1] == 1
+    assert second is None
+    assert repo.lease_still_mine(app_id, "worker-1", first[1])
+
+    with repo.connect() as conn:
+        row = conn.execute("SELECT status, worker_id, lease_epoch FROM applications WHERE application_id = ?", (app_id,)).fetchone()
+        transitions = conn.execute(
+            """
+            SELECT from_status, to_status, reason
+            FROM application_state_transitions
+            WHERE application_id = ?
+            """,
+            (app_id,),
+        ).fetchall()
+    assert row["status"] == "APPLYING"
+    assert row["worker_id"] == "worker-1"
+    assert row["lease_epoch"] == 1
+    assert [(t["from_status"], t["to_status"], t["reason"]) for t in transitions] == [
+        ("READY", "APPLYING", "worker lease claimed")
+    ]
+
+    repo.release_lease(app_id, "worker-1", first[1])
+    assert not repo.lease_still_mine(app_id, "worker-1", first[1])
+
+
+def test_dry_run_transcript_is_persisted_with_hash(tmp_path):
+    repo = JobAgentRepository(tmp_path / "agent.sqlite3")
+    repo.initialize()
+    job_id = repo.upsert_job(
+        Job(
+            external_job_id="job-1",
+            company_id="acme",
+            company_name="Acme",
+            title="Data Analyst",
+            location="Remote",
+            description="SQL",
+            source="fixture",
+            source_url="https://example.test/job",
+            apply_url="https://example.test/apply",
+            ats_type="fixture",
+            job_family=JobFamily.DATA_ANALYTICS,
+        )
+    )
+    app_id = repo.insert_application(
+        Application(
+            job_id=job_id,
+            company="Acme",
+            position="Data Analyst",
+            location="Remote",
+            job_family=JobFamily.DATA_ANALYTICS,
+            source="fixture",
+            ats_type="fixture",
+            status=ApplicationStatus.READY,
+        )
+    )
+    transcript = DryRunTranscript(
+        application_id=app_id,
+        job_id=job_id,
+        payload={"fields": [{"name": "email", "value": "candidate@example.test"}]},
+        would_submit=False,
+        blocking_reasons=["REAL_SUBMISSION_DISABLED"],
+    )
+
+    transcript_id = repo.insert_dry_run_transcript(transcript)
+
+    with repo.connect() as conn:
+        row = conn.execute("SELECT * FROM dry_run_transcripts WHERE transcript_id = ?", (transcript_id,)).fetchone()
+    assert row["application_id"] == app_id
+    assert row["would_submit"] == 0
+    assert row["blocking_json"] == '["REAL_SUBMISSION_DISABLED"]'
+    assert row["payload_hash"] == transcript.payload_hash()

@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 
 from app.models.application import Application
 from app.models.job import Job
+from app.tracking.verification import VerificationEvidence
 
 
 class ApplicationAdapter(ABC):
@@ -38,6 +39,5 @@ class ApplicationAdapter(ABC):
         """Submit only when the adapter has explicit support for the workflow."""
 
     @abstractmethod
-    def verify_submission(self, application: Application) -> bool:
-        """Return true only with reliable success evidence."""
-
+    def verify_submission(self, application: Application) -> VerificationEvidence | None:
+        """Return structured evidence when verification succeeds; otherwise return None/UNKNOWN."""

@@ -12,6 +12,7 @@ from app.database.schema import SCHEMA_SQL
 from app.models.application import Application
 from app.models.enums import ApplicationStatus
 from app.models.job import Job, stable_hash
+from app.applications.dry_run import DryRunTranscript
 from app.applications.human_tasks import HumanTask
 from app.resumes.generator import ResumeArtifact, artifact_to_db_tuple
 
@@ -57,6 +58,20 @@ class JobAgentRepository:
                 (_application_dedupe_key(row["job_id"]), row["application_id"]),
             )
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_applications_dedupe_key ON applications(dedupe_key)")
+        for column_name in ("worker_id", "claimed_at", "lease_expires_at"):
+            if column_name not in columns:
+                try:
+                    conn.execute(f"ALTER TABLE applications ADD COLUMN {column_name} TEXT")
+                except sqlite3.OperationalError as exc:
+                    if "duplicate column name" not in str(exc).lower():
+                        raise
+        if "lease_epoch" not in columns:
+            try:
+                conn.execute("ALTER TABLE applications ADD COLUMN lease_epoch INTEGER NOT NULL DEFAULT 0")
+            except sqlite3.OperationalError as exc:
+                if "duplicate column name" not in str(exc).lower():
+                    raise
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_applications_lease ON applications(lease_expires_at)")
 
     def upsert_job(self, job: Job) -> int:
         with self.connect() as conn:
@@ -73,6 +88,65 @@ class JobAgentRepository:
             if row is None:
                 row = conn.execute("SELECT id FROM jobs WHERE apply_url = ?", (job.apply_url,)).fetchone()
             return int(row["id"])
+
+    def list_jobs_by_status(self, status: str, limit: int = 50) -> list[sqlite3.Row]:
+        with self.connect() as conn:
+            return list(
+                conn.execute(
+                    """
+                    SELECT id, company_name, title, location, job_family, status, source, apply_url
+                    FROM jobs
+                    WHERE status = ?
+                    ORDER BY discovered_at DESC
+                    LIMIT ?
+                    """,
+                    (status, limit),
+                ).fetchall()
+            )
+
+    def list_eligible_applications(self, limit: int = 50) -> list[sqlite3.Row]:
+        with self.connect() as conn:
+            return list(
+                conn.execute(
+                    """
+                    SELECT a.application_id, a.status, a.company, a.position, a.location, a.job_family, a.ats_type, j.apply_url
+                    FROM applications a
+                    JOIN jobs j ON j.id = a.job_id
+                    WHERE a.status IN ('ELIGIBLE', 'QUEUED', 'READY')
+                    ORDER BY a.discovered_at ASC, a.application_id ASC
+                    LIMIT ?
+                    """,
+                    (limit,),
+                ).fetchall()
+            )
+
+    def get_next_application_with_job(self, status: ApplicationStatus) -> sqlite3.Row | None:
+        with self.connect() as conn:
+            return conn.execute(
+                """
+                SELECT
+                    a.application_id, a.company, a.position, a.persona,
+                    j.id AS job_id, j.external_job_id, j.company_id, j.company_name,
+                    j.title, j.normalized_title, j.job_family, j.location, j.remote_status,
+                    j.employment_type, j.salary_min, j.salary_max, j.currency, j.description,
+                    j.source, j.source_url, j.apply_url, j.ats_type, j.description_hash
+                FROM applications a
+                JOIN jobs j ON j.id = a.job_id
+                WHERE a.status = ?
+                  AND (a.lease_expires_at IS NULL OR a.lease_expires_at < ?)
+                ORDER BY a.queued_at ASC, a.application_id ASC
+                LIMIT 1
+                """,
+                (status.value, dt(datetime.now(timezone.utc))),
+            ).fetchone()
+
+    def discovery_stats(self) -> dict[str, int]:
+        with self.connect() as conn:
+            rows = conn.execute("SELECT status, COUNT(*) AS count FROM jobs GROUP BY status").fetchall()
+            filter_rows = conn.execute("SELECT COALESCE(reason, 'ALLOWED') AS reason, COUNT(*) AS count FROM job_filter_results GROUP BY reason").fetchall()
+        stats = {f"jobs_{row['status'].lower()}": row["count"] for row in rows}
+        stats.update({f"filter_{row['reason'].lower()}": row["count"] for row in filter_rows})
+        return stats
 
     def insert_application(self, application: Application) -> str:
         dedupe_key = application.dedupe_key or _application_dedupe_key(application.job_id)
@@ -138,6 +212,82 @@ class JobAgentRepository:
             ).fetchall()
             return list(rows)
 
+    def claim_next_application(self, status: ApplicationStatus, worker_id: str, lease_expires_at: datetime) -> tuple[str, int] | None:
+        machine = ApplicationStateMachine()
+        now = datetime.now(timezone.utc)
+        target = ApplicationStatus.APPLYING if status in {ApplicationStatus.READY, ApplicationStatus.RETRY_PENDING} else status
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                """
+                SELECT application_id, status
+                FROM applications
+                WHERE status = ?
+                  AND (lease_expires_at IS NULL OR lease_expires_at < ?)
+                ORDER BY queued_at ASC, application_id ASC
+                LIMIT 1
+                """,
+                (status.value, dt(now)),
+            ).fetchone()
+            if row is None:
+                conn.execute("COMMIT")
+                return None
+            transition = machine.transition(ApplicationStatus(row["status"]), target, "worker lease claimed")
+            cursor = conn.execute(
+                """
+                UPDATE applications
+                SET status = ?, worker_id = ?, claimed_at = ?, lease_expires_at = ?, lease_epoch = lease_epoch + 1
+                WHERE application_id = ?
+                  AND status = ?
+                  AND (lease_expires_at IS NULL OR lease_expires_at < ?)
+                """,
+                (target.value, worker_id, dt(now), dt(lease_expires_at), row["application_id"], status.value, dt(now)),
+            )
+            if cursor.rowcount != 1:
+                conn.execute("ROLLBACK")
+                return None
+            conn.execute(
+                """
+                INSERT INTO application_state_transitions (application_id, from_status, to_status, reason, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    row["application_id"],
+                    transition.from_status.value,
+                    transition.to_status.value,
+                    transition.reason,
+                    dt(now),
+                ),
+            )
+            epoch_row = conn.execute("SELECT lease_epoch FROM applications WHERE application_id = ?", (row["application_id"],)).fetchone()
+            conn.execute("COMMIT")
+        return str(row["application_id"]), int(epoch_row["lease_epoch"])
+
+    def lease_still_mine(self, application_id: str, worker_id: str, lease_epoch: int) -> bool:
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT 1 FROM applications
+                WHERE application_id = ?
+                  AND worker_id = ?
+                  AND lease_epoch = ?
+                  AND lease_expires_at > ?
+                """,
+                (application_id, worker_id, lease_epoch, dt(datetime.now(timezone.utc))),
+            ).fetchone()
+            return row is not None
+
+    def release_lease(self, application_id: str, worker_id: str, lease_epoch: int) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                UPDATE applications
+                SET worker_id = NULL, claimed_at = NULL, lease_expires_at = NULL
+                WHERE application_id = ? AND worker_id = ? AND lease_epoch = ?
+                """,
+                (application_id, worker_id, lease_epoch),
+            )
+
     def get_application_status(self, application_id: str) -> ApplicationStatus:
         with self.connect() as conn:
             row = conn.execute(
@@ -163,20 +313,69 @@ class JobAgentRepository:
         with self.connect() as conn:
             conn.execute(f"UPDATE applications SET {', '.join(updates)} WHERE application_id = ?", values)
 
-    def mark_human_required(self, application_id: str, reason: str) -> None:
+    def increment_attempt_count(self, application_id: str) -> None:
         with self.connect() as conn:
+            conn.execute(
+                "UPDATE applications SET attempt_count = attempt_count + 1 WHERE application_id = ?",
+                (application_id,),
+            )
+
+    def set_applied_at_now(self, application_id: str) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "UPDATE applications SET applied_at = ? WHERE application_id = ?",
+                (dt(datetime.now(timezone.utc)), application_id),
+            )
+
+    def mark_human_required(self, application_id: str, reason: str, task: HumanTask | None = None) -> None:
+        machine = ApplicationStateMachine()
+        now = datetime.now(timezone.utc)
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             row = conn.execute(
                 "SELECT status FROM applications WHERE application_id = ?",
                 (application_id,),
             ).fetchone()
             if row is None:
+                conn.execute("ROLLBACK")
                 raise KeyError(f"Unknown application_id: {application_id}")
-        self.transition_application(application_id, ApplicationStatus.HUMAN_REQUIRED, reason)
-        with self.connect() as conn:
+            current = ApplicationStatus(row["status"])
+            if task is None:
+                task = HumanTask(
+                    application_id=application_id,
+                    category=reason,
+                    blocking_state=current.value,
+                    prompt=f"Human review required: {reason}",
+                    context={"reason": reason, "previous_status": current.value},
+                )
+            transition = machine.transition(current, ApplicationStatus.HUMAN_REQUIRED, reason)
             conn.execute(
-                "UPDATE applications SET human_required_reason = ? WHERE application_id = ?",
-                (reason, application_id),
+                "UPDATE applications SET status = ?, human_required_reason = ? WHERE application_id = ? AND status = ?",
+                (ApplicationStatus.HUMAN_REQUIRED.value, reason, application_id, current.value),
             )
+            conn.execute(
+                """
+                INSERT INTO application_state_transitions (application_id, from_status, to_status, reason, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (application_id, transition.from_status.value, transition.to_status.value, reason, dt(now)),
+            )
+            if task is not None:
+                conn.execute(
+                    """
+                    INSERT INTO human_tasks (
+                        task_id, application_id, job_id, category, status, blocking_state, prompt,
+                        options_json, context_json, resume_token, resolution_json, resolved_by,
+                        created_at, updated_at, expires_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(application_id, category) WHERE status IN ('OPEN', 'IN_PROGRESS') DO UPDATE SET
+                        prompt=excluded.prompt,
+                        context_json=excluded.context_json,
+                        updated_at=excluded.updated_at
+                    """,
+                    _human_task_values(task, now),
+                )
+            conn.execute("COMMIT")
 
     def record_job_filter_result(self, job_id: int, allowed: bool, reason: str | None) -> None:
         with self.connect() as conn:
@@ -273,6 +472,29 @@ class JobAgentRepository:
             ).fetchone()
             return str(row["task_id"])
 
+    def insert_dry_run_transcript(self, transcript: DryRunTranscript) -> str:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO dry_run_transcripts (
+                    transcript_id, application_id, job_id, created_at, generator_version,
+                    would_submit, blocking_json, payload_json, payload_hash
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    transcript.transcript_id,
+                    transcript.application_id,
+                    transcript.job_id,
+                    dt(transcript.created_at),
+                    transcript.generator_version,
+                    int(transcript.would_submit),
+                    json.dumps(transcript.blocking_reasons),
+                    transcript.payload_json(),
+                    transcript.payload_hash(),
+                ),
+            )
+            return transcript.transcript_id
+
     def transition_application(self, application_id: str, target: ApplicationStatus, reason: str) -> None:
         machine = ApplicationStateMachine()
         with self.connect() as conn:
@@ -311,6 +533,26 @@ class JobAgentRepository:
 
 def _application_dedupe_key(job_id: int) -> str:
     return stable_hash(f"default_candidate|job:{job_id}")
+
+
+def _human_task_values(task: HumanTask, now: datetime) -> tuple[object, ...]:
+    return (
+        task.task_id,
+        task.application_id,
+        task.job_id,
+        task.category,
+        task.status,
+        task.blocking_state,
+        task.prompt,
+        json.dumps(task.options),
+        json.dumps(task.context, sort_keys=True),
+        task.resume_token,
+        json.dumps(task.resolution, sort_keys=True) if task.resolution else None,
+        task.resolved_by,
+        dt(task.created_at or now),
+        dt(task.updated_at or now),
+        dt(task.expires_at),
+    )
 
 
 _UPSERT_JOB_SQL = """

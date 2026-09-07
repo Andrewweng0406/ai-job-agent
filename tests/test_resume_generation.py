@@ -85,5 +85,6 @@ application_answers: {}
 
     assert result.artifact is not None
     assert result.artifact.validation_status == "VALIDATED"
-    assert "Jane Student" in (tmp_path / "resumes" / f"{result.artifact.resume_id}.txt").read_text(encoding="utf-8")
-
+    pdf_path = tmp_path / "resumes" / result.artifact.file_path.split("/")[-1]
+    assert pdf_path.read_bytes().startswith(b"%PDF-")
+    assert result.artifact.changes["structured_json_path"].endswith(".json")

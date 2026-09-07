@@ -1,6 +1,6 @@
 # Architecture
 
-This repository implements the Phase 1 foundation plus read-only discovery, safe queueing, deterministic resume artifacts, deterministic truth checks, and daily reporting. It intentionally does not perform live application submission.
+This repository implements the Phase 1-4 safety foundation: read-only discovery, normalization, hard filtering, safe queueing, deterministic tailoring, ATS-friendly PDF resume artifacts, dry-run application preparation, verification evidence persistence, and daily reporting. It intentionally does not perform live application submission.
 
 The system is organized around deterministic, auditable pipeline stages:
 
@@ -9,11 +9,13 @@ The system is organized around deterministic, auditable pipeline stages:
 3. Deduplication prevents previously seen jobs or applications from entering the queue.
 4. Hard filters remove roles with clear disqualifiers before any LLM work.
 5. Persona classification maps accepted job families to resume personas.
-6. Resume generation will use only facts from `config/candidate_profile.yaml`.
-7. Application adapters prepare, fill, submit, and verify supported ATS workflows.
-8. SQLite stores jobs, applications, state transitions, resumes, and confirmation evidence.
-9. Daily reporting converts stored UTC timestamps into the configured local timezone before counting daily KPIs.
-10. Human-required blockers are persisted as idempotent `human_tasks` rows keyed by application and category.
+6. Tailoring selects only candidate fact IDs from `config/candidate_profile.yaml`.
+7. Resume generation writes a structured JSON intermediate and an ATS-friendly PDF artifact.
+8. Application preparation moves queued rows through `TAILORING -> READY` and emits a preview.
+9. Browser/application work must run as persisted dry-run transcripts before any submit path is considered.
+10. Application adapters prepare, fill, submit, and verify supported ATS workflows behind hard safety gates.
+11. SQLite stores jobs, applications, worker leases, state transitions, resumes, dry-run transcripts, human tasks, and confirmation evidence.
+12. Daily reporting converts stored UTC timestamps into the configured local timezone before counting daily KPIs.
 
 Safety decisions:
 
@@ -23,3 +25,6 @@ Safety decisions:
 - `SUBMISSION_UNKNOWN` is distinct from `SUBMITTED` and cannot automatically retry into `APPLYING`.
 - Candidate facts marked `TODO` are treated as missing and must not be guessed.
 - Resume generation refuses to produce an artifact while required profile facts are missing.
+- Worker claims are transactional and fenced by `worker_id` plus `lease_epoch`.
+- Discovery application creation is conflict-safe by requisition-derived dedupe key.
+- Dry-run transcripts are immutable payload snapshots; approval and real submission are separate steps.

@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from app.models.enums import ApplicationStatus, FailureCategory, JobFamily, Persona
 from app.models.job import Job, stable_hash
+from app.normalization.deduplication import canonicalize_url
 
 
 @dataclass(slots=True)
@@ -40,10 +41,26 @@ def requisition_key_for_job(job: Job) -> str:
     for key in ("requisition_id", "internal_job_id", "job_id", "jobId", "posting_id"):
         value = job.metadata.get(key)
         if value not in (None, "", "TODO"):
-            return f"{job.ats_type}:{value}"
+            return f"req:{value}"
+    canonical_url = canonicalize_url(job.apply_url)
+    url_req = _extract_requisition_from_url(canonical_url)
+    if url_req:
+        return f"url_req:{url_req}"
+    if canonical_url:
+        return f"url:{stable_hash(canonical_url)}"
     return f"{job.ats_type}:{job.external_job_id}"
 
 
 def application_dedupe_key_for_job(job: Job, candidate_id: str) -> str:
     stable_candidate = candidate_id if candidate_id and candidate_id != "TODO" else "default_candidate"
     return stable_hash("|".join([stable_candidate, job.company_id, requisition_key_for_job(job)]))
+
+
+def _extract_requisition_from_url(url: str) -> str | None:
+    import re
+
+    matches = re.findall(r"(?:jobs?|postings?|requisitions?)/([a-zA-Z0-9_-]+)", url)
+    if matches:
+        return matches[-1].lower()
+    numeric = re.findall(r"\b\d{3,}\b", url)
+    return numeric[-1] if numeric else None

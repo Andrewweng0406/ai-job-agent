@@ -97,12 +97,14 @@ def validate_with_provenance(items: list[dict[str, object]], profile_fact_ids: s
     for item in items:
         fact_ids = [str(fact_id) for fact_id in item.get("fact_ids", []) if str(fact_id)]
         text = str(item.get("text", ""))
+        fact_texts = [str(fact_text) for fact_text in item.get("fact_texts", [])]
         for fact_id in fact_ids:
             if fact_id not in profile_fact_ids:
                 unknown_ids.append(fact_id)
         numbers = [str(number) for number in item.get("numbers", [])]
-        if numbers:
-            unsupported_numbers.extend(numbers)
+        for number in numbers:
+            if not _number_supported(number, fact_texts):
+                unsupported_numbers.append(number)
         if OVERREACH_PATTERN.search(text):
             unsupported_claims.append(text)
         if not fact_ids:
@@ -113,6 +115,39 @@ def validate_with_provenance(items: list[dict[str, object]], profile_fact_ids: s
         unsupported_numbers=unsupported_numbers,
         unsupported_claims=unsupported_claims,
     )
+
+
+def _number_supported(number: str, fact_texts: list[str]) -> bool:
+    if not fact_texts:
+        return False
+    target = _normalize_number(number)
+    if target is None:
+        return False
+    for fact_text in fact_texts:
+        for candidate in re.findall(r"~?\d[\d,]*(?:\.\d+)?\s*k?\s*(?:[-–—]\s*~?\d[\d,]*(?:\.\d+)?\s*k?)?", fact_text.lower()):
+            normalized = _normalize_number(candidate)
+            if normalized == target:
+                return True
+    return False
+
+
+def _normalize_number(value: str) -> int | tuple[int, int] | None:
+    text = value.lower().strip().replace(",", "").replace("~", "")
+    range_match = re.fullmatch(r"(.+?)\s*[-–—]\s*(.+)", text)
+    if range_match:
+        start = _normalize_number(range_match.group(1))
+        end = _normalize_number(range_match.group(2))
+        if isinstance(start, int) and isinstance(end, int):
+            return (start, end)
+        return None
+    multiplier = 1
+    if text.endswith("k"):
+        multiplier = 1000
+        text = text[:-1].strip()
+    try:
+        return int(float(text) * multiplier)
+    except ValueError:
+        return None
 
 
 def _claim_supported(claim: str, supported_facts: list[str]) -> bool:

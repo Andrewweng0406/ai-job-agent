@@ -7,9 +7,12 @@ from app.database.repository import JobAgentRepository
 from app.discovery.pipeline import DiscoveryPipeline
 from app.matching.taxonomy import RoleTaxonomy
 from app.applications.queue import ApplicationQueue
+from app.models.enums import ApplicationStatus
 from app.reporting.daily_report import build_daily_report
 from app.resumes.profile import CandidateProfile, profile_completeness_gate
 from app.services.company_registry import load_company_registry
+from app.services.application_preparer import ApplicationPreparer
+from app.llm.tailoring import TailoringMode
 from app.utils.config import load_yaml
 from app.utils.logging import configure_logging
 
@@ -18,9 +21,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Autonomous new-grad job application agent.")
     parser.add_argument("--init-db", action="store_true", help="Initialize the local SQLite database schema.")
     parser.add_argument("--discover", action="store_true", help="Run read-only job discovery for configured companies.")
+    parser.add_argument("--company-id", help="Limit discovery to one company_id from the registry.")
+    parser.add_argument("--show-new-jobs", action="store_true", help="Show recently discovered NEW jobs.")
+    parser.add_argument("--show-eligible-jobs", action="store_true", help="Show eligible/queued/ready applications.")
+    parser.add_argument("--discovery-stats", action="store_true", help="Show discovery and filtering statistics.")
     parser.add_argument("--queue-eligible", action="store_true", help="Move eligible applications into the queue.")
     parser.add_argument("--daily-report", action="store_true", help="Print today's daily KPI report.")
     parser.add_argument("--check-profile", action="store_true", help="Validate required candidate profile facts.")
+    parser.add_argument("--prepare-next", action="store_true", help="Tailor a resume, generate a PDF, and print a safe application preview for one queued application.")
+    parser.add_argument("--tailoring-mode", choices=["FAST", "DEEP"], default="FAST", help="Resume tailoring mode.")
     parser.add_argument("--limit", type=int, default=100, help="Limit for queueing operations.")
     parser.add_argument("--settings", default="config/settings.yaml", help="Path to settings YAML.")
     parser.add_argument("--companies", default="config/companies.yaml", help="Path to company registry YAML.")
@@ -42,6 +51,8 @@ def main() -> int:
         taxonomy = RoleTaxonomy.from_yaml(args.taxonomy)
         profile = CandidateProfile.from_yaml(args.candidate_profile)
         companies = load_company_registry(args.companies)
+        if args.company_id:
+            companies = [company for company in companies if company.company_id == args.company_id]
         summary = DiscoveryPipeline(
             repo,
             taxonomy,
@@ -56,6 +67,24 @@ def main() -> int:
             f"applications_created={summary.applications_created}, errors={len(summary.errors)}"
         )
         return 1 if summary.errors else 0
+
+    if args.show_new_jobs:
+        repo.initialize()
+        for row in repo.list_jobs_by_status("NEW", args.limit):
+            print(f"{row['id']}\t{row['company_name']}\t{row['title']}\t{row['location']}\t{row['apply_url']}")
+        return 0
+
+    if args.show_eligible_jobs:
+        repo.initialize()
+        for row in repo.list_eligible_applications(args.limit):
+            print(f"{row['application_id']}\t{row['status']}\t{row['company']}\t{row['position']}\t{row['location']}\t{row['apply_url']}")
+        return 0
+
+    if args.discovery_stats:
+        repo.initialize()
+        for key, value in sorted(repo.discovery_stats().items()):
+            print(f"{key}: {value}")
+        return 0
 
     if args.queue_eligible:
         repo.initialize()
@@ -84,6 +113,16 @@ def main() -> int:
         for fact_id in result.missing_fact_ids:
             print(f"- Missing required fact: {fact_id}")
         return 1
+
+    if args.prepare_next:
+        repo.initialize()
+        profile = CandidateProfile.from_yaml(args.candidate_profile)
+        result = ApplicationPreparer(repo).prepare_next(profile, TailoringMode(args.tailoring_mode))
+        if result.preview:
+            print(result.preview.to_markdown())
+            return 0
+        print(f"Prepare result: status={result.status.value}, reason={result.reason}")
+        return 1 if result.status == ApplicationStatus.HUMAN_REQUIRED else 0
 
     parser.print_help()
     return 0

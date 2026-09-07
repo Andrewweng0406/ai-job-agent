@@ -3,8 +3,9 @@
 Foundation for a safe, auditable, high-throughput system that discovers U.S. new-grad job
 postings and prepares/submits applications with **verified** confirmation.
 
-> Status: Phase 1–2 foundation. `real_submission_enabled: false`. No live submissions. No browser
-> automation. Discovery adapters are being built against public/structured ATS endpoints only.
+> Status: Phase 1-4 safety foundation. `real_submission_enabled: false`. No live submissions.
+> Discovery, filtering, queueing, deterministic tailoring, PDF artifact generation, previews, and
+> persistence are implemented. Browser automation remains dry-run/approval-gated work.
 
 ## Principles
 
@@ -20,7 +21,7 @@ postings and prepares/submits applications with **verified** confirmation.
 |---|---|
 | `app/` | pipeline stages: discovery, normalization, filtering, matching, applications, database |
 | `config/` | candidate profile (source of truth), role taxonomy, company registry, safety settings |
-| `tests/` | unit tests + `test_adversarial_*.py` (adversarial suite; `xfail` = tracked gap) |
+| `tests/` | unit tests plus adversarial review suites |
 | `docs/` | architecture, research, and the principal review log |
 
 ## Docs
@@ -37,4 +38,14 @@ postings and prepares/submits applications with **verified** confirmation.
 ```bash
 python -m pip install -e ".[dev]"
 python -m pytest -q
+```
+
+Useful local commands:
+
+```bash
+python "apply company.py" --init-db
+python "apply company.py" --discover --company-id <company_id> --show-new-jobs
+python "apply company.py" --queue-eligible
+python "apply company.py" --prepare-next --tailoring-mode FAST
+python "apply company.py" --daily-report
 ```

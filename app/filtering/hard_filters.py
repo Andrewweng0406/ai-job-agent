@@ -16,7 +16,12 @@ CLEARANCE_PATTERN = re.compile(
 US_CITIZEN_PATTERN = re.compile(
     r"\b(us|u\.s\.)\s+citizens?\s+only\b|"
     r"\bmust\s+be\s+(a\s+)?u\.s\.\s+citizen\b|"
-    r"\bu\.s\.\s+citizenship\s+is\s+required\b",
+    r"\bu\.?s\.?\s+citizenship\s+(is\s+)?required\b|"
+    r"\brequires?\s+u\.?s\.?\s+citizenship\b|"
+    r"\bmust\s+be\s+(a\s+)?u\.?s\.?\s+citizen\s+or\s+permanent\s+resident\b|"
+    r"\bmust\s+have\s+permanent\s+residenc(y|e)\b|"
+    r"\bpermanent\s+residenc(y|e)\s+required\b|"
+    r"\b(u\.?s\.?\s+)?citizens?\s+and\s+green\s+card\s+holders?\s+only\b",
     re.I,
 )
 NO_SPONSORSHIP_PATTERN = re.compile(
@@ -141,8 +146,36 @@ def _location_ineligible(location: str | None) -> bool:
 
 
 def _has_negative_sponsorship(text: str) -> bool:
-    if not NO_SPONSORSHIP_PATTERN.search(text):
+    if _has_positive_sponsorship(text) and not _has_explicit_negative_sponsorship(text):
         return False
-    if re.search(r"\bno\s+visa\s+sponsorship\s+is\s+available\b", text, re.I):
+    return _has_explicit_negative_sponsorship(text)
+
+
+def _has_positive_sponsorship(text: str) -> bool:
+    return bool(POSITIVE_SPONSORSHIP_PATTERN.search(text)) or bool(
+        re.search(
+            r"\bsponsorship\s+(may\s+be\s+available|considered|will\s+be\s+considered)\b|"
+            r"\b(candidates\s+requiring\s+sponsorship\s+will\s+be\s+considered|opt\s+candidates\s+are\s+welcome)\b",
+            text,
+            re.I,
+        )
+    )
+
+
+def _has_explicit_negative_sponsorship(text: str) -> bool:
+    if NO_SPONSORSHIP_PATTERN.search(text):
         return True
-    return not POSITIVE_SPONSORSHIP_PATTERN.search(text)
+    normalized = " ".join(text.lower().replace("-", " ").replace("/", " ").split())
+    negative_window_patterns = [
+        r"\b(unable|not able|cannot|can't)\s+(?:\w+\s+){0,5}(sponsor|provide|offer)\s+(?:\w+\s+){0,4}(sponsorship|visas?|work\s+visas?|employment\s+visas?)\b",
+        r"\b(does\s+not|do\s+not|will\s+not)\s+(?:\w+\s+){0,5}(sponsor|provide|offer)\s+(?:\w+\s+){0,4}(sponsorship|visas?|work\s+visas?)\b",
+        r"\bnot\s+in\s+a\s+position\s+to\s+offer\s+(immigration\s+)?sponsorship\b",
+        r"\bno\s+(visa\s+)?sponsorship\s+is\s+available\b",
+        r"\bwithout\s+(employer\s+)?sponsorship\b",
+        r"\bpermanent\s+basis\s+without\s+(employer\s+)?sponsorship\b",
+        r"\bmust\s+(not\s+require|be\s+able\s+to\s+work\s+.*without)\s+(employer\s+)?sponsorship\b",
+        r"\bcurrent\s+or\s+future\s+sponsorship\b",
+    ]
+    if any(re.search(pattern, normalized, re.I) for pattern in negative_window_patterns):
+        return True
+    return False

@@ -3,12 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import timezone
 from pathlib import Path
-from uuid import uuid4
 import hashlib
 import json
 
 from app.models.enums import Persona
 from app.models.job import Job, utc_now
+from app.resumes.pdf import render_simple_pdf
 from app.resumes.profile import CandidateProfile, profile_completeness_gate
 from app.resumes.truth_validation import check_required_fields, validate_claims_against_profile
 
@@ -67,19 +67,23 @@ class DeterministicResumeGenerator:
 
         content = self._render_text(sections)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        resume_id = str(uuid4())
-        path = self.output_dir / f"{resume_id}.txt"
-        path.write_text(content, encoding="utf-8")
-        file_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        resume_id = _resume_id(job, persona, profile.schema_version, selected_fact_ids)
+        base_name = _artifact_base_name(job, resume_id)
+        json_path = self.output_dir / f"{base_name}.json"
+        pdf_path = self.output_dir / f"{base_name}.pdf"
+        json_path.write_text(json.dumps({"sections": sections}, indent=2, sort_keys=True), encoding="utf-8")
+        pdf_bytes = render_simple_pdf(content.splitlines())
+        pdf_path.write_bytes(pdf_bytes)
+        file_hash = hashlib.sha256(pdf_bytes).hexdigest()
         artifact = ResumeArtifact(
             resume_id=resume_id,
             job_id=job.id or 0,
             persona=persona,
             base_version=f"profile-v{profile.schema_version}",
             generated_at=utc_now().astimezone(timezone.utc).isoformat(),
-            changes={"mode": "deterministic", "selected_fact_ids": selected_fact_ids},
+            changes={"mode": "deterministic", "selected_fact_ids": selected_fact_ids, "structured_json_path": str(json_path)},
             validation_status="VALIDATED",
-            file_path=str(path),
+            file_path=str(pdf_path),
             file_hash=file_hash,
         )
         return ResumeGenerationResult(artifact=artifact)
@@ -119,3 +123,27 @@ def artifact_to_db_tuple(artifact: ResumeArtifact) -> tuple[object, ...]:
         artifact.file_hash,
     )
 
+
+def _artifact_base_name(job: Job, resume_id: str) -> str:
+    safe_company = _safe_name(job.company_name)
+    safe_role = _safe_name(job.title)
+    safe_job = _safe_name(job.external_job_id)
+    return f"{safe_company}_{safe_role}_{safe_job}_{resume_id}_resume"
+
+
+def _resume_id(job: Job, persona: Persona, schema_version: int, selected_fact_ids: list[str]) -> str:
+    signature = "|".join(
+        [
+            job.company_id,
+            job.external_job_id,
+            persona.value,
+            str(schema_version),
+            ",".join(sorted(selected_fact_ids)),
+        ]
+    )
+    return hashlib.sha256(signature.encode("utf-8")).hexdigest()[:16]
+
+
+def _safe_name(value: str) -> str:
+    cleaned = "".join(ch.lower() if ch.isalnum() else "_" for ch in value)
+    return "_".join(part for part in cleaned.split("_") if part)[:80] or "artifact"
