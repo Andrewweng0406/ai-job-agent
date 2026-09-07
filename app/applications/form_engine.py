@@ -96,6 +96,7 @@ class FormDryRunEngine:
         fields: list[RawFormField],
         resume_validation_status: str = "VALIDATED",
         persona: str | None = None,
+        browser_evidence: dict[str, Any] | None = None,
     ) -> FormDryRunResult:
         resume_validated = resume_validation_status.upper() in {"VALIDATED", "PASS", "PASSED"}
         resolutions = [resolve_form_field(field, profile, resume_path, resume_validated=resume_validated) for field in fields]
@@ -117,11 +118,13 @@ class FormDryRunEngine:
             "real_submission_enabled": self.real_submission_enabled,
             "job": {
                 "company": job.company_name,
+                "company_id": job.company_id,
                 "role": job.title,
                 "ats": job.ats_type,
                 "job_id": job.id,
                 "requisition_key": requisition_key_for_job(job),
                 "apply_url": job.apply_url,
+                "job_url": job.source_url,
                 "job_content_hash": job.description_hash,
             },
             "persona": persona,
@@ -135,6 +138,7 @@ class FormDryRunEngine:
             "unresolved": unresolved,
             "would_submit": would_submit,
             "blocking_reasons": blocking_reasons,
+            "browser_evidence": browser_evidence or {},
         }
         transcript = DryRunTranscript(
             application_id=application_id,
@@ -299,6 +303,11 @@ def _map_select_value(value: str, options: list[str], canonical_key: str) -> str
             if wants_yes and normalized in {"yes", "yes i am", "authorized", "i am authorized"}:
                 return option
             if wants_no and normalized in {"no", "no i am not", "not authorized"}:
+                return option
+    if canonical_key == "eeo_decline":
+        for option in options:
+            normalized = _normalize_option(option)
+            if any(token in normalized for token in ("decline", "wish", "want", "prefer not")):
                 return option
     return None
 

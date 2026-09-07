@@ -93,7 +93,6 @@ def test_eeo_fields_are_never_answered_with_a_real_demographic_value(needle):
 
 
 @pytest.mark.parametrize("needle", ["gender", "race", "veteran", "disability"])
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P2-18: EEO decline constant does not match real ATS decline-option wording; every EEO field -> HUMAN_REQUIRED")
 def test_eeo_fields_auto_decline_against_real_option_wording(needle):
     field = _by_label(_fields(), needle)[0]
     res = resolve_form_field(field, _profile(), "/tmp/r.pdf")
@@ -131,7 +130,6 @@ def test_unknown_required_custom_question_is_human_required(needle):
 
 
 # --- P1-26: honeypot / hidden field must NOT be extracted --------
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P1-26: display:none / aria-hidden / tabindex=-1 honeypot field is extracted (and mislabeled)")
 def test_honeypot_field_is_excluded():
     fields = _fields()
     # the honeypot input name is job_application[hp_email]; it must not appear as a fillable field
@@ -156,7 +154,6 @@ def test_aria_labelledby_resolved_by_id_not_only_position():
 
 
 # --- P2-17: no field may carry a label bled from the previous control --
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P2-17: an unlabeled input picks up the preceding control's text")
 def test_no_field_has_a_bled_or_degenerate_label():
     bad = [f for f in _fields() if f.label.strip() in {"", "*", "Yes", "No"}]
     assert bad == [], f"degenerate labels: {[f.label for f in bad]}"

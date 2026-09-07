@@ -247,6 +247,8 @@ class JobAgentRepository:
                 FROM applications
                 WHERE status = ?
                   AND (lease_expires_at IS NULL OR lease_expires_at < ?)
+                  AND submit_attempted_at IS NULL
+                  AND submit_attempted_at IS NULL
                 ORDER BY queued_at ASC, application_id ASC
                 LIMIT 1
                 """,
@@ -263,6 +265,7 @@ class JobAgentRepository:
                 WHERE application_id = ?
                   AND status = ?
                   AND (lease_expires_at IS NULL OR lease_expires_at < ?)
+                  AND submit_attempted_at IS NULL
                 """,
                 (target.value, worker_id, dt(now), dt(lease_expires_at), row["application_id"], status.value, dt(now)),
             )
@@ -628,8 +631,8 @@ class JobAgentRepository:
             current = ApplicationStatus(row["status"])
             transition = machine.transition(current, target, reason)
             cursor = conn.execute(
-                "UPDATE applications SET status = ? WHERE application_id = ? AND status = ?",
-                (target.value, application_id, current.value),
+                "UPDATE applications SET status = ?, submit_attempted_at = CASE WHEN ? = 'SKIPPED' THEN NULL ELSE submit_attempted_at END WHERE application_id = ? AND status = ?",
+                (target.value, target.value, application_id, current.value),
             )
             if cursor.rowcount != 1:
                 conn.execute("ROLLBACK")

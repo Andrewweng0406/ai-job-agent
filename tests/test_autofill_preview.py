@@ -1,4 +1,5 @@
 import json
+import sqlite3
 
 import pytest
 
@@ -31,14 +32,15 @@ def test_autofill_preview_rejects_mutated_payload_after_approval(tmp_path):
     mutated = dict(dry_run.transcript.payload)
     mutated["would_submit"] = False
 
-    with repo.connect() as conn:
-        conn.execute(
-            "UPDATE dry_run_transcripts SET payload_json = ? WHERE transcript_id = ?",
-            (json.dumps(mutated, sort_keys=True), transcript_id),
-        )
+    with pytest.raises(sqlite3.IntegrityError, match="payload is immutable"):
+        with repo.connect() as conn:
+            conn.execute(
+                "UPDATE dry_run_transcripts SET payload_json = ? WHERE transcript_id = ?",
+                (json.dumps(mutated, sort_keys=True), transcript_id),
+            )
 
-    with pytest.raises(RuntimeError, match="hash mismatch"):
-        ApprovedAutofillPreviewBuilder(repo).build(transcript_id)
+    preview = ApprovedAutofillPreviewBuilder(repo).build(transcript_id)
+    assert preview.transcript_id == transcript_id
 
 
 def test_autofill_preview_rejects_not_submit_ready_transcript(tmp_path):

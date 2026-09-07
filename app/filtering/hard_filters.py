@@ -41,7 +41,12 @@ POSITIVE_SPONSORSHIP_PATTERN = re.compile(
     r"\bsponsorship\s+(is\s+)?(available|provided|offered)\b|\bwill\s+sponsor\b|\bhappy\s+to\s+sponsor\b",
     re.I,
 )
-HIGH_EXPERIENCE_PATTERN = re.compile(r"\b(?:minimum|required|requires?|must have)?\s*([5-9]|1[0-9])\+?\s+years?\b", re.I)
+HIGH_EXPERIENCE_PATTERN = re.compile(
+    r"\b(?:minimum|required|requires?|must\s+have)(?:\s+of)?\s+([5-9]|1[0-9])\+?\s+years?"
+    r"(?:\s+of)?\s+(?:professional\s+|relevant\s+)?experience\b|"
+    r"\b([5-9]|1[0-9])\+?\s+years?(?:\s+of)?\s+(?:professional\s+|relevant\s+)?experience\b",
+    re.I,
+)
 US_LOCATION_TERMS = {
     "remote",
     "united states",

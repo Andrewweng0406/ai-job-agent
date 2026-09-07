@@ -85,16 +85,19 @@ class HtmlFormFieldExtractor:
     def extract(self, html: str, ats_type: str = "generic") -> list[RawFormField]:
         parser = _FormHtmlParser()
         parser.feed(html)
+        labelled_text = _element_text_by_id(html)
         fields: list[RawFormField] = []
         radio_groups: dict[str, list[_Element]] = {}
         for index, control in enumerate(parser.controls):
             input_type = control.attrs.get("type", "text").lower()
             if input_type in {"hidden", "submit", "button", "reset"}:
                 continue
+            if _is_noninteractive(control):
+                continue
             if input_type == "radio" and control.attrs.get("name"):
                 radio_groups.setdefault(control.attrs["name"], []).append(control)
                 continue
-            label = _label_for(control, parser.labels)
+            label = _label_for(control, parser.labels, labelled_text)
             if not label:
                 continue
             fields.append(
@@ -107,7 +110,7 @@ class HtmlFormFieldExtractor:
                 )
             )
         for index, (name, controls) in enumerate(radio_groups.items()):
-            options = [_label_for(control, parser.labels) or control.attrs.get("value", "") for control in controls]
+            options = [_label_for(control, parser.labels, labelled_text) or control.attrs.get("value", "") for control in controls]
             options = [_clean_text(option) for option in options if _clean_text(option)]
             label = _radio_group_label(name, controls, options)
             fields.append(
@@ -122,10 +125,14 @@ class HtmlFormFieldExtractor:
         return fields
 
 
-def _label_for(control: _Element, labels: dict[str, str]) -> str:
+def _label_for(control: _Element, labels: dict[str, str], labelled_text: dict[str, str]) -> str:
     control_id = control.attrs.get("id")
     if control_id and labels.get(control_id):
         return labels[control_id]
+    labelled_by = control.attrs.get("aria-labelledby", "").split()
+    accessible_label = _clean_text(" ".join(labelled_text.get(item, "") for item in labelled_by))
+    if accessible_label:
+        return accessible_label
     for key in ("aria-label", "placeholder"):
         if control.attrs.get(key):
             return _clean_text(control.attrs[key])
@@ -136,10 +143,18 @@ def _label_for(control: _Element, labels: dict[str, str]) -> str:
     return ""
 
 
+def _is_noninteractive(control: _Element) -> bool:
+    attrs = control.attrs
+    if attrs.get("aria-hidden", "").lower() == "true" or attrs.get("tabindex") == "-1":
+        return True
+    style = attrs.get("style", "").replace(" ", "").lower()
+    return "display:none" in style or "visibility:hidden" in style
+
+
 def _kind_for(tag: str, input_type: str, attrs: dict[str, str], options: list[str]) -> InputKind:
     if tag == "textarea":
         return InputKind.LONG_TEXT
-    if tag == "select":
+    if tag == "select" or attrs.get("role", "").lower() in {"combobox", "listbox"}:
         return InputKind.SELECT
     if input_type == "file":
         return InputKind.FILE
@@ -189,3 +204,16 @@ def _radio_group_label(name: str, controls: list[_Element], options: list[str]) 
 
 def _clean_text(value: str) -> str:
     return " ".join(unescape(re.sub(r"<[^>]+>", " ", value)).split())
+
+
+def _element_text_by_id(html: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for match in re.finditer(
+        r'<(?P<tag>[a-zA-Z][\w:-]*)[^>]*\bid=["\'](?P<id>[^"\']+)["\'][^>]*>(?P<body>.*?)</(?P=tag)>',
+        html,
+        flags=re.I | re.S,
+    ):
+        text = _clean_text(match.group("body"))
+        if text:
+            values[match.group("id")] = text
+    return values

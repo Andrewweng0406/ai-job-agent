@@ -33,3 +33,4 @@ Safety decisions:
 - The current browser bridge is a deterministic page-capture plus HTML field extractor, with optional Playwright read-only navigation for Greenhouse live dry runs.
 - Greenhouse, Lever, and Ashby have DOM-driven dry-run adapters against realistic fixture HTML. Greenhouse also has a no-submit live-navigation runner.
 - PDF upload eligibility is gated by resume validation status and PDF QA.
+- Live Greenhouse dry-run evidence is recorded in `docs/greenhouse_live_dry_run_report.json`; the runner navigates public application pages, extracts actual DOM fields, applies only resolved values, and has no submit operation in its dry-run path.

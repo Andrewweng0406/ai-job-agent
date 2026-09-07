@@ -31,7 +31,7 @@ def test_browser_capture_blocks_captcha_without_extracting_fields():
     result = BrowserFieldCapture().capture(page, ats_type="lever")
 
     assert result.human_required
-    assert result.blocking_reasons == ["CAPTCHA"]
+    assert result.blocking_reasons == ["BOT_WALL"]
     assert result.fields == []
 
 

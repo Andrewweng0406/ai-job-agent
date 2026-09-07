@@ -1,0 +1,21 @@
+{
+  "run_date": "2026-09-07",
+  "company": "Anthropic",
+  "role": "Account Executive, AI Native",
+  "application_url": "https://job-boards.greenhouse.io/anthropic/jobs/4461450008",
+  "discovery_source": "Greenhouse boards API",
+  "human_invoked_autofill": true,
+  "status": "HUMAN_REQUIRED",
+  "fields_discovered": 24,
+  "auto_safe_filled": 3,
+  "profile_required_or_human_required": 14,
+  "optional_skipped": 7,
+  "captcha_or_bot_wall": false,
+  "resume_upload_call_count": 0,
+  "transcript_id": "dry_6b531f0a-d71d-48ea-91e2-9f95d55dfefc",
+  "payload_hash": "be62f35d0fd2a8ec3f01909792ef05b3ce9a47396fb15d7bc3ff92a72b8188ef",
+  "would_submit": false,
+  "final_submit_invocation_count": 0,
+  "screenshot_path": "artifacts/greenhouse_anthropic_4461450008.png",
+  "notes": "Live DOM capture and safe autofill only. Candidate profile is intentionally TODO-backed, so unresolved required fields remain HUMAN_REQUIRED. No application was submitted."
+}

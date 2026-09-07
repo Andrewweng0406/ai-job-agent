@@ -78,7 +78,7 @@ def test_greenhouse_dom_dry_run_hard_stop_goes_to_human_required(tmp_path):
     assert adapter.submit_call_count == 0
     with repo.connect() as conn:
         task = conn.execute("SELECT category FROM human_tasks WHERE application_id = ?", (app_id,)).fetchone()
-    assert task["category"] == "CAPTCHA"
+    assert task["category"] == "BOT_WALL"
 
 
 def test_greenhouse_bad_pdf_never_reaches_submit_ready_upload_path(tmp_path):

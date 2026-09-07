@@ -154,7 +154,6 @@ def test_dry_run_autofill_raises_on_transcript_mismatch():
         DryRunBrowserAutofill().apply(page, [res], expected_resume_hash="sha256:abc")
 
 
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P1-27: dry-run autofill sends locator.press('Enter') on a live form (implicit-submission risk)")
 def test_dry_run_autofill_never_presses_enter_or_keys_that_can_submit():
     from app.applications.browser_autofill import DryRunBrowserAutofill
     from app.applications.form_engine import FormFieldResolution, FormFieldStatus, InputKind

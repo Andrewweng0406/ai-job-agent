@@ -70,7 +70,6 @@ def test_submission_unknown_can_never_reach_a_submit_permitting_state():
     assert not forbidden, f"SUBMISSION_UNKNOWN can reach {sorted(s.value for s in forbidden)}"
 
 
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P1-25: submit_attempted_at is never cleared and claim_next_application does not guard on it; a stale value on a re-READY row is not re-checked before a future real submit")
 def test_stale_submit_attempted_on_a_reREADY_row_is_guarded(tmp_path):
     repo = _repo(tmp_path)
     app_id = _claimed_applying(repo)

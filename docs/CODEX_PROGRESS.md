@@ -110,9 +110,10 @@ Latest local verification:
 - Optional Greenhouse live dry-run runner that performs read-only Playwright navigation, refuses `real_submission_enabled=True`, and hands the page to the no-submit dry-run adapter.
 - Approval-gated autofill preview builder and CLI rendering; it rejects unapproved, mutated-hash, and not-submit-ready transcripts.
 - Dry-run application worker integration that atomically claims READY work, fences stale leases before browser access, persists DOM transcripts, returns no-submit work to READY, and refuses real-submission mode.
+- First live Greenhouse DOM dry-run completed against Anthropic's public application page: 24 fields discovered, 3 safe fields filled, 14 human-required, `would_submit=false`, upload calls `0`, submit invocations `0`; audit report is in `docs/greenhouse_live_dry_run_report.json`.
 
 ## Next
 
-1. Exercise Greenhouse live dry-run navigation against reviewed public postings without submitting.
-2. Exercise the dry-run worker against reviewed live Greenhouse pages before considering application concurrency above one.
+1. Repeat Greenhouse live dry-runs with a completed, validated candidate profile and real PDF QA artifact, still without submitting.
+2. Keep application concurrency at one until multiple reviewed Greenhouse dry-run transcripts are complete.
 3. Add provider-backed LLM tailoring only after deterministic prompt contracts and evals are in place.

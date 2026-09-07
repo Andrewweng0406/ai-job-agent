@@ -43,6 +43,13 @@ class AtsDomDryRunAdapter:
         capture = self.capture.capture(page, ats_type=self.ats_type, screenshot_path=screenshot_path)
         if persist_browser_hard_stop(self.repository, application_id, job.id, capture):
             return AtsDomDryRunResult(ApplicationStatus.HUMAN_REQUIRED, reason="BROWSER_HARD_STOP")
+        if capture.posting_closed:
+            self.repository.transition_application(application_id, ApplicationStatus.CLOSED, "posting closed")
+            return AtsDomDryRunResult(ApplicationStatus.CLOSED, reason="POSTING_CLOSED")
+        if capture.drift_reasons:
+            reason = "ATS_CHANGED:" + ",".join(capture.drift_reasons)
+            self.repository.mark_human_required(application_id, reason)
+            return AtsDomDryRunResult(ApplicationStatus.HUMAN_REQUIRED, reason=reason)
         if not capture.fields:
             self.repository.mark_human_required(application_id, "ATS_CHANGED")
             return AtsDomDryRunResult(ApplicationStatus.HUMAN_REQUIRED, reason="ATS_CHANGED")
@@ -56,6 +63,13 @@ class AtsDomDryRunAdapter:
             resume_validation_status=resume_validation_status,
             persona=persona,
             fields=capture.fields,
+            browser_evidence={
+                "screenshot_path": capture.screenshot_path,
+                "form_detected": capture.form_detected,
+                "submit_control_detected": capture.submit_control_detected,
+                "validation_errors": capture.validation_errors,
+                "drift_reasons": capture.drift_reasons,
+            },
         )
         return AtsDomDryRunResult(dry_run.status, dry_run=dry_run)
 

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from app.applications.browser_autofill import BrowserAutofillResult, DryRunBrowserAutofill
 from app.applications.greenhouse_dry_run import GreenhouseDryRunAdapter, GreenhouseDryRunResult
 from app.models.job import Job
 from app.resumes.profile import CandidateProfile
@@ -46,6 +47,26 @@ class GreenhouseLiveDryRunInput:
     persona: str | None = None
     screenshot_path: str | Path | None = None
     timeout_ms: int = 30_000
+    autofill: bool = True
+    human_invoked: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class GreenhouseLiveDryRunResult:
+    adapter_result: GreenhouseDryRunResult
+    autofill: BrowserAutofillResult
+
+    @property
+    def status(self):
+        return self.adapter_result.status
+
+    @property
+    def dry_run(self):
+        return self.adapter_result.dry_run
+
+    @property
+    def reason(self):
+        return self.adapter_result.reason
 
 
 class GreenhouseLiveDryRunRunner:
@@ -54,8 +75,9 @@ class GreenhouseLiveDryRunRunner:
     def __init__(self, adapter: GreenhouseDryRunAdapter, *, playwright_factory=None) -> None:
         self.adapter = adapter
         self.playwright_factory = playwright_factory
+        self.autofill = DryRunBrowserAutofill()
 
-    def run(self, payload: GreenhouseLiveDryRunInput) -> GreenhouseDryRunResult:
+    def run(self, payload: GreenhouseLiveDryRunInput) -> GreenhouseLiveDryRunResult:
         if self.adapter.real_submission_enabled:
             raise RuntimeError("Live dry-run runner refuses real_submission_enabled=True")
         manager = self._playwright_manager()
@@ -66,7 +88,7 @@ class GreenhouseLiveDryRunRunner:
                 try:
                     page = context.new_page()
                     page.goto(payload.job.apply_url, wait_until="domcontentloaded", timeout=payload.timeout_ms)
-                    return self.adapter.dry_run(
+                    adapter_result = self.adapter.dry_run(
                         page=page,
                         application_id=payload.application_id,
                         job=payload.job,
@@ -78,6 +100,16 @@ class GreenhouseLiveDryRunRunner:
                         persona=payload.persona,
                         screenshot_path=payload.screenshot_path,
                     )
+                    autofill = BrowserAutofillResult([], 0)
+                    if payload.autofill and not payload.human_invoked:
+                        raise RuntimeError("Live autofill requires explicit human_invoked=True")
+                    if payload.autofill and adapter_result.dry_run is not None:
+                        autofill = self.autofill.apply(
+                            page,
+                            adapter_result.dry_run.resolutions,
+                            expected_resume_hash=payload.resume_hash,
+                        )
+                    return GreenhouseLiveDryRunResult(adapter_result, autofill)
                 finally:
                     context.close()
             finally:

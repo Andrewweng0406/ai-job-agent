@@ -110,7 +110,7 @@ def test_ats_dom_dry_run_routes_empty_apply_page_to_ats_changed(tmp_path):
     )
 
     assert result.status == ApplicationStatus.HUMAN_REQUIRED
-    assert result.reason == "ATS_CHANGED"
+    assert result.reason == "ATS_CHANGED:MISSING_APPLICATION_FORM"
     assert adapter.submit_call_count == 0
     assert repo.get_application_status(app_id) == ApplicationStatus.HUMAN_REQUIRED
 

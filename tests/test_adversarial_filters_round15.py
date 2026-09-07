@@ -65,6 +65,10 @@ def test_high_years_only_in_preferred_section_is_kept():
     assert result("Requirements: SQL, Python.\nPreferred: 6+ years of dashboarding.").allowed
 
 
+def test_company_age_is_not_an_experience_requirement():
+    assert result("For 10 years, the company has built software.\nRequirements: Python and React.").allowed
+
+
 # ---------------------------------------------------------------------------
 # Sponsorship — negative phrasing disqualifies (candidate needs future sponsorship);
 # positive / neutral phrasing does not.

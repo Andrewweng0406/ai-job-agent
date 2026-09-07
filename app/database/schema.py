@@ -158,4 +158,12 @@ CREATE TABLE IF NOT EXISTS dry_run_transcripts (
 );
 
 CREATE INDEX IF NOT EXISTS idx_dryrun_app ON dry_run_transcripts(application_id, created_at);
+
+CREATE TRIGGER IF NOT EXISTS dry_run_transcripts_immutable_payload
+BEFORE UPDATE OF application_id, job_id, created_at, generator_version, would_submit,
+                 blocking_json, payload_json, payload_hash
+ON dry_run_transcripts
+BEGIN
+    SELECT RAISE(ABORT, 'dry-run transcript payload is immutable');
+END;
 """

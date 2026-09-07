@@ -18,7 +18,7 @@ def test_browser_hard_stop_transitions_and_opens_task(tmp_path):
     assert repo.get_application_status(app_id) == ApplicationStatus.HUMAN_REQUIRED
     with repo.connect() as conn:
         task = conn.execute("SELECT category, context_json FROM human_tasks WHERE application_id = ?", (app_id,)).fetchone()
-    assert task["category"] == "CAPTCHA"
+    assert task["category"] == "BOT_WALL"
     assert "captcha.png" in task["context_json"]
 
 

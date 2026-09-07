@@ -27,6 +27,7 @@ def test_greenhouse_live_dry_run_navigates_and_stops_before_submit(tmp_path):
             resume_validation_status="VALIDATED",
             persona="DATA",
             screenshot_path=screenshot_path,
+            autofill=False,
         )
     )
 

@@ -35,8 +35,8 @@ CLEAN_FORM = (
     "html,reason",
     [
         ("<html><body><div>Please complete the reCAPTCHA to continue.</div>" + CLEAN_FORM + "</body></html>", "CAPTCHA"),
-        ("<html><body><h1>Verify you are human</h1>" + CLEAN_FORM + "</body></html>", "CAPTCHA"),
-        ("<html><body>Checking your browser before you access the site." + CLEAN_FORM + "</body></html>", "CAPTCHA"),
+        ("<html><body><h1>Verify you are human</h1>" + CLEAN_FORM + "</body></html>", "BOT_WALL"),
+        ("<html><body>Checking your browser before you access the site." + CLEAN_FORM + "</body></html>", "BOT_WALL"),
         ("<html><body>Enter the one-time password we sent to your phone." + CLEAN_FORM + "</body></html>", "MFA"),
         ("<html><body>Two-factor authentication is required." + CLEAN_FORM + "</body></html>", "MFA"),
     ],
@@ -81,6 +81,13 @@ def test_recaptcha_script_tag_is_detected():
     assert "CAPTCHA" in result.blocking_reasons
 
 
+def test_inactive_recaptcha_configuration_in_hydration_data_is_not_a_wall():
+    html = CLEAN_FORM + '<script>window.config={"GOOGLE_RECAPTCHA_ENDPOINT":"https://www.recaptcha.net/recaptcha/enterprise.js"}</script>'
+    result = BrowserFieldCapture().capture(_Page(html), ats_type="greenhouse")
+    assert result.blocking_reasons == []
+    assert result.fields
+
+
 def test_turnstile_widget_without_captcha_token_is_detected():
     html = (
         "<html><body><div class='cf-turnstile' data-sitekey='0xABC'></div>"
@@ -88,4 +95,4 @@ def test_turnstile_widget_without_captcha_token_is_detected():
         + CLEAN_FORM + "</body></html>"
     )
     result = BrowserFieldCapture().capture(_Page(html), ats_type="greenhouse")
-    assert result.blocking_reasons, "an unrecognized challenge widget should still block, not extract fields"
+    assert result.blocking_reasons == ["BOT_WALL"]

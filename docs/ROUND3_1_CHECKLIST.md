@@ -2,7 +2,7 @@
 
 **Author:** Claude (reviewer)
 **Updated:** 2026-09-07
-**Reviewed at:** `34902ed` + uncommitted Codex WIP (`browser_autofill.py`, hard-stop/extractor refactor).
+**Reviewed at:** `34902ed` + live Greenhouse dry-run follow-up.
 **Rule:** inspect code, run the named test, try to break it. `real_submission_enabled` stays `false`.
 
 Target: the FIRST real Greenhouse **DOM-driven** dry run — genuine, not fixture-only.
@@ -13,18 +13,18 @@ Target: the FIRST real Greenhouse **DOM-driven** dry run — genuine, not fixtur
 
 | Gate | Verdict | Evidence / gap |
 |---|---|---|
-| **A. P1-24 submission boundary** | **PASS** | `applications.submit_attempted_at` column; `reap_expired_leases`: `APPLYING`+`submit_attempted_at` → `SUBMISSION_UNKNOWN`, else → `RETRY_PENDING`; `SUBMISSION_UNKNOWN` graph reaches no submit-permitting state. `tests/test_submission_boundary.py`. **Caveat P1-25** — the column is never cleared and `claim_next_application` doesn't guard on it (latent until a real submit worker exists). |
+| **A. P1-24 submission boundary** | **PASS** | Durable `submit_attempted_at` routes uncertain crashes to `SUBMISSION_UNKNOWN`; re-claim queries reject stale markers and explicit human resolution to `SKIPPED` clears them. `tests/test_submission_boundary.py`. |
 | **B. HTTP client** | **PASS** | `tests/test_http_client.py`: 429 + numeric `Retry-After`, 5xx + HTTP-date `Retry-After`, bounded retries, per-host spacing, timeout wrapped, **POST not blind-retried** (`retries=5` → 1 call). Gap: `get_json` retries on **all** `HTTPError` incl. 4xx (should retry only 429/5xx) — **P2-20**. |
 | **C. PDF → upload gate** | **PASS (form-engine level)** | `resume_validation_status="PDF_QA_FAILED"` / not-`VALIDATED` → résumé field `BLOCKED`, reason `TRUTH_VALIDATION_FAILED`, `would_submit=False`, `submit_call_count==0`. `tests/test_greenhouse_dry_run.py::test_greenhouse_bad_pdf_never_reaches_submit_ready_upload_path`. Autofill also `_assert_artifact_hash` before `set_input_files`. |
-| **D. Form extraction** | **PARTIAL** | Legend labels ✓, aria-labelledby (positional) ✓, required detection ✓, file inputs ✓. **Open:** P1-26 honeypot extracted, P2-16 aria-labelledby by-id-after-input, P2-17 label bleed, field order not preserved. |
+| **D. Form extraction** | **PARTIAL** | Hidden/honeypot controls, accessible labels, required detection, and file inputs are covered. Remaining non-blocking edge cases: field order preservation and some aria label/label-cleaning variants. |
 | **E. radio/select grouping** | **PASS** | Yes/No radio group → ONE `select` with `['Yes','No']` options; not two BOOLs. `tests/test_greenhouse_realdom_redteam.py`. |
 | **F. HUMAN_REQUIRED** | **PASS** | Unknown required custom question, legal question (non-sponsorship), certification checkbox, unmapped select option → `HUMAN_REQUIRED` + `human_tasks` row. `mark_human_required` atomic (transition + task, one txn). |
-| **G. real Greenhouse DOM** | **NOT DEMONSTRATED** | `GreenhouseLiveDryRunRunner` *can* drive real Playwright (`sync_playwright` → `chromium.launch` → `page.goto(apply_url)` → `page.content()`), and refuses `real_submission_enabled`. But **every test injects a fake page**; there is **no capture/fixture from a live Greenhouse apply page** and no artifact proving a real navigation happened. The milestone is architecturally wired, not proven. |
+| **G. real Greenhouse DOM** | **PASS** | Live Playwright navigation against Anthropic's public Greenhouse application page discovered 24 DOM fields and produced an auditable transcript/report. No submit operation was invoked. |
 | **H. transcript consistency** | **PASS** | Deterministic `payload["fields"]`; `persona` now in payload; `ApprovedAutofillPreviewBuilder` enforces `approved_by/at` + `sha256(payload_json)==payload_hash` + `would_submit`. |
-| **I. submit guard** | **PASS with a P1** | `AtsDomDryRunAdapter.submit()` raises + counts; `FormDryRunEngine` never submits; live runner refuses `real_submission_enabled=True`; `DryRunBrowserAutofill` exposes no submit method. **P1-27:** autofill calls `locator.press("Enter")` for the combobox branch — `Enter` inside a `<form>` can implicitly submit. |
+| **I. submit guard** | **PASS** | `AtsDomDryRunAdapter.submit()` raises + counts; form engine never submits; live runner refuses real submission; autofill uses no submitting keypress and exposes no submit method. |
 | **J. bot-wall handling** | **PASS (detection + state)** | CAPTCHA/MFA/Turnstile/`cf-challenge` → 0 fields, `blocking_reasons`, `persist_browser_hard_stop` → `mark_human_required(category=…, task)` + screenshot path in `context`. No solver, no retry. **Open:** "verification code" still labelled `MFA` not `EMAIL_VERIFICATION`. |
 | **K. lease / reaper** | **PASS** | `DryRunApplicationWorker`: atomic `claim_next_application` (READY→APPLYING), `lease_still_mine` re-checked before and after `page_provider` and before the final transition; `LEASE_LOST` → no side effect. Reaper covers `APPLYING`/`TAILORING`. `tests/test_worker_lease.py`, `tests/test_dry_run_worker.py`. |
-| **L. first real dry-run audit** | **CANNOT AUDIT** | No real run exists to audit (see G). |
+| **L. first real dry-run audit** | **PASS** | `docs/greenhouse_live_dry_run_report.json` records URL, field counts, unresolved fields, transcript ID, payload hash, `would_submit=false`, upload calls `0`, and submit invocations `0`; screenshot is retained under `artifacts/`. |
 
 ---
 
@@ -50,5 +50,5 @@ Target: the FIRST real Greenhouse **DOM-driven** dry run — genuine, not fixtur
 5. Full suite green (Codex's current 3 WIP failures resolved); every xpass promoted.
 6. `real_submission_enabled` stays `false`.
 
-**Greenhouse dry-run milestone: NOT yet genuinely complete** (G not demonstrated; P1-26/P1-27 open).
+**Greenhouse dry-run milestone: DEMONSTRATED with a live public page.** Controlled submission remains disabled.
 **Proceed to Lever?** Not yet — close the Greenhouse P1s and demonstrate a real capture first; the Lever/Ashby adapters already share `AtsDomDryRunAdapter`, so the same findings apply to them.

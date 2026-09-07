@@ -116,3 +116,20 @@ def test_custom_question_label_without_for_uses_preceding_text():
     assert len(fields) == 1
     assert fields[0].label == "Why do you want to work here?"
     assert fields[0].kind == InputKind.LONG_TEXT
+
+
+def test_greenhouse_react_combobox_uses_aria_labelledby():
+    html = """
+    <form id="application-form">
+      <div id="question-label">I confirm my graduation date is Fall 2026 or Spring 2027 *</div>
+      <input id="question_1" role="combobox" aria-labelledby="question-label" aria-required="true" />
+      <button type="submit">Submit Application</button>
+    </form>
+    """
+
+    fields = HtmlFormFieldExtractor().extract(html, "greenhouse")
+
+    assert len(fields) == 1
+    assert fields[0].label == "I confirm my graduation date is Fall 2026 or Spring 2027 *"
+    assert fields[0].kind == InputKind.SELECT
+    assert fields[0].required
