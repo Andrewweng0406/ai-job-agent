@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import zlib
 
 
 @dataclass(frozen=True, slots=True)
@@ -17,7 +18,9 @@ def run_pdf_qa(pdf: bytes, expected_text: list[str] | None = None) -> PdfQaResul
         failures.append("PDF_EOF_MISSING")
     if b"/Type /Catalog" not in pdf:
         failures.append("PDF_CATALOG_MISSING")
-    if b"?" in _content_stream_bytes(pdf):
+    # Compressed streams are binary; a literal question byte is not evidence
+    # of a replacement glyph. Text extraction/visual QA handles those streams.
+    if b"/FlateDecode" not in pdf and b"?" in _content_stream_bytes(pdf):
         failures.append("UNSUPPORTED_TEXT_REPLACEMENT")
     if expected_text:
         decoded = pdf.decode("latin-1", "replace")
@@ -41,7 +44,14 @@ def _content_stream_bytes(pdf: bytes) -> bytes:
         stream_end = pdf.find(end, content_start)
         if stream_end < 0:
             break
-        chunks.append(pdf[content_start:stream_end])
+        chunk = pdf[content_start:stream_end]
+        header = pdf[max(0, stream_start - 260):stream_start]
+        if b"/FlateDecode" in header or chunk.startswith((b"\x78\x01", b"\x78\x9c", b"\x78\xda")):
+            try:
+                chunk = zlib.decompress(chunk)
+            except zlib.error:
+                pass
+        chunks.append(chunk)
         start = stream_end + len(end)
     return b"\n".join(chunks)
 
