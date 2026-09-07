@@ -1206,10 +1206,9 @@ into `docs/REAL_CANDIDATE_PROFILE_BLOCKERS.md`, `docs/CODEX_PROGRESS.md`, `tests
 fixtures (×3), and — my own mistake — `docs/CLAUDE_REVIEW.md`. **Scrubbed from all tracked files**
 (name → "Test Candidate" / "their name"); `tests/test_pii_guard.py` strengthened to also derive the
 name needle from `config/candidate_profile.local.yaml` so any re-introduction fails.
-- The name **remains in git history** (commit content + the git author identity
-  `andrewweng.weng@sjsu.edu` on every commit). A `git filter-repo` rewrite would break every review
-  SHA; since the email is already unavoidably in commit metadata, the real mitigation is **making the
-  GitHub repo private** — flag for the user.
+- The name **remains in git history** (commit content and historical commit metadata). A `git
+  filter-repo` rewrite would break every review SHA; the real mitigation is **making the GitHub repo
+  private** — flag for the user.
 - **P3 for Codex** — stop putting the real name in tracked docs/tests; use "Test Candidate".
 
 ### Still open (unchanged from 3.7)
