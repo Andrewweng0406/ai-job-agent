@@ -103,7 +103,14 @@ def main() -> int:
             context.close()
             browser.close()
     if transcript is None:
-        raise SystemExit("live page did not produce a transcript")
+        _write_blocked_bundle(out, run_id, ats, job, application_id, worker_id,
+                              lease_epoch, args.url, final_browser_url, page_title,
+                              capture, html, actions)
+        repo.release_lease(application_id, worker_id, lease_epoch)
+        print(json.dumps({"run_id": run_id, "artifact_dir": str(out),
+                          "status": "HUMAN_REQUIRED", "reason": "BROWSER_HARD_STOP",
+                          "submit_invocation_count": 0}, indent=2))
+        return 2
     payload = transcript.payload
     sanitized_payload = _sanitize_payload(payload)
     sanitized_payload["sanitized"] = True
@@ -203,6 +210,41 @@ def _field_entry(index, raw, resolution, html):
 def _action(actions, action, *, lease_epoch, success, **extra):
     actions.append({"timestamp": datetime.now(timezone.utc).isoformat(), "action": action,
                     "lease_epoch": lease_epoch, "success": success, **extra})
+
+
+def _write_blocked_bundle(out, run_id, ats, job, application_id, worker_id,
+                          lease_epoch, requested_url, final_url, page_title,
+                          capture, html, actions):
+    """Persist evidence even when a provider hard-stop prevents transcript creation."""
+    (out / "field_map.json").write_text("[]", encoding="utf-8")
+    (out / "transcript.sanitized.json").write_text(json.dumps({
+        "sanitized": True, "transcript_available": False,
+        "reason": "BROWSER_HARD_STOP", "ats": ats,
+    }, indent=2, sort_keys=True), encoding="utf-8")
+    (out / "browser_actions.jsonl").write_text(
+        "".join(json.dumps(item, sort_keys=True) + "\n" for item in actions), encoding="utf-8")
+    (out / "safety.json").write_text(json.dumps({
+        "planned_field_count": 0, "attempted_field_count": 0,
+        "matched_field_count": 0, "mismatch_count": 0,
+        "unplanned_browser_actions": 0, "unfilled_required_fields": [],
+        "submit_invocation_count": 0, "autofill_performed": False,
+        "hard_stop": True,
+    }, indent=2, sort_keys=True), encoding="utf-8")
+    (out / "report.json").write_text(json.dumps({
+        "run_id": run_id, "captured_at": datetime.now(timezone.utc).isoformat(),
+        "company": job.company_name, "role": job.title, "ats": ats,
+        "canonical_job_url": job.source_url, "application_url": requested_url,
+        "final_browser_url": final_url, "page_title": page_title,
+        "live_page": True, "real_browser": True, "application_id": application_id,
+        "worker_id": worker_id, "lease_epoch": lease_epoch,
+        "transcript_available": False, "status": "HUMAN_REQUIRED",
+        "blocking_reasons": list(capture.blocking_reasons),
+        "field_count": 0, "auto_safe_count": 0, "human_required_count": 0,
+        "hidden_fields_excluded_count": 0, "upload_performed": False,
+        "post_fill_hard_stop": True, "would_submit": False,
+        "submit_invocation_count": 0, "approval_status": "not_approved",
+        "source": "live_capture", "sanitized": True,
+    }, indent=2, sort_keys=True), encoding="utf-8")
 
 
 if __name__ == "__main__":
