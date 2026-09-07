@@ -655,3 +655,30 @@ P2-11 (PDF QA gate), P2-9 (multi-category tasks), P2-12 (hard-stop state wiring)
 fixture-driven ATS adapter dry run that stops before submit, verified by a spy adapter. `real_submission_enabled`
 stays `false`; controlled submission remains a separate human decision after ≥3 reviewed dry-run
 transcripts per ATS.
+
+---
+
+## Codex response — Round 3 follow-up
+
+**Verification:** `python3 -m pytest -q` → **305 passed, 1 skipped**.
+
+### Fixed
+
+| Ref | Status |
+|---|---|
+| P1-21 resume validation gate | **Fixed.** `FormDryRunEngine` accepts `resume_validation_status`; invalid/non-passing artifacts block the resume field with `TRUTH_VALIDATION_FAILED`. `ApplicationDryRunPreparer` passes the persisted resume validation status from the database. |
+| P1-22 legal/source routing | **Fixed.** Legal/work-authorization auto-answering is restricted to tight known authorization/sponsorship phrasings. Novel legal labels and source-code/open-source labels route to human/skip rather than canned answers. |
+| P1-23 select option mapping | **Fixed.** Select/multi-select fields validate the resolved value against options and only use conservative sponsorship/authorization mappings; unmappable values become `FORM_MAPPING`. |
+| P1-24 submit attempted marker | **Fixed.** Added `submit_attempted_at`, repository `mark_submit_attempted()`, workflow marking before submit, and reaper logic based on that dedicated column instead of free-text `notes`. |
+| P2-9 multi-category human tasks | **Fixed.** Dry-runs now open one human task per distinct blocking category. |
+| P2-10 transcript payload/approval foundation | **Fixed foundation.** Transcript payload includes `persona` and source-neutral `requisition_key`; repository approval/hash helpers are available for future submit gating. |
+| P2-11 PDF QA | **Fixed foundation.** PDF rendering no longer truncates lines, paginates long content, applies ASCII-safe punctuation fallback, and the generator runs `pdf_qa` before producing a validated artifact. |
+| P2-12 bot-wall detection | **Fixed at capture level.** Browser capture now detects Turnstile/Cloudflare challenge markers in addition to CAPTCHA/MFA text tokens. Live worker state wiring remains deferred until Playwright workers exist. |
+| P2-13 radio groups | **Fixed.** Same-name radio controls are coalesced into one select-like field with options. |
+| P2-14 custom labels | **Fixed foundation.** HTML extraction now prefers nearby question text before machine `name` attributes. |
+| P2-15 single-token name | **Fixed.** Required last-name derivation blocks with `PROFILE_INCOMPLETE:name.full` instead of filling an empty string. |
+
+### Still Deferred
+
+- Controlled real submission remains deferred. `real_submission_enabled` stays `false`.
+- Live Playwright navigation/worker state wiring is next; browser capture and dry-run transcript generation are implemented first.

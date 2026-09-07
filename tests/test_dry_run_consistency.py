@@ -152,3 +152,47 @@ def test_dry_run_blocks_when_resume_not_validated(tmp_path):
     )
     resume_res = next(r for r in result.resolutions if r.canonical_key == "application.resume")
     assert resume_res.status != FormFieldStatus.FILLED
+
+
+def test_multi_category_unresolved_opens_task_per_category(tmp_path):
+    repo = _repo(tmp_path); job = _job(repo); app_id = _app(repo, job)
+    result = _engine(repo).build_transcript(
+        application_id=app_id,
+        job=job,
+        profile=_profile(),
+        resume_id="resume_1",
+        resume_path="/a/r.pdf",
+        resume_hash="h",
+        fields=[
+            RawFormField("Desired annual compensation?", InputKind.TEXT, "salary", required=True),
+            RawFormField("GitHub URL", InputKind.TEXT, "github", required=True),
+        ],
+    )
+
+    assert result.status == ApplicationStatus.HUMAN_REQUIRED
+    with repo.connect() as conn:
+        categories = {
+            row["category"]
+            for row in conn.execute("SELECT category FROM human_tasks WHERE application_id = ?", (app_id,)).fetchall()
+        }
+    assert categories == {"FORM_MAPPING", "OPTIONAL_SKIP"}
+
+
+def test_transcript_payload_has_persona_and_requisition_key_and_approval_hash(tmp_path):
+    repo = _repo(tmp_path); job = _job(repo); app_id = _app(repo, job)
+    transcript = _engine(repo).build_transcript(
+        application_id=app_id,
+        job=job,
+        profile=_profile(),
+        resume_id="resume_1",
+        resume_path="/a/r.pdf",
+        resume_hash="h",
+        fields=FULLY_RESOLVABLE,
+        persona="PRODUCT_PM",
+    ).transcript
+
+    assert transcript.payload["persona"] == "PRODUCT_PM"
+    assert transcript.payload["job"]["requisition_key"]
+    repo.approve_dry_run_transcript(transcript.transcript_id, "human@example.test")
+    assert repo.dry_run_approval_is_valid(transcript.transcript_id, transcript.payload_hash())
+    assert not repo.dry_run_approval_is_valid(transcript.transcript_id, "changed")

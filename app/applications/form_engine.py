@@ -7,6 +7,7 @@ from typing import Any
 from app.applications.dry_run import DryRunTranscript
 from app.applications.form_fields import FieldPolicy, classify_label, resolve_value
 from app.applications.human_tasks import HumanTask
+from app.models.application import requisition_key_for_job
 from app.models.enums import ApplicationStatus, QuestionAnswerState
 from app.models.job import Job
 from app.resumes.profile import CandidateProfile
@@ -39,7 +40,7 @@ class RawFormField:
     options: list[str] = field(default_factory=list)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class FormFieldResolution:
     label: str
     selector: str
@@ -93,8 +94,11 @@ class FormDryRunEngine:
         resume_path: str,
         resume_hash: str,
         fields: list[RawFormField],
+        resume_validation_status: str = "VALIDATED",
+        persona: str | None = None,
     ) -> FormDryRunResult:
-        resolutions = [resolve_form_field(field, profile, resume_path) for field in fields]
+        resume_validated = resume_validation_status.upper() in {"VALIDATED", "PASS", "PASSED"}
+        resolutions = [resolve_form_field(field, profile, resume_path, resume_validated=resume_validated) for field in fields]
         unresolved = [
             {
                 "kind": "field",
@@ -116,13 +120,16 @@ class FormDryRunEngine:
                 "role": job.title,
                 "ats": job.ats_type,
                 "job_id": job.id,
+                "requisition_key": requisition_key_for_job(job),
                 "apply_url": job.apply_url,
                 "job_content_hash": job.description_hash,
             },
+            "persona": persona,
             "resume": {
                 "resume_id": resume_id,
                 "file": resume_path,
                 "file_hash": resume_hash,
+                "truth_validation": resume_validation_status,
             },
             "fields": [resolution.to_payload() for resolution in resolutions],
             "unresolved": unresolved,
@@ -152,11 +159,22 @@ class FormDryRunEngine:
                     context={"unresolved": unresolved, "transcript_id": transcript.transcript_id},
                 ),
             )
+            for reason in blocking_reasons[1:]:
+                self.repository.open_human_task(
+                    HumanTask(
+                        application_id=application_id,
+                        job_id=job.id,
+                        category=reason,
+                        blocking_state=ApplicationStatus.HUMAN_REQUIRED.value,
+                        prompt="Application dry-run has unresolved required fields.",
+                        context={"unresolved": unresolved, "transcript_id": transcript.transcript_id},
+                    )
+                )
             return FormDryRunResult(transcript, resolutions, ApplicationStatus.HUMAN_REQUIRED)
         return FormDryRunResult(transcript, resolutions, ApplicationStatus.READY)
 
 
-def resolve_form_field(field: RawFormField, profile: CandidateProfile, resume_path: str) -> FormFieldResolution:
+def resolve_form_field(field: RawFormField, profile: CandidateProfile, resume_path: str, resume_validated: bool = True) -> FormFieldResolution:
     spec = classify_label(field.label, field.options)
     if spec is None:
         status = FormFieldStatus.HUMAN_REQUIRED if field.required else FormFieldStatus.SKIPPED
@@ -169,6 +187,17 @@ def resolve_form_field(field: RawFormField, profile: CandidateProfile, resume_pa
             reason="FORM_MAPPING" if field.required else "OPTIONAL_SKIP",
         )
     if spec.canonical_key == "application.resume":
+        if not resume_validated:
+            return FormFieldResolution(
+                label=field.label,
+                selector=field.selector,
+                kind=field.kind,
+                required=field.required,
+                status=FormFieldStatus.BLOCKED,
+                canonical_key=spec.canonical_key,
+                policy=spec.policy,
+                reason="TRUTH_VALIDATION_FAILED",
+            )
         return FormFieldResolution(
             label=field.label,
             selector=field.selector,
@@ -185,6 +214,21 @@ def resolve_form_field(field: RawFormField, profile: CandidateProfile, resume_pa
     resolved = resolve_value(spec, profile)
     legal_sensitive = spec.policy == FieldPolicy.NEVER_GUESS
     if resolved.state in {QuestionAnswerState.AUTO_SAFE, QuestionAnswerState.AUTO_FROM_PROFILE}:
+        value = resolved.value
+        if field.kind in {InputKind.SELECT, InputKind.MULTI_SELECT} and field.options:
+            value = _map_select_value(value or "", field.options, spec.canonical_key)
+            if value is None:
+                return FormFieldResolution(
+                    label=field.label,
+                    selector=field.selector,
+                    kind=field.kind,
+                    required=field.required,
+                    status=FormFieldStatus.HUMAN_REQUIRED,
+                    canonical_key=spec.canonical_key,
+                    policy=spec.policy,
+                    reason="FORM_MAPPING",
+                    legal_sensitive=legal_sensitive,
+                )
         return FormFieldResolution(
             label=field.label,
             selector=field.selector,
@@ -192,7 +236,7 @@ def resolve_form_field(field: RawFormField, profile: CandidateProfile, resume_pa
             required=field.required,
             status=FormFieldStatus.FILLED,
             canonical_key=spec.canonical_key,
-            value=resolved.value,
+            value=value,
             policy=spec.policy,
             source=_source_for_spec(spec),
             confidence=resolved.state.value,
@@ -231,3 +275,33 @@ def _source_for_spec(spec) -> dict[str, str]:
     if spec.constant:
         return {"constant": spec.constant}
     return {}
+
+
+def _map_select_value(value: str, options: list[str], canonical_key: str) -> str | None:
+    normalized_value = _normalize_option(value)
+    for option in options:
+        if _normalize_option(option) == normalized_value:
+            return option
+    if canonical_key == "requires_sponsorship":
+        wants_yes = normalized_value in {"yes", "true", "1"}
+        wants_no = normalized_value in {"no", "false", "0"}
+        for option in options:
+            normalized = _normalize_option(option)
+            if wants_yes and "require" in normalized and "sponsorship" in normalized and "not require" not in normalized and "do not" not in normalized:
+                return option
+            if wants_no and (("do not" in normalized or "not require" in normalized) and "sponsorship" in normalized):
+                return option
+    if canonical_key == "work_authorized_us":
+        wants_yes = normalized_value in {"yes", "true", "1"}
+        wants_no = normalized_value in {"no", "false", "0"}
+        for option in options:
+            normalized = _normalize_option(option)
+            if wants_yes and normalized in {"yes", "yes i am", "authorized", "i am authorized"}:
+                return option
+            if wants_no and normalized in {"no", "no i am not", "not authorized"}:
+                return option
+    return None
+
+
+def _normalize_option(value: str) -> str:
+    return " ".join(value.lower().replace(".", "").split())

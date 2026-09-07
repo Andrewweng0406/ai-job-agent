@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS applications (
     discovered_at TEXT,
     queued_at TEXT,
     applied_at TEXT,
+    submit_attempted_at TEXT,
     submission_verified_at TEXT,
     status TEXT NOT NULL,
     attempt_count INTEGER NOT NULL DEFAULT 0,

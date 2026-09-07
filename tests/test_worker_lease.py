@@ -92,14 +92,27 @@ def test_reaper_routes_post_submit_crash_to_submission_unknown(tmp_path):
     repo = _repo(tmp_path)
     _ready_application(repo)
     app_id, _epoch = repo.claim_next_application(ApplicationStatus.READY, "w1", _future(-1))
+    repo.mark_submit_attempted(app_id)
     with repo.connect() as conn:
-        conn.execute("UPDATE applications SET notes = ? WHERE application_id = ?", ("SUBMIT_POST_SENT", app_id))
+        conn.execute("UPDATE applications SET lease_expires_at = ? WHERE application_id = ?", (_future(-1).isoformat(), app_id))
 
     reaped = repo.reap_expired_leases()
 
     assert reaped == [(app_id, ApplicationStatus.SUBMISSION_UNKNOWN)]
     assert repo.get_application_status(app_id) == ApplicationStatus.SUBMISSION_UNKNOWN
     assert repo.claim_next_application(ApplicationStatus.RETRY_PENDING, "w2", _future(10)) is None
+
+
+def test_reaper_ignores_notes_for_submit_attempt_detection(tmp_path):
+    repo = _repo(tmp_path)
+    _ready_application(repo)
+    app_id, _epoch = repo.claim_next_application(ApplicationStatus.READY, "w1", _future(-1))
+    with repo.connect() as conn:
+        conn.execute("UPDATE applications SET notes = ? WHERE application_id = ?", ("SUBMIT_POST_SENT", app_id))
+
+    reaped = repo.reap_expired_leases()
+
+    assert reaped == [(app_id, ApplicationStatus.RETRY_PENDING)]
 
 
 def test_reaper_routes_expired_tailoring_to_retry_pending(tmp_path):

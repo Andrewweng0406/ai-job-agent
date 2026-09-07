@@ -85,7 +85,9 @@ class ApplicationDryRunPreparer:
             resume_id=row["resume_id"],
             resume_path=row["resume_file_path"],
             resume_hash=row["resume_file_hash"],
+            resume_validation_status=row["resume_validation_status"],
             fields=self.field_provider.fields_for(job.ats_type),
+            persona=row["persona"],
         )
         return DryRunPrepareResult(dry_run, dry_run.status)
 

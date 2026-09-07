@@ -79,3 +79,40 @@ def test_ashby_react_like_fields_are_extracted_from_aria_and_placeholder():
     assert fields[0].required
     assert fields[2].kind == InputKind.SELECT
     assert fields[2].options == ["Yes", "No"]
+
+
+def test_radio_group_is_coalesced_into_one_select_field():
+    html = """
+    <form>
+      <fieldset>
+        <legend>Will you now or in the future require sponsorship?</legend>
+        <label for="s_yes">Yes</label><input id="s_yes" type="radio" name="sponsor" value="yes" required />
+        <label for="s_no">No</label><input id="s_no" type="radio" name="sponsor" value="no" required />
+      </fieldset>
+    </form>
+    """
+
+    fields = HtmlFormFieldExtractor().extract(html, "greenhouse")
+
+    assert len(fields) == 1
+    assert fields[0].kind == InputKind.SELECT
+    assert fields[0].label == "Will you now or in the future require sponsorship?"
+    assert fields[0].options == ["Yes", "No"]
+    assert fields[0].required
+
+
+def test_custom_question_label_without_for_uses_preceding_text():
+    html = """
+    <form>
+      <div class="application-question">
+        <div class="application-label">Why do you want to work here?</div>
+        <textarea name="cards[abc][field0]"></textarea>
+      </div>
+    </form>
+    """
+
+    fields = HtmlFormFieldExtractor().extract(html, "lever")
+
+    assert len(fields) == 1
+    assert fields[0].label == "Why do you want to work here?"
+    assert fields[0].kind == InputKind.LONG_TEXT

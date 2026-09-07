@@ -29,7 +29,8 @@ class BrowserCaptureResult:
 
 class BrowserFieldCapture:
     CAPTCHA_PATTERN = re.compile(
-        r"\b(captcha|hcaptcha|recaptcha|verify\s+you\s+are\s+human|checking\s+your\s+browser)\b",
+        r"\b(captcha|hcaptcha|recaptcha|turnstile|cf-turnstile|cf-challenge|"
+        r"challenges\.cloudflare\.com|verify\s+you\s+are\s+human|checking\s+your\s+browser)\b",
         re.I,
     )
     MFA_PATTERN = re.compile(r"\b(mfa|multi-factor|two-factor|verification\s+code|one-time\s+password|otp)\b", re.I)

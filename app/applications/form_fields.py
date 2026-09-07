@@ -61,10 +61,10 @@ FIELD_SPECS = {
 
 def classify_label(raw_label: str, options: list[str] | None = None) -> FieldSpec | None:
     label = " ".join(raw_label.lower().split())
-    if re.search(r"\b(immigration|visa|sponsorship|citizen|authorized to work|work authorization)\b", label):
-        if "sponsorship" in label:
+    if re.search(r"\b(immigration|visa|sponsorship|citizen|authorized to work|work authorization|employer support|petition|contingent on employer action)\b", label):
+        if _is_known_sponsorship_question(label):
             return FIELD_SPECS["requires_sponsorship"]
-        if "authorized" in label or "work authorization" in label:
+        if _is_known_authorization_question(label):
             return FIELD_SPECS["work_authorized_us"]
         return FieldSpec("legal_unknown", FieldPolicy.HUMAN_REQUIRED)
     if re.search(r"\b(gender|race|ethnicity|veteran|disability)\b", label):
@@ -91,9 +91,22 @@ def classify_label(raw_label: str, options: list[str] | None = None) -> FieldSpe
         return FIELD_SPECS["school"]
     if "graduation" in label or "expected completion" in label:
         return FIELD_SPECS["graduation_date"]
-    if "how did you hear" in label or "source" in label:
+    if "how did you hear" in label or re.search(r"\b(source|referral source)\b", label) and not re.search(r"\b(open source|source code|source of .*experience)\b", label):
         return FIELD_SPECS["source"]
     return None
+
+
+def _is_known_authorization_question(label: str) -> bool:
+    return bool(re.search(r"\b(legally\s+)?authorized\s+to\s+work\s+in\s+(the\s+)?(u\.s\.|us|united states)\b", label))
+
+
+def _is_known_sponsorship_question(label: str) -> bool:
+    if "cannot" in label or "can't" in label or "unable" in label:
+        return False
+    return bool(
+        re.search(r"\b(now\s+or\s+in\s+the\s+future|current\s+or\s+future)\b", label)
+        and re.search(r"\brequire\s+(visa\s+|employment\s+visa\s+)?sponsorship\b|\bsponsorship\s+for\s+an\s+employment\s+visa\b", label)
+    )
 
 
 def resolve_value(spec: FieldSpec, profile: CandidateProfile) -> ResolveResult:
@@ -120,6 +133,8 @@ def resolve_value(spec: FieldSpec, profile: CandidateProfile) -> ResolveResult:
             return ResolveResult(QuestionAnswerState.AUTO_FROM_PROFILE, value=str(fact.value).split()[0])
         if spec.canonical_key == "personal.last_name":
             parts = str(fact.value).split()
-            return ResolveResult(QuestionAnswerState.AUTO_FROM_PROFILE, value=parts[-1] if len(parts) > 1 else "")
+            if len(parts) <= 1:
+                return ResolveResult(QuestionAnswerState.HUMAN_REQUIRED, reason="PROFILE_INCOMPLETE:name.full")
+            return ResolveResult(QuestionAnswerState.AUTO_FROM_PROFILE, value=parts[-1])
         return ResolveResult(QuestionAnswerState.AUTO_FROM_PROFILE, value=str(fact.value))
     return ResolveResult(QuestionAnswerState.UNSUPPORTED, reason="NO_RESOLUTION_RULE")

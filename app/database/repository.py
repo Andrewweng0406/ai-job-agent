@@ -58,7 +58,7 @@ class JobAgentRepository:
                 (_application_dedupe_key(row["job_id"]), row["application_id"]),
             )
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_applications_dedupe_key ON applications(dedupe_key)")
-        for column_name in ("worker_id", "claimed_at", "lease_expires_at"):
+        for column_name in ("worker_id", "claimed_at", "lease_expires_at", "submit_attempted_at"):
             if column_name not in columns:
                 try:
                     conn.execute(f"ALTER TABLE applications ADD COLUMN {column_name} TEXT")
@@ -127,6 +127,7 @@ class JobAgentRepository:
                 SELECT
                     a.application_id, a.company, a.position, a.persona, a.resume_id,
                     r.file_path AS resume_file_path, r.file_hash AS resume_file_hash,
+                    r.validation_status AS resume_validation_status,
                     j.id AS job_id, j.external_job_id, j.company_id, j.company_name,
                     j.title, j.normalized_title, j.job_family, j.location, j.remote_status,
                     j.employment_type, j.salary_min, j.salary_max, j.currency, j.description,
@@ -300,7 +301,7 @@ class JobAgentRepository:
             conn.execute("BEGIN IMMEDIATE")
             rows = conn.execute(
                 """
-                SELECT application_id, status, notes
+                SELECT application_id, status, submit_attempted_at
                 FROM applications
                 WHERE status IN ('APPLYING', 'TAILORING')
                   AND lease_expires_at IS NOT NULL
@@ -313,7 +314,7 @@ class JobAgentRepository:
                 current = ApplicationStatus(row["status"])
                 target = (
                     ApplicationStatus.SUBMISSION_UNKNOWN
-                    if current == ApplicationStatus.APPLYING and "SUBMIT_POST_SENT" in (row["notes"] or "")
+                    if current == ApplicationStatus.APPLYING and row["submit_attempted_at"]
                     else ApplicationStatus.RETRY_PENDING
                 )
                 transition = machine.transition(current, target, "expired worker lease reaped")
@@ -374,6 +375,13 @@ class JobAgentRepository:
             conn.execute(
                 "UPDATE applications SET attempt_count = attempt_count + 1 WHERE application_id = ?",
                 (application_id,),
+            )
+
+    def mark_submit_attempted(self, application_id: str, attempted_at: datetime | None = None) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "UPDATE applications SET submit_attempted_at = ? WHERE application_id = ?",
+                (dt(attempted_at or datetime.now(timezone.utc)), application_id),
             )
 
     def set_applied_at_now(self, application_id: str) -> None:
@@ -550,6 +558,29 @@ class JobAgentRepository:
                 ),
             )
             return transcript.transcript_id
+
+    def approve_dry_run_transcript(self, transcript_id: str, approved_by: str, approved_at: datetime | None = None) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                UPDATE dry_run_transcripts
+                SET approved_by = ?, approved_at = ?
+                WHERE transcript_id = ?
+                """,
+                (approved_by, dt(approved_at or datetime.now(timezone.utc)), transcript_id),
+            )
+
+    def dry_run_approval_is_valid(self, transcript_id: str, payload_hash: str) -> bool:
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT approved_by, approved_at, payload_hash
+                FROM dry_run_transcripts
+                WHERE transcript_id = ?
+                """,
+                (transcript_id,),
+            ).fetchone()
+        return row is not None and bool(row["approved_by"]) and bool(row["approved_at"]) and row["payload_hash"] == payload_hash
 
     def transition_application(self, application_id: str, target: ApplicationStatus, reason: str) -> None:
         machine = ApplicationStateMachine()

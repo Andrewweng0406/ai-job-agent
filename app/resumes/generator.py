@@ -9,6 +9,7 @@ import json
 from app.models.enums import Persona
 from app.models.job import Job, utc_now
 from app.resumes.pdf import render_simple_pdf
+from app.resumes.pdf_qa import run_pdf_qa
 from app.resumes.profile import CandidateProfile, profile_completeness_gate
 from app.resumes.truth_validation import check_required_fields, validate_claims_against_profile
 
@@ -73,6 +74,13 @@ class DeterministicResumeGenerator:
         pdf_path = self.output_dir / f"{base_name}.pdf"
         json_path.write_text(json.dumps({"sections": sections}, indent=2, sort_keys=True), encoding="utf-8")
         pdf_bytes = render_simple_pdf(content.splitlines())
+        pdf_qa = run_pdf_qa(pdf_bytes, content.splitlines())
+        if not pdf_qa.passed:
+            return ResumeGenerationResult(
+                artifact=None,
+                human_required_reason="PDF_QA_FAILED",
+                missing_fact_ids=pdf_qa.failures,
+            )
         pdf_path.write_bytes(pdf_bytes)
         file_hash = hashlib.sha256(pdf_bytes).hexdigest()
         artifact = ResumeArtifact(

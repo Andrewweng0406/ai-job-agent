@@ -109,6 +109,18 @@ def test_required_optional_field_without_value_blocks_instead_of_guessing():
     assert result.reason == "OPTIONAL_SKIP"
 
 
+def test_single_token_name_blocks_required_last_name():
+    profile = _profile(facts={"name.full": "Prince"}, answers={})
+    result = resolve_form_field(
+        RawFormField("Last Name", InputKind.TEXT, "#last", required=True),
+        profile,
+        "resume.pdf",
+    )
+
+    assert result.status == FormFieldStatus.BLOCKED
+    assert result.reason == "PROFILE_INCOMPLETE:name.full"
+
+
 def _repo_job_app(tmp_path):
     repo = JobAgentRepository(tmp_path / "form.sqlite3")
     repo.initialize()

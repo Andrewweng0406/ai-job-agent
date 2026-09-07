@@ -87,6 +87,8 @@ class ApplicationWorkflowRunner:
             adapter.upload_resume(application, resume_path)
             adapter.answer_questions(application)
             adapter.validate(application)
+            if repository:
+                repository.mark_submit_attempted(application.application_id)
             adapter.submit(application)
             submit_sent = True
             verification = adapter.verify_submission(application)

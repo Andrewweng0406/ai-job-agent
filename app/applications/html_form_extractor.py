@@ -75,9 +75,13 @@ class HtmlFormFieldExtractor:
         parser = _FormHtmlParser()
         parser.feed(html)
         fields: list[RawFormField] = []
+        radio_groups: dict[str, list[_Element]] = {}
         for index, control in enumerate(parser.controls):
             input_type = control.attrs.get("type", "text").lower()
             if input_type in {"hidden", "submit", "button", "reset"}:
+                continue
+            if input_type == "radio" and control.attrs.get("name"):
+                radio_groups.setdefault(control.attrs["name"], []).append(control)
                 continue
             label = _label_for(control, parser.labels)
             if not label:
@@ -91,6 +95,19 @@ class HtmlFormFieldExtractor:
                     options=control.options,
                 )
             )
+        for index, (name, controls) in enumerate(radio_groups.items()):
+            options = [_label_for(control, parser.labels) or control.attrs.get("value", "") for control in controls]
+            options = [_clean_text(option) for option in options if _clean_text(option)]
+            label = _radio_group_label(name, controls, options)
+            fields.append(
+                RawFormField(
+                    label=label,
+                    kind=InputKind.SELECT,
+                    selector=f"name={name}",
+                    required=any(_is_required(control, label) for control in controls),
+                    options=options,
+                )
+            )
         return fields
 
 
@@ -98,10 +115,14 @@ def _label_for(control: _Element, labels: dict[str, str]) -> str:
     control_id = control.attrs.get("id")
     if control_id and labels.get(control_id):
         return labels[control_id]
-    for key in ("aria-label", "placeholder", "name"):
+    for key in ("aria-label", "placeholder"):
         if control.attrs.get(key):
             return _clean_text(control.attrs[key])
-    return _clean_text(control.text)
+    if control.text:
+        return _clean_text(control.text)
+    if control.attrs.get("name"):
+        return _clean_text(control.attrs["name"])
+    return ""
 
 
 def _kind_for(tag: str, input_type: str, attrs: dict[str, str], options: list[str]) -> InputKind:
@@ -139,6 +160,17 @@ def _is_required(control: _Element, label: str) -> bool:
         or "required" in class_text.lower()
         or label.rstrip().endswith("*")
     )
+
+
+def _radio_group_label(name: str, controls: list[_Element], options: list[str]) -> str:
+    for control in controls:
+        text = control.text
+        for option in options:
+            text = re.sub(rf"\b{re.escape(option)}\b", " ", text, flags=re.I)
+        text = _clean_text(text)
+        if text:
+            return text
+    return _clean_text(name)
 
 
 def _clean_text(value: str) -> str:

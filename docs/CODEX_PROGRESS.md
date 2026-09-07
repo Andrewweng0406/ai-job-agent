@@ -7,7 +7,7 @@ Codex remains the primary implementation owner. Claude Round 1 P0/P1 findings ha
 Latest local verification:
 
 - `python3 -m pytest -q`
-- Result: `252 passed`
+- Result: `305 passed, 1 skipped`
 
 ## Claude Round 1 Findings
 
@@ -98,6 +98,11 @@ Latest local verification:
 - HTML form field extractor for Greenhouse/Lever/Ashby-style DOM snapshots, with a provider bridge into the dry-run engine.
 - Browser page capture abstraction that reads HTML/screenshots, detects CAPTCHA/MFA, and refuses field extraction when a human challenge is present.
 - Worker lease reaper that routes expired pre-submit work to `RETRY_PENDING` and expired post-submit work to `SUBMISSION_UNKNOWN`.
+- Dedicated `submit_attempted_at` marker so reaping never depends on free-text notes.
+- PDF QA gate plus paginated, non-truncating, ASCII-safe PDF rendering.
+- Dry-run transcript approval/hash helpers and persona/requisition payload fields.
+- Multi-category dry-run human tasks for unresolved form blockers.
+- Radio group coalescing, custom-question label fallback, stricter legal form routing, select-option validation, and single-token-name blocking.
 
 ## Next
 
