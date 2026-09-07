@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Produce a sanitized, no-submit Greenhouse live dry-run evidence bundle."""
+"""Produce a sanitized, no-submit live dry-run evidence bundle for a shared ATS."""
 from __future__ import annotations
 
 import argparse
@@ -19,6 +19,8 @@ from app.applications.form_engine import FormDryRunEngine
 from app.applications.browser_autofill import DryRunBrowserAutofill
 from app.applications.preview import ApprovedAutofillPreviewBuilder
 from app.applications.greenhouse_dry_run import GreenhouseDryRunAdapter
+from app.applications.lever_dry_run import LeverDryRunAdapter
+from app.applications.ashby_dry_run import AshbyDryRunAdapter
 from app.models.application import Application
 from app.models.enums import ApplicationStatus, JobFamily
 from app.models.job import Job
@@ -30,18 +32,19 @@ def main() -> int:
     args = _args()
     if args.real_submission_enabled:
         raise SystemExit("real_submission_enabled must remain false")
-    run_id = args.run_id or f"greenhouse-{uuid4().hex}"
+    ats = args.ats
+    run_id = args.run_id or f"{ats}-{uuid4().hex}"
     out = Path(args.output) / run_id
     out.mkdir(parents=True, exist_ok=False)
     captured_at = datetime.now(timezone.utc).isoformat()
     profile = CandidateProfile.from_yaml(args.profile)
-    job = _job_from_url(args.url, args.company, args.role)
+    job = _job_from_url(args.url, args.company, args.role, ats)
     repo = JobAgentRepository(out / "run.sqlite3")
     repo.initialize()
     job.id = repo.upsert_job(job)
     application = Application(job_id=job.id, company=job.company_name, position=job.title,
                               location=job.location, job_family=job.job_family,
-                              source="greenhouse", ats_type="greenhouse")
+                              source=ats, ats_type=ats)
     application_id = repo.insert_application(application)
     for status in (ApplicationStatus.ELIGIBLE, ApplicationStatus.QUEUED,
                    ApplicationStatus.TAILORING, ApplicationStatus.READY):
@@ -69,10 +72,12 @@ def main() -> int:
             html = page.content()
             (out / "dom.sanitized.html").write_text(_sanitize_html(html), encoding="utf-8")
             _action(actions, "SCAN_HARD_STOP", lease_epoch=lease_epoch, success=True)
-            capture = BrowserFieldCapture().capture(page, ats_type="greenhouse")
+            capture = BrowserFieldCapture().capture(page, ats_type=ats)
             _action(actions, "EXTRACT_FIELDS", lease_epoch=lease_epoch, success=True,
                     field_count=len(capture.fields))
-            adapter = GreenhouseDryRunAdapter(repo, real_submission_enabled=False)
+            adapter_cls = {"greenhouse": GreenhouseDryRunAdapter, "lever": LeverDryRunAdapter,
+                           "ashby": AshbyDryRunAdapter}[ats]
+            adapter = adapter_cls(repo, real_submission_enabled=False)
             result = adapter.dry_run(page=page, application_id=application_id, job=job,
                                      profile=profile, resume_id="none", resume_path="",
                                      resume_hash="", resume_validation_status="PDF_QA_FAILED",
@@ -86,7 +91,7 @@ def main() -> int:
                 ApprovedAutofillPreviewBuilder(repo).build(transcript.transcript_id)
                 _action(actions, "APPROVAL_VERIFIED", lease_epoch=lease_epoch, success=True)
                 autofill = DryRunBrowserAutofill().apply(
-                    page, resolutions, expected_resume_hash=""
+                            page, resolutions, expected_resume_hash=""
                 )
                 for selector in autofill.filled_selectors:
                     _action(actions, "FILL_TEXT", field_id=selector, lease_epoch=lease_epoch, success=True)
@@ -114,7 +119,7 @@ def main() -> int:
     }, indent=2, sort_keys=True), encoding="utf-8")
     report = {
         "run_id": run_id, "captured_at": captured_at, "company": job.company_name,
-        "role": job.title, "ats": "greenhouse", "canonical_job_url": job.source_url,
+        "role": job.title, "ats": ats, "canonical_job_url": job.source_url,
         "application_url": args.url, "final_browser_url": final_browser_url, "page_title": page_title,
         "live_page": True, "real_browser": True, "application_id": application_id,
         "worker_id": worker_id, "lease_epoch": lease_epoch, "transcript_id": transcript.transcript_id,
@@ -138,6 +143,7 @@ def main() -> int:
 def _args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", required=True)
+    parser.add_argument("--ats", choices=("greenhouse", "lever", "ashby"), default="greenhouse")
     parser.add_argument("--company", default="Live Greenhouse Company")
     parser.add_argument("--role", default="Live Greenhouse Role")
     parser.add_argument("--profile", default="config/candidate_profile.yaml")
@@ -149,12 +155,12 @@ def _args():
     return parser.parse_args()
 
 
-def _job_from_url(url: str, company: str, role: str) -> Job:
+def _job_from_url(url: str, company: str, role: str, ats: str) -> Job:
     match = re.search(r"/jobs/(\d+)", url)
     external_id = match.group(1) if match else hashlib.sha256(url.encode()).hexdigest()[:12]
     return Job(external_job_id=external_id, company_id=company.lower().replace(" ", "-"),
                company_name=company, title=role, location="Unknown", description="Live Greenhouse dry run",
-               source="greenhouse", source_url=url, apply_url=url, ats_type="greenhouse",
+               source=ats, source_url=url, apply_url=url, ats_type=ats,
                job_family=JobFamily.UNKNOWN, metadata={"requisition_id": external_id})
 
 

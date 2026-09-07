@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from uuid import NAMESPACE_URL, uuid5
 
 from app.utils.config import load_yaml
 
@@ -44,8 +45,11 @@ class CandidateProfile:
             )
             facts[fact.fact_id] = fact
         answers = data.get("application_answers", {})
+        configured_id = str(meta.get("candidate_id", "TODO"))
+        # This is only a stable database namespace; it is never candidate data.
+        candidate_id = configured_id if configured_id != "TODO" else f"internal-{uuid5(NAMESPACE_URL, 'ai-job-agent:local-candidate-profile')}"
         return cls(
-            candidate_id=str(meta.get("candidate_id", "TODO")),
+            candidate_id=candidate_id,
             schema_version=int(meta.get("schema_version", 2)),
             facts=facts,
             application_answers={str(key): str(value) for key, value in answers.items()},
