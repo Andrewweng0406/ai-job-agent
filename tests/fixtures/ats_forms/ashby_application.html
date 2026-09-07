@@ -1,0 +1,90 @@
+<!--
+  Representative Ashby hosted application form (jobs.ashbyhq.com/{org}/{id}).
+  Hand-built to mirror the real DOM shape: _fieldEntry wrappers, custom label divs (no <label for>),
+  Yes/No custom radio groups, a dropdown, a multi-select, a file dropzone (visually-hidden input),
+  aria-labelledby on a long-text question, a honeypot, an offscreen decoy, a disabled trap.
+  NOT a live capture.
+-->
+<html><head><title>Product Analyst at Ramp</title></head><body>
+<form data-testid="application-form">
+  <div class="_fieldEntry_x1">
+    <div class="_label_x1" id="lbl-name">Name<span aria-hidden="true">*</span></div>
+    <input aria-labelledby="lbl-name" name="_systemfield_name" required>
+  </div>
+  <div class="_fieldEntry_x1">
+    <div class="_label_x1" id="lbl-email">Email<span aria-hidden="true">*</span></div>
+    <input aria-labelledby="lbl-email" name="_systemfield_email" type="email" required>
+  </div>
+  <div class="_fieldEntry_x1">
+    <div class="_label_x1" id="lbl-phone">Phone</div>
+    <input aria-labelledby="lbl-phone" name="_systemfield_phone" type="tel">
+  </div>
+  <div class="_fieldEntry_x1">
+    <div class="_label_x1" id="lbl-resume">Resume<span aria-hidden="true">*</span></div>
+    <input aria-labelledby="lbl-resume" name="_systemfield_resume" type="file" class="visually-hidden" required>
+  </div>
+
+  <div class="_fieldEntry_x1">
+    <div class="_label_x1" id="lbl-spon">Do you now or in the future require sponsorship to work in the US?<span aria-hidden="true">*</span></div>
+    <div role="radiogroup" aria-labelledby="lbl-spon">
+      <label><input type="radio" name="q_sponsorship" value="Yes" required> Yes</label>
+      <label><input type="radio" name="q_sponsorship" value="No" required> No</label>
+    </div>
+  </div>
+
+  <div class="_fieldEntry_x1">
+    <div class="_label_x1" id="lbl-auth">Are you authorized to work in the United States?<span aria-hidden="true">*</span></div>
+    <div role="radiogroup" aria-labelledby="lbl-auth">
+      <label><input type="radio" name="q_auth" value="Yes" required> Yes</label>
+      <label><input type="radio" name="q_auth" value="No" required> No</label>
+    </div>
+  </div>
+
+  <div class="_fieldEntry_x1">
+    <label class="_label_x1" for="q_hear">How did you hear about this role?</label>
+    <select id="q_hear" name="q_hear">
+      <option value="">Select an option</option><option>Company website</option><option>LinkedIn</option><option>Referral</option>
+    </select>
+  </div>
+
+  <div class="_fieldEntry_x1">
+    <label class="_label_x1" for="q_locations">Which office locations work for you? (select all)</label>
+    <select id="q_locations" name="q_locations" multiple>
+      <option>New York</option><option>San Francisco</option><option>Remote (US)</option>
+    </select>
+  </div>
+
+  <div class="_fieldEntry_x1">
+    <div class="_label_x1" id="lbl-salary">What are your compensation expectations?<span aria-hidden="true">*</span></div>
+    <input aria-labelledby="lbl-salary" name="q_salary" required>
+  </div>
+
+  <div class="_fieldEntry_x1">
+    <span id="lbl-why" class="_label_x1">Tell us why you're excited about this role.<span aria-hidden="true">*</span></span>
+    <textarea aria-labelledby="lbl-why" name="q_why" required></textarea>
+  </div>
+
+  <div class="_fieldEntry_x1" data-visible-if="q_relocate=Yes">
+    <label class="_label_x1" for="q_relocate_when">If relocating, when could you start?</label>
+    <input id="q_relocate_when" name="q_relocate_when">
+  </div>
+
+  <fieldset>
+    <legend>U.S. Equal Employment Opportunity</legend>
+    <label for="a_gender">Gender</label>
+    <select id="a_gender" name="a_gender">
+      <option value="">I don't wish to answer</option><option>Man</option><option>Woman</option>
+    </select>
+    <label for="a_disability">Disability status</label>
+    <select id="a_disability" name="a_disability">
+      <option value="">I do not want to answer</option><option>Yes</option><option>No</option>
+    </select>
+  </fieldset>
+
+  <input name="q_honeypot_email" type="text" style="display:none" aria-hidden="true" tabindex="-1">
+  <input name="q_offscreen" type="text" style="position:absolute;left:-9999px">
+  <input name="q_disabled" type="text" disabled>
+
+  <button type="submit">Submit Application</button>
+</form>
+</body></html>

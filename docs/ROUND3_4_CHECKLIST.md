@@ -142,3 +142,21 @@ sanitized transcript, (e) `run.sqlite3` un-committed. Then Gate G can PASS and L
 5. A real submit worker still does not exist.
 6. `real_submission_enabled` stays `false` until ≥3 fully-audited *approved-autofill* dry-run bundles per
    ATS (Greenhouse, Lever, Ashby).
+
+## Codex autonomous follow-up
+
+Verification: `pytest -q` -> **412 passed, 1 skipped**.
+
+- P1-28: the reusable live runner accepts worker fencing metadata and an approved transcript identifier;
+  it checks ownership before navigation, DOM work, and autofill checkpoints. Autofill remains impossible
+  without explicit human invocation and approval.
+- P2-21: hidden, disabled, opacity-zero, and clearly offscreen controls are excluded and covered by
+  promoted regression tests.
+- P2-23: evidence-run SQLite files are ignored and removed from committed bundles.
+- P2-24: evidence script captures the application form region when available, otherwise a full-page image.
+- P2-25/P2-26: transcript payloads are marked sanitized with sensitive values redacted; HTML phone
+  redaction is separator/context constrained so requisition IDs remain auditable.
+
+Gate G remains conditional on a real candidate profile and a reviewer-approved, `would_submit=true`
+transcript before any live autofill. The current TODO-backed profile intentionally produces
+`HUMAN_REQUIRED`; no synthetic data crosses into real submission.

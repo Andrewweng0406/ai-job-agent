@@ -1,0 +1,95 @@
+<!--
+  Representative Lever hosted application form (jobs.lever.co/{co}/{id}/apply).
+  Hand-built to mirror the real DOM shape: .application-form, .application-field / .application-question
+  blocks, name="cards[UUID][fieldN]" custom questions, radios as <label><input type=radio></label>,
+  a honeypot, an offscreen decoy, a disabled trap, an aria-hidden validity mirror.
+  NOT a live capture. Exists so shared-ATS field extraction can be red-teamed.
+-->
+<html><head><title>Data Analyst - Acme</title></head><body>
+<form class="application-form" method="POST" action="/acme/aaaa-bbbb/apply">
+  <div class="application-field">
+    <label>Full name<span class="required-symbol">✱</span></label>
+    <input name="name" required>
+  </div>
+  <div class="application-field">
+    <label>Email<span class="required-symbol">✱</span></label>
+    <input name="email" type="email" required>
+  </div>
+  <div class="application-field">
+    <label>Phone</label>
+    <input name="phone" type="tel">
+  </div>
+  <div class="application-field">
+    <label>Resume/CV<span class="required-symbol">✱</span></label>
+    <input name="resume" type="file" required>
+  </div>
+  <div class="application-field">
+    <label>LinkedIn URL</label>
+    <input name="urls[LinkedIn]">
+  </div>
+
+  <div class="application-question">
+    <div class="application-label">Will you now or in the future require sponsorship for employment visa status?<span class="required-symbol">✱</span></div>
+    <ul class="application-answers">
+      <li><label><input type="radio" name="cards[b1a2c3d4][field0]" value="Yes" required>Yes</label></li>
+      <li><label><input type="radio" name="cards[b1a2c3d4][field0]" value="No" required>No</label></li>
+    </ul>
+  </div>
+
+  <div class="application-question">
+    <div class="application-label">Are you legally authorized to work in the United States?<span class="required-symbol">✱</span></div>
+    <ul class="application-answers">
+      <li><label><input type="radio" name="cards[b1a2c3d4][field1]" value="Yes" required>Yes</label></li>
+      <li><label><input type="radio" name="cards[b1a2c3d4][field1]" value="No" required>No</label></li>
+    </ul>
+  </div>
+
+  <div class="application-question">
+    <label class="application-label" for="salary">Desired base salary (USD)<span class="required-symbol">✱</span></label>
+    <input id="salary" name="cards[b1a2c3d4][field2]" required>
+  </div>
+
+  <div class="application-question">
+    <label class="application-label" for="relo">Are you willing to relocate?</label>
+    <select id="relo" name="cards[b1a2c3d4][field3]">
+      <option value="">Select...</option><option>Yes</option><option>No</option>
+    </select>
+  </div>
+
+  <div class="application-question">
+    <label class="application-label" for="why">Why do you want to work at Acme?<span class="required-symbol">✱</span></label>
+    <textarea id="why" name="cards[b1a2c3d4][field4]" required></textarea>
+  </div>
+
+  <div class="application-question" data-conditional="cards[b1a2c3d4][field3]=Yes">
+    <label class="application-label" for="relo_city">Which city would you relocate to?</label>
+    <input id="relo_city" name="cards[b1a2c3d4][field5]">
+  </div>
+
+  <div class="application-additional">
+    <label for="comments">Additional information</label>
+    <textarea id="comments" name="comments"></textarea>
+  </div>
+
+  <fieldset class="eeo">
+    <legend>Voluntary Self-Identification</legend>
+    <label for="gender">Gender</label>
+    <select id="gender" name="eeoResponses[gender]">
+      <option value="">Decline to self identify</option><option>Male</option><option>Female</option>
+    </select>
+    <label for="veteran">Veteran status</label>
+    <select id="veteran" name="eeoResponses[veteran]">
+      <option value="">I prefer not to answer</option><option>Protected veteran</option><option>Not a protected veteran</option>
+    </select>
+  </fieldset>
+
+  <!-- honeypot + traps -->
+  <input name="cards[b1a2c3d4][honeypot]" type="text" style="display:none" aria-hidden="true" tabindex="-1" autocomplete="off">
+  <input name="off_screen" type="text" style="position:absolute;left:-9999px">
+  <input name="disabled_trap" type="text" disabled>
+  <input name="opacity_trap" type="text" style="opacity:0">
+  <input class="visually-hidden-required-mirror" type="text" tabindex="-1" aria-hidden="true" required>
+
+  <button type="submit" class="template-btn-submit">Submit application</button>
+</form>
+</body></html>

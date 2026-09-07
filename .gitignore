@@ -11,6 +11,7 @@ venv/
 data/*.sqlite3
 data/*.db
 data/resumes/
+artifacts/**/run.sqlite3
 logs/*
 !logs/.gitkeep
 

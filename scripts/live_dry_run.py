@@ -65,7 +65,7 @@ def main() -> int:
             page.goto(args.url, wait_until="domcontentloaded", timeout=args.timeout_ms)
             page_title = page.title()
             final_browser_url = page.url
-            page.screenshot(path=str(out / "before_fill.png"))
+            _form_screenshot(page, out / "before_fill.png")
             html = page.content()
             (out / "dom.sanitized.html").write_text(_sanitize_html(html), encoding="utf-8")
             _action(actions, "SCAN_HARD_STOP", lease_epoch=lease_epoch, success=True)
@@ -92,7 +92,7 @@ def main() -> int:
                     _action(actions, "FILL_TEXT", field_id=selector, lease_epoch=lease_epoch, success=True)
             else:
                 autofill = None
-            page.screenshot(path=str(out / "after_fill.png"))
+            _form_screenshot(page, out / "after_fill.png")
             _action(actions, "POST_FILL_SCAN", lease_epoch=lease_epoch, success=True)
         finally:
             context.close()
@@ -100,7 +100,9 @@ def main() -> int:
     if transcript is None:
         raise SystemExit("live page did not produce a transcript")
     payload = transcript.payload
-    (out / "transcript.sanitized.json").write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    sanitized_payload = _sanitize_payload(payload)
+    sanitized_payload["sanitized"] = True
+    (out / "transcript.sanitized.json").write_text(json.dumps(sanitized_payload, indent=2, sort_keys=True), encoding="utf-8")
     field_map = [_field_entry(i, raw, resolution, html) for i, (raw, resolution) in enumerate(zip(capture.fields, resolutions))]
     (out / "field_map.json").write_text(json.dumps(field_map, indent=2, sort_keys=True), encoding="utf-8")
     (out / "browser_actions.jsonl").write_text("".join(json.dumps(item, sort_keys=True) + "\n" for item in actions), encoding="utf-8")
@@ -158,8 +160,26 @@ def _job_from_url(url: str, company: str, role: str) -> Job:
 
 def _sanitize_html(html: str) -> str:
     html = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "[REDACTED_EMAIL]", html)
-    html = re.sub(r"(?<!\d)(?:\+?\d[\d ()-]{8,}\d)(?!\d)", "[REDACTED_PHONE]", html)
+    html = re.sub(r"(?<![\w])\+?\d{1,3}[ -]?(?:\(\d{3}\)|\d{3})[ -]\d{3}[ -]\d{4}(?!\w)", "[REDACTED_PHONE]", html)
     return html
+
+
+def _sanitize_payload(payload):
+    clean = json.loads(json.dumps(payload))
+    for field in clean.get("fields", []):
+        key = str(field.get("canonical_key") or "").lower()
+        if field.get("legal_sensitive") or key in {"email", "phone", "contact.email", "contact.phone"}:
+            if field.get("value") is not None:
+                field["value"] = "[REDACTED]"
+    return clean
+
+
+def _form_screenshot(page, path: Path) -> None:
+    form = page.locator("#application_form")
+    if form.count():
+        form.screenshot(path=str(path))
+    else:
+        page.screenshot(path=str(path), full_page=True)
 
 
 def _field_entry(index, raw, resolution, html):

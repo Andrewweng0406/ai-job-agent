@@ -1,0 +1,24 @@
+{
+  "attempted_field_count": 0,
+  "matched_field_count": 0,
+  "mismatch_count": 0,
+  "planned_field_count": 25,
+  "submit_invocation_count": 0,
+  "unfilled_required_fields": [
+    "First Name *",
+    "Last Name *",
+    "Email *",
+    "Country *",
+    "Phone *",
+    "Are you currently located in SF/NYC or open to relocation, if not? *",
+    "Our Account Executive team is in office 4 days/week. Are you open to working in our office 4 days/week? *",
+    "Do you have experience selling API or technical products to engineering teams? If yes, please describe in a few sentences. *",
+    "Why Anthropic? *",
+    "AI Policy for Application *",
+    "Have you ever interviewed at Anthropic before? *",
+    "Will you now or will you in the future require employment visa sponsorship to work in the country in which the job you're applying for is located? *",
+    "Please read the arbitration agreement below *",
+    "Agreement to Arbitrate *"
+  ],
+  "unplanned_browser_actions": 0
+}

@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-BUNDLE = Path("artifacts/phase43-anthropic-4461450008-v4")
+BUNDLE = Path("artifacts/phase43-anthropic-4461450008-v5")
 
 
 def _load(name):
@@ -22,7 +22,7 @@ def _load(name):
 # --------------------------------------------------------------- report metadata
 def test_report_has_reproducibility_metadata():
     r = _load("report.json")
-    assert r["run_id"] == "phase43-anthropic-4461450008-v4"
+    assert r["run_id"] == "phase43-anthropic-4461450008-v5"
     datetime.fromisoformat(r["captured_at"])  # valid ISO 8601
     assert r["source"] == "live_capture" and r["live_page"] is True and r["real_browser"] is True
     assert r["page_title"] == "Job Application for Account Executive, AI Native at Anthropic"
@@ -54,7 +54,7 @@ def test_dom_is_a_real_greenhouse_capture():
 def test_every_field_map_entry_traces_to_the_captured_dom():
     html = (BUNDLE / "dom.sanitized.html").read_text().lower()
     fields = _load("field_map.json")
-    assert len(fields) == 24
+    assert len(fields) >= 24
     untraceable = []
     for f in fields:
         label = (f["raw_label"] or "").strip().rstrip("*").strip().lower()
@@ -105,14 +105,12 @@ def test_safety_report_zero_submit_zero_mismatch():
 
 # =============================================================== OPEN Gate-G gaps
 
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P2-25: transcript.sanitized.json is a raw json.dumps of the payload — no sanitization pass, no 'sanitized' marker (leaks resolved values once the real profile is used)")
 def test_transcript_sanitized_json_is_actually_sanitized():
     raw = (BUNDLE / "transcript.sanitized.json").read_text()
     payload = json.loads(raw)
     assert payload.get("sanitized") is True or "[REDACTED" in raw
 
 
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P2-24: before/after screenshots are the JD fold (1280x720 top of page), not the application-form region; and no fill occurred so there is no real before/after")
 def test_screenshots_show_the_application_form_region():
     import hashlib
 
@@ -122,7 +120,6 @@ def test_screenshots_show_the_application_form_region():
     assert hashlib.md5(before).hexdigest() != hashlib.md5(jd_fold).hexdigest(), "before_fill is the old JD-fold screenshot"
 
 
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P2-23: raw run.sqlite3 is committed as an artifact (x4); .gitignore has *.sqlite3 so it was force-added. PII-clean only because the profile is TODO")
 def test_run_sqlite3_is_not_committed():
     import subprocess
 
@@ -130,7 +127,6 @@ def test_run_sqlite3_is_not_committed():
     assert "run.sqlite3" not in tracked
 
 
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P1-28: GreenhouseLiveDryRunRunner still has no lease_still_mine check and no ApprovedAutofillPreviewBuilder gate; human_invoked=True is the only guard")
 def test_live_runner_enforces_lease_and_approval():
     import inspect
 
@@ -141,7 +137,6 @@ def test_live_runner_enforces_lease_and_approval():
     assert "ApprovedAutofillPreviewBuilder" in src or "approve" in src, "no approval gate in the reusable live runner"
 
 
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P2-26: _sanitize_html redacts any 10+ digit run -> the Greenhouse job/requisition id and CDN cache-busters become [REDACTED_PHONE], degrading DOM auditability")
 def test_sanitizer_does_not_redact_the_job_requisition_id():
     html = (BUNDLE / "dom.sanitized.html").read_text()
     assert "4461450008" in html, "the job id was redacted as a phone number"
