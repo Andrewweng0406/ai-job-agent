@@ -29,4 +29,4 @@ Safety decisions:
 - Discovery application creation is conflict-safe by requisition-derived dedupe key.
 - Dry-run transcripts are immutable payload snapshots; approval and real submission are separate steps.
 - Legal/work-authorization form fields are never guessed; missing canonical answers open human tasks.
-- The current browser bridge is a deterministic HTML field extractor; live Playwright capture remains a no-submit integration step.
+- The current browser bridge is a deterministic page-capture plus HTML field extractor; live Playwright navigation remains a no-submit integration step.

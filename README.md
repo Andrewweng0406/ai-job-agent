@@ -6,7 +6,7 @@ postings and prepares/submits applications with **verified** confirmation.
 > Status: Phase 1-4 safety foundation. `real_submission_enabled: false`. No live submissions.
 > Discovery, filtering, queueing, deterministic tailoring, PDF artifact generation, previews, and
 > persisted dry-run transcripts are implemented. Browser automation remains no-submit/approval-gated work;
-> HTML field extraction is available for ATS form snapshots.
+> page capture and HTML field extraction are available for ATS form snapshots.
 
 ## Principles
 
