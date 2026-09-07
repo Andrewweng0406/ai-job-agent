@@ -1,2 +1,50 @@
-companies: []
-
+companies:
+  - company_id: openai
+    company_name: OpenAI
+    career_url: https://jobs.ashbyhq.com/openai
+    ats_type: ashby
+    ats_identifier: openai
+    active: true
+    industry: AI
+    metadata:
+      discovery_status: verified_public_ashby_board
+  - company_id: google
+    company_name: Google
+    career_url: https://www.google.com/about/careers/applications/jobs/results/
+    ats_type: official_careers
+    ats_identifier: google
+    active: false
+    industry: Technology
+    metadata:
+      discovery_status: adapter_required
+      reason: Official careers search is not yet covered by a verified read-only adapter.
+  - company_id: meta
+    company_name: Meta
+    career_url: https://www.metacareers.com/jobs
+    ats_type: official_careers
+    ats_identifier: meta
+    active: false
+    industry: Technology
+    metadata:
+      discovery_status: adapter_required
+      reason: Official careers search is not yet covered by a verified read-only adapter.
+  - company_id: apple
+    company_name: Apple
+    career_url: https://jobs.apple.com/en-us/search
+    ats_type: official_careers
+    ats_identifier: apple
+    active: false
+    industry: Technology
+    metadata:
+      discovery_status: adapter_required
+      reason: Official careers search is not yet covered by a verified read-only adapter.
+  - company_id: tesla
+    company_name: Tesla
+    career_url: https://www.tesla.com/careers
+    ats_type: official_careers
+    ats_identifier: tesla
+    active: false
+    industry: Automotive
+    metadata:
+      discovery_status: adapter_required
+      reason: Official careers search is not yet covered by a verified read-only adapter.

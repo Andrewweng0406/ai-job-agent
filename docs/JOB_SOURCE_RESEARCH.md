@@ -152,3 +152,4 @@ companies(
 6. **Same company, multiple ATSes** (migrating vendors) — registry allows >1 provider row per company; dedupe across them.
 7. **Geo/IP gating:** some boards serve different results by region; run from a stable U.S. egress.
 ```
+- Target company registry now includes official careers entry points for OpenAI, Google, Meta, Apple, and Tesla. OpenAI is active through the verified public Ashby board; Google, Meta, Apple, and Tesla remain inactive until dedicated read-only adapters are verified, so the agent never guesses an ATS endpoint.
