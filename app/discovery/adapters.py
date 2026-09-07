@@ -164,6 +164,7 @@ class AshbyJobSource(BaseAtsJobSource):
             metadata={
                 "department": raw_job.get("department"),
                 "team": raw_job.get("team"),
+                "job_id": raw_job.get("jobId"),
                 "published_at": raw_job.get("publishedAt"),
             },
         )

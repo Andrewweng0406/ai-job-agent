@@ -36,3 +36,13 @@ def test_skips_us_citizen_only_role():
     assert not result.allowed
     assert result.reason == "US_CITIZEN_ONLY"
 
+
+def test_no_sponsorship_depends_on_candidate_configuration():
+    job = make_job("Data Analyst", "Candidates must be authorized to work in the U.S. without sponsorship.")
+    allowed = apply_hard_filters(job, {"DATA_ANALYTICS"}, requires_visa_sponsorship=False)
+    blocked = apply_hard_filters(job, {"DATA_ANALYTICS"}, requires_visa_sponsorship=True)
+    incomplete = apply_hard_filters(job, {"DATA_ANALYTICS"}, requires_visa_sponsorship=None)
+
+    assert allowed.allowed
+    assert not blocked.allowed and blocked.reason == "NO_VISA_SPONSORSHIP"
+    assert not incomplete.allowed and incomplete.reason == "WORK_AUTHORIZATION_PROFILE_INCOMPLETE"

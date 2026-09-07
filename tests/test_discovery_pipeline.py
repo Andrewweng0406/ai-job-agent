@@ -50,3 +50,30 @@ def test_discovery_pipeline_creates_application_once(tmp_path):
     assert filters["count"] == 1
     assert transitions["count"] == 1
 
+
+class NoSponsorshipSource(FakeSource):
+    def normalize_job(self, raw_job):
+        job = super().normalize_job(raw_job)
+        job.description = "Candidates must be authorized to work in the U.S. without sponsorship."
+        return job
+
+
+def test_discovery_pipeline_marks_work_auth_unknown_as_human_required(tmp_path):
+    repo = JobAgentRepository(tmp_path / "agent.sqlite3")
+    repo.initialize()
+    taxonomy = RoleTaxonomy({"DATA_ANALYTICS": {"title_keywords": ["data analyst"]}})
+    company = CompanyRegistryEntry("acme", "Acme", "https://example.test/careers", "fixture", "acme")
+    pipeline = DiscoveryPipeline(
+        repo,
+        taxonomy,
+        source_factory=lambda _company, _taxonomy: NoSponsorshipSource(),
+        requires_visa_sponsorship=None,
+    )
+
+    summary = pipeline.run([company])
+
+    assert summary.applications_created == 0
+    with repo.connect() as conn:
+        row = conn.execute("SELECT status, human_required_reason FROM applications").fetchone()
+    assert row["status"] == "HUMAN_REQUIRED"
+    assert row["human_required_reason"] == "WORK_AUTHORIZATION_PROFILE_INCOMPLETE"

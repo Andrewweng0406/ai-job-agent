@@ -64,6 +64,19 @@ class CandidateProfile:
             values.append(str(fact.value))
         return values
 
+    def requires_future_sponsorship(self) -> bool | None:
+        fact = self.facts.get("auth.needs_future_sponsorship")
+        if fact is None or fact.is_missing:
+            return None
+        if isinstance(fact.value, bool):
+            return fact.value
+        normalized = str(fact.value).strip().lower()
+        if normalized in {"true", "yes", "y", "1"}:
+            return True
+        if normalized in {"false", "no", "n", "0"}:
+            return False
+        return None
+
 
 @dataclass(frozen=True, slots=True)
 class ProfileCompletenessResult:
@@ -74,4 +87,3 @@ class ProfileCompletenessResult:
 def profile_completeness_gate(profile: CandidateProfile) -> ProfileCompletenessResult:
     missing = profile.required_missing_fact_ids()
     return ProfileCompletenessResult(complete=not missing, missing_fact_ids=missing)
-

@@ -24,6 +24,10 @@ NO_SPONSORSHIP_PATTERN = re.compile(
     r"\bno\s+visa\s+sponsorship\s+is\s+available\b",
     re.I,
 )
+POSITIVE_SPONSORSHIP_PATTERN = re.compile(
+    r"\bsponsorship\s+(is\s+)?(available|provided|offered)\b|\bwill\s+sponsor\b|\bhappy\s+to\s+sponsor\b",
+    re.I,
+)
 HIGH_EXPERIENCE_PATTERN = re.compile(r"\b(?:minimum|required|requires?|must have)?\s*([5-9]|1[0-9])\+?\s+years?\b", re.I)
 US_LOCATION_TERMS = {
     "remote",
@@ -74,7 +78,7 @@ def apply_hard_filters(
     job: Job,
     accepted_families: set[str],
     allow_security_clearance: bool = False,
-    requires_visa_sponsorship: bool = True,
+    requires_visa_sponsorship: bool | None = True,
 ) -> FilterResult:
     text = f"{job.title}\n{job.description}"
     if job.job_family.value not in accepted_families:
@@ -87,7 +91,10 @@ def apply_hard_filters(
         return FilterResult(False, "EXPERIENCE_REQUIREMENT_TOO_HIGH")
     if US_CITIZEN_PATTERN.search(text):
         return FilterResult(False, "US_CITIZEN_ONLY")
-    if requires_visa_sponsorship and NO_SPONSORSHIP_PATTERN.search(text):
+    has_negative_sponsorship = _has_negative_sponsorship(text)
+    if requires_visa_sponsorship is None and has_negative_sponsorship:
+        return FilterResult(False, "WORK_AUTHORIZATION_PROFILE_INCOMPLETE")
+    if requires_visa_sponsorship and has_negative_sponsorship:
         return FilterResult(False, "NO_VISA_SPONSORSHIP")
     if not allow_security_clearance and CLEARANCE_PATTERN.search(text):
         return FilterResult(False, "INCOMPATIBLE_SECURITY_CLEARANCE")
@@ -120,3 +127,11 @@ def _location_ineligible(location: str | None) -> bool:
     if any(term in normalized for term in US_LOCATION_TERMS):
         return False
     return bool(NON_US_LOCATION_PATTERN.search(normalized))
+
+
+def _has_negative_sponsorship(text: str) -> bool:
+    if not NO_SPONSORSHIP_PATTERN.search(text):
+        return False
+    if re.search(r"\bno\s+visa\s+sponsorship\s+is\s+available\b", text, re.I):
+        return True
+    return not POSITIVE_SPONSORSHIP_PATTERN.search(text)

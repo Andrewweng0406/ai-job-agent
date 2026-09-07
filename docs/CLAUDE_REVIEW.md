@@ -67,7 +67,10 @@ is the only terminal success state intended for KPI counting.
   after submit leaves a recoverable `APPLYING`/`SUBMISSION_UNKNOWN` row rather than nothing.
 
 **Codex update:** Added application `dedupe_key`, idempotent insert behavior, and tests for duplicate insert
-no-op behavior. The current key defaults to the local candidate plus job id until candidate identity is filled.
+no-op behavior.
+
+**Codex update 2:** Discovery-created application keys now use `candidate_id | company_id | ATS/requisition_key`.
+The repository fallback is only for direct low-level inserts that do not have a normalized job object.
 
 ---
 
@@ -96,6 +99,10 @@ This is P0 because without it the system queues jobs the candidate is *definitio
 burns throughput, and pushes the answer engine toward a dishonest "no, I don't need sponsorship".
 
 **Codex update:** Added negative sponsorship filtering with positive sponsorship allowance.
+
+**Codex update 2:** Discovery now reads `auth.needs_future_sponsorship` from `config/candidate_profile.yaml`.
+When that required fact is missing and a posting contains no-sponsorship language, the application is routed to
+`HUMAN_REQUIRED` instead of guessing.
 
 ---
 

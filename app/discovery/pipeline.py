@@ -7,7 +7,7 @@ from app.discovery.adapters import source_for_company
 from app.discovery.interfaces import JobSource
 from app.filtering.hard_filters import apply_hard_filters
 from app.matching.taxonomy import RoleTaxonomy
-from app.models.application import Application
+from app.models.application import Application, application_dedupe_key_for_job
 from app.models.company_registry import CompanyRegistryEntry
 from app.models.enums import ApplicationStatus, JobStatus
 from app.models.job import Job
@@ -30,10 +30,19 @@ class DiscoveryRunSummary:
 
 
 class DiscoveryPipeline:
-    def __init__(self, repository, taxonomy: RoleTaxonomy, source_factory=None) -> None:
+    def __init__(
+        self,
+        repository,
+        taxonomy: RoleTaxonomy,
+        source_factory=None,
+        candidate_id: str = "default_candidate",
+        requires_visa_sponsorship: bool | None = True,
+    ) -> None:
         self.repository = repository
         self.taxonomy = taxonomy
         self.source_factory = source_factory or source_for_company
+        self.candidate_id = candidate_id
+        self.requires_visa_sponsorship = requires_visa_sponsorship
 
     def run(self, companies: list[CompanyRegistryEntry]) -> DiscoveryRunSummary:
         seen_keys: set[str] = set()
@@ -59,7 +68,11 @@ class DiscoveryPipeline:
                     job_id = self.repository.upsert_job(job)
                     if job.status in {JobStatus.NEW, JobStatus.UPDATED}:
                         changed_count += 1
-                        filter_result = apply_hard_filters(job, self.taxonomy.accepted_family_names())
+                        filter_result = apply_hard_filters(
+                            job,
+                            self.taxonomy.accepted_family_names(),
+                            requires_visa_sponsorship=self.requires_visa_sponsorship,
+                        )
                         self.repository.record_job_filter_result(job_id, filter_result.allowed, filter_result.reason)
                         if filter_result.allowed:
                             eligible_count += 1
@@ -72,6 +85,7 @@ class DiscoveryPipeline:
                                     job_family=job.job_family,
                                     source=job.source,
                                     ats_type=job.ats_type,
+                                    dedupe_key=application_dedupe_key_for_job(job, self.candidate_id),
                                 )
                                 self.repository.insert_application(application)
                                 self.repository.transition_application(
@@ -80,6 +94,20 @@ class DiscoveryPipeline:
                                     "passed deterministic hard filters",
                                 )
                                 created_count += 1
+                        elif filter_result.reason == "WORK_AUTHORIZATION_PROFILE_INCOMPLETE":
+                            application = Application(
+                                job_id=job_id,
+                                company=job.company_name,
+                                position=job.title,
+                                location=job.location,
+                                job_family=job.job_family,
+                                source=job.source,
+                                ats_type=job.ats_type,
+                                dedupe_key=application_dedupe_key_for_job(job, self.candidate_id),
+                            )
+                            app_id = self.repository.insert_application(application)
+                            self.repository.mark_human_required(app_id, filter_result.reason)
+                            skipped_count += 1
                         else:
                             skipped_count += 1
             except Exception as exc:

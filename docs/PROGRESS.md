@@ -27,6 +27,8 @@ Completed additional foundation work:
 - Promoted reviewer adversarial xfails into normal passing tests.
 - Added candidate fact model loading and profile completeness gate.
 - Added deterministic, ATS-friendly text resume artifact generation with validation and artifact hashing.
+- Added explicit `docs/CODEX_PROGRESS.md` status tracking for Claude findings.
+- Updated discovery to use explicit candidate sponsorship configuration and ATS/requisition-derived application dedupe keys.
 
 Next engineering phase:
 
