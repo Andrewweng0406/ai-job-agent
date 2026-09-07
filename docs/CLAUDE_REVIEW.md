@@ -882,3 +882,50 @@ no field map, no action log, no lease fencing, no approval gate, incomplete arti
 
 ### May Codex proceed to Lever / Ashby? **No.** Blockers: P1-28, P2-21, P2-22.
 `real_submission_enabled` stays `false`.
+
+---
+
+## Review round 3.4 — reproducible Greenhouse evidence bundle (autonomous mode)
+
+**At `5acdeb9`** (Codex `dee8e92` bundle + `5acdeb9` hidden-field hardening). Suite: 407 passed /
+1 skipped / 5 xfailed. Reviewer tests: `tests/test_round34_evidence_audit.py`. Checklist:
+`docs/ROUND3_4_CHECKLIST.md`.
+
+### Verified FIXED
+- **P2-21** — `_is_noninteractive` now excludes `hidden` attr / `disabled` / `aria-hidden` /
+  `display:none` / `visibility:hidden` / `opacity:0` / `tabindex=-1`+hidden-class / offscreen
+  `position:absolute;left:-9xxx`. `tests/test_round32_regressions.py` P2-21 cases pass.
+- **P2-22** — reproducible `scripts/live_dry_run.py` + archived bundles now exist.
+
+### Independently verified (bundle is genuine)
+- `dom.sanitized.html` (105 KB) is a real live Greenhouse capture: real Anthropic font assets, the real
+  `candidate-ai-guidance` link, the embedded Greenhouse form-descriptor JSON, role-specific question
+  text. Matches the reviewer’s own Round 3.3 navigation.
+- All **24** `field_map.json` entries trace by label/selector into the captured DOM; custom questions
+  carry real `question_########` ids; sponsorship question present + required; arbitration fields →
+  HUMAN_REQUIRED.
+- `browser_actions.jsonl` — ordered, time-sorted, `lease_epoch`-stamped, NAVIGATE/SCAN/EXTRACT/
+  POST_FILL_SCAN only, no submit token. `safety.json` — submit 0, mismatch 0.
+
+### Gate G — **FAIL (near miss)**
+Real navigation + traceable DOM + reproducible script are in place. Blocked on P1-28 and the absence of
+an *approved-autofill* run (the archived run is capture-only: `attempted_field_count: 0`,
+`approval_status: not_approved_capture_only`), so the live transcript↔browser differential and the
+runner-side approval/lease path are still unexercised.
+
+### Open findings
+- **P1-28 (P1, open)** — lease fencing is decorative (`lease_epoch` stamped, `lease_still_mine` never
+  called) and the approval gate lives only in `scripts/live_dry_run.py`, not in
+  `GreenhouseLiveDryRunRunner` (`human_invoked=True` is its sole guard).
+- **P2-23** — raw `run.sqlite3` committed x4 (`.gitignore` has `*.sqlite3`; force-added). PII-clean only
+  because the profile is TODO.
+- **P2-24** — before/after screenshots are the JD fold (1280x720 top of page), not the form region;
+  `before_fill.png` is byte-identical to the original JD screenshot; no fill occurred.
+- **P2-25** — `transcript.sanitized.json` is a raw `json.dumps` of the payload — no redaction, no marker.
+- **P2-26** — `_sanitize_html` redacts any 10+ digit run → the Greenhouse job id `4461450008` and CDN
+  cache-busters become `[REDACTED_PHONE]`; and it does nothing for names/addresses/tokens.
+- **P3** — 4 near-dup bundles (~1.5 MB); base bundle missing `report.json`; `dom.sanitized.html` is
+  React-hydration-timing-dependent (only ~5 native inputs captured); `disabled` required fields now
+  silently dropped by the extractor.
+
+### No new P0. May NOT proceed to Lever/Ashby. `real_submission_enabled` stays `false`.
