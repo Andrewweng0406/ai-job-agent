@@ -972,3 +972,45 @@ Suite: 437 passed / 1 skipped / 4 xfailed / 1 xpassed. Reviewer test: `tests/tes
 ### Gate G verdict: **FAIL — one substantive blocker left** (an *exercised* approved-autofill live run).
 Everything else for Greenhouse is in place. **Not yet clear to start Lever/Ashby live work.**
 `real_submission_enabled` stays `false`.
+
+---
+
+## Review round 3.4c — audit of Codex `287b577` ("Fence autofill mutations and harden shared labels")
+
+Suite: 463 passed / 1 skipped / 2 xfailed.
+
+### Verified FIXED
+- **P1-28b** — `greenhouse_live.py`: `if payload.autofill and (worker_id is None or lease_epoch is
+  None): raise RuntimeError("Live autofill requires worker lease identity")`. Fencing is no longer
+  opt-in for the autofill path.
+- **P1-28c** — `DryRunBrowserAutofill.apply(..., lease_check=Callable)` now calls `lease_check()` before
+  **every individual field**, wired to `self._assert_lease(payload)`. A lease lost mid-fill aborts with
+  `LEASE_LOST` and the remaining fields are not touched.
+- **P2-27 / P2-28** — Lever/Ashby label bleed + Yes/No radio-group options fixed in
+  `html_form_extractor.py`; `tests/test_shared_ats_redteam.py` all pass (Codex removed the xfails).
+
+### P1-28 is now fully closed for Greenhouse
+`GreenhouseLiveDryRunRunner`: refuses `real_submission_enabled`; requires `worker_id` + `lease_epoch`
+when `autofill=True`; requires `approved_transcript_id` and validates it via
+`ApprovedAutofillPreviewBuilder.build()` (approval + payload_hash + would_submit); `_assert_lease` →
+`lease_still_mine` → `RuntimeError("LEASE_LOST")` at start / pre-nav / post-nav / pre-fill / per-field /
+post-fill; post-fill hard-stop re-capture → HUMAN_REQUIRED.
+
+### Gate G — **FAIL, one blocker remaining**
+Every finding raised in rounds 3.2–3.4b is now closed **except**: no committed bundle is an *exercised*
+approved-autofill run (`approval_status: approved`, `attempted_field_count > 0`, `mismatch_count: 0`,
+`submit_invocation_count: 0`) with a real `#application_form` before/after screenshot pair. The path is
+built, gated, and fenced — it needs to be run once with `--approved-by` and the bundle committed.
+Codex can do this without user input (`real_submission_enabled` stays `false`; profile is TODO so
+only AUTO_SAFE fields — e.g. EEO decline, "how did you hear" — would fill, which is enough to exercise
+the differential).
+Tests: `tests/test_gate_g_remaining_gaps.py::test_an_approved_autofill_bundle_exists_with_exercised_differential`,
+`::test_before_and_after_screenshots_are_form_region_and_differ` (xfail).
+
+### New this round
+- `tests/test_legal_question_matrix.py` — 23-case shared-ATS legal/work-auth/citizenship/clearance/
+  salary/relocation resolution matrix (all pass). This is the audit baseline for every future
+  Lever/Ashby live run: a legal question is never auto-answered with an invented value.
+
+`real_submission_enabled` stays `false`. May NOT start Lever/Ashby live work until the Gate G blocker
+above is evidenced.
