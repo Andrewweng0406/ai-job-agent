@@ -1014,3 +1014,67 @@ Tests: `tests/test_gate_g_remaining_gaps.py::test_an_approved_autofill_bundle_ex
 
 `real_submission_enabled` stays `false`. May NOT start Lever/Ashby live work until the Gate G blocker
 above is evidenced.
+
+---
+
+## Review round 3.5 — OSS provenance + `scripts/live_dry_run.py` audit (autonomous)
+
+**At `8d73220`.** Suite: 469 passed / 1 skipped / 2 xfailed. Reviewer tests:
+`tests/test_provenance_review.py`, `tests/test_live_dry_run_script_audit.py`.
+
+### Open-source reference / provenance — REVIEWER-VERIFIED PASS (with P3 notes)
+- All three repos in `THIRD_PARTY_NOTICES.md` **independently confirmed to exist and be MIT-licensed**
+  (WebFetch): `idea-torx/CareerWeaver` (Python, MIT), `muhammad-saadd/applyai` (JavaScript Chrome
+  extension, MIT), `AkbarDevop/ai-job-agent` (JS+Python, MIT). The referenced upstream files exist.
+- `86c3b5e` added **only 4 doc/test files, zero `app/` code**.
+- The repo contains **no `.js`/`.mjs` files** — the two JS references could not have been code-copied.
+- The codebase history is fully incremental (reviewed commit-by-commit across rounds 1–3.4); nothing
+  reads as a paste. The "concepts reimplemented, no code copied" claim is credible and consistent.
+- **P3** — the notices should quote each upstream `LICENSE` copyright line verbatim (WebFetch could
+  not confirm the exact holder names) and note whether the pinned commit hashes were HEAD-at-review.
+
+### LLM / model-router safety — N/A
+No model-router or provider-SDK code exists (`grep` for anthropic/openai/litellm/langchain → none).
+`app/llm/tailoring.py` is the deterministic planner only. The standing contracts
+(`LLM_RESUME_REVIEW_CONTRACT.md`, `LLM_COST_STRATEGY.md`) apply when a generator lands.
+
+### `scripts/live_dry_run.py` — the evidence-producing tool bypasses the hardened runner
+Codex extended the script to `--ats {greenhouse,lever,ashby}` and added `_write_blocked_bundle` (full
+evidence on a CAPTCHA/bot-wall hard stop — good). But the script **reimplements the browser flow
+inline and never uses `GreenhouseLiveDryRunRunner`**, so the P1-28 hardening is absent from the path
+that will produce the Gate-G approved-autofill bundle:
+
+- **P1-29** — `DryRunBrowserAutofill().apply(page, resolutions, expected_resume_hash="")` is called
+  **without `lease_check=`**. The per-field lease fencing (P1-28c) is bypassed in the evidence path.
+- **P1-30** — the script never calls `lease_still_mine` / `_assert_lease` after the initial claim.
+  No lease fencing around nav / capture / autofill / screenshot.
+- **P1-30b** — the `POST_FILL_SCAN` action is logged but nothing is re-captured or checked; there is
+  **no post-fill bot-wall detection** (no `BrowserFieldCapture().capture()` / `persist_browser_hard_stop`
+  after autofill).
+- **P1-31** — `safety.json` hardcodes `attempted_field_count: 0`, `matched_field_count: 0`,
+  `mismatch_count: 0` **even when `--approved-by` autofill ran**. The transcript↔browser differential
+  in the evidence bundle would be a fabricated zero. `report.json.auto_safe_count` reflects the fill
+  count; `safety.json` does not.
+- **Fix:** route the script through `GreenhouseLiveDryRunRunner` (and Lever/Ashby equivalents once they
+  exist), passing `worker_id`/`lease_epoch`/`approved_transcript_id`; compute `safety.json` from the
+  real `BrowserAutofillResult` (attempted = len(resolutions filled), matched/mismatch from the
+  `BROWSER_TRANSCRIPT_MISMATCH` comparison).
+
+### P2-31 — no synthetic-vs-real candidate-profile separation
+`CandidateProfile` built with plausible test data ("Jane Q Student") is structurally identical to a
+real one. Nothing marks a profile as `synthetic_test` and nothing refuses such a profile in
+`scripts/live_dry_run.py` / a future submit path. Today the only mitigation is that the real profile
+is all-`TODO`. **Fix:** `CandidateProfile.source in {"config","synthetic_test"}`; the live script and
+submit path refuse `synthetic_test`.
+
+### P2-32 — `pdf_qa.run_pdf_qa`: `b"?" in content_stream` false-positives
+A résumé bullet containing a literal `?` ("Why us?") → `UNSUPPORTED_TEXT_REPLACEMENT` → PDF_QA_FAILED →
+HUMAN_REQUIRED. The check should compare against expected text or look for the specific latin-1
+replacement pattern, not any `?`.
+
+### Lever / Ashby status — NOT LIVE-EVIDENCED
+`--ats lever|ashby` dispatch exists; the adapters are the shared `AtsDomDryRunAdapter`. **No committed
+Lever or Ashby evidence bundle exists** (the `phase-lever-slate` / `phase-ashby-harvey` dirs were
+transient and discarded). IMPLEMENTED (dispatch) but not TESTED against a live page, not LIVE-EVIDENCED.
+
+`real_submission_enabled` stays `false`.
