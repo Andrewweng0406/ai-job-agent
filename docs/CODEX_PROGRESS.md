@@ -174,6 +174,29 @@ Latest local verification:
   generated artifacts remain gitignored and were not committed.
 - Full suite: 535 passed, 1 skipped, 12 xfailed.
 
+## Claude Follow-Up Safety Closure (2026-09-07)
+
+- P1 fixed: `llm.send_candidate_pii=false` now prevents the provider router from being built. The
+  dashboard/status field is an enforced runtime boundary rather than a display-only claim.
+- P1 fixed: live evidence leases now default to a ten-minute TTL and reject values below one minute.
+- P1 fixed: `--approved-by` requires an exact `--confirm-apply-url` acknowledgment, and the final
+  browser URL is checked again before any autofill.
+- P2 fixed: unknown models cannot use a caller-declared zero cost; conservative configured prices are
+  applied. Four related Claude xfails were converted to passing tests.
+- P3 fixed: actual provider cost above a reservation is committed to the ledger before the router fails
+  closed, so an overrun is never omitted from accounting.
+- P3 resolved: the evidence role is parsed from the live Greenhouse page title instead of trusting a
+  stale CLI label.
+- P3 rejected as inapplicable: the current OpenAI Responses API create schema does not expose `seed`.
+  Reproducibility uses a fixed model, strict ID-only output contract, request hash cache, and local
+  deterministic resume rendering.
+- Evidence payload sanitization now redacts every populated candidate field value, including names,
+  addresses, profile URLs, and custom free text.
+- A synthetic TEST_ONLY Greenhouse v5 run captured 25 real DOM fields with a complete field map and
+  transcript, no lease loss, no autofill, no upload, and zero submit invocations. This is a technical
+  capture checkpoint, not an approved Gate G pass.
+- Full suite: 543 passed, 1 skipped, 8 xfailed.
+
 ## Open-Source Reference Review
 
 ### Fixed / Adapted

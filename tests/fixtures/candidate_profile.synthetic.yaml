@@ -1,0 +1,45 @@
+meta:
+  candidate_id: synthetic-test-candidate
+  schema_version: 2
+  profile_source: synthetic_test_only
+facts:
+  - fact_id: name.full
+    type: identity
+    value: Test Candidate
+    required: true
+  - fact_id: contact.email
+    type: contact
+    value: candidate@example.test
+    required: true
+  - fact_id: contact.phone
+    type: contact
+    value: "(555) 010-0100"
+    required: true
+  - fact_id: edu.primary.school
+    type: education
+    value: Example State University
+    required: true
+  - fact_id: edu.primary.degree
+    type: education
+    value: B.S. Data Science
+    required: true
+  - fact_id: edu.primary.grad_date
+    type: education
+    value: May 2027
+    required: true
+  - fact_id: auth.status
+    type: legal
+    value: authorized to work in the United States
+    required: true
+    literal_only: true
+  - fact_id: auth.needs_future_sponsorship
+    type: legal
+    value: true
+    required: true
+    literal_only: true
+  - fact_id: skill.sql
+    type: skill
+    value: SQL
+application_answers:
+  work_authorized_us: "Yes"
+  requires_sponsorship_now_or_future: "Yes"

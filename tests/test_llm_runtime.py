@@ -23,8 +23,9 @@ def test_runtime_builds_budgeted_router_when_explicitly_enabled(monkeypatch):
         "cheap_model": "gpt-5-nano",
         "strong_model": "gpt-5-mini",
         "daily_cost_limit_usd": 0.25,
+        "send_candidate_pii": True,
     }}
     router = build_router(settings)
     assert router is not None
     assert router.policy.daily_cost_limit_usd == 0.25
-    assert runtime_status(settings).send_candidate_pii is False
+    assert runtime_status(settings).send_candidate_pii is True

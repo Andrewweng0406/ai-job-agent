@@ -110,18 +110,17 @@ class LLMRouter:
             preflight_cost = price.cost(
                 input_tokens=max(1, len(prompt) // 4), output_tokens=limit
             )
-        elif estimated_cost_usd is not None:
-            preflight_cost = estimated_cost_usd
         else:
             # Unknown models are estimated at the most expensive configured rate,
-            # never treated as free. Production should still configure an exact rate.
+            # never treated as free or allowed to trust a zero caller estimate.
             conservative = ModelPrice(
                 max(item.input_per_million_usd for item in self.model_prices.values()),
                 max(item.output_per_million_usd for item in self.model_prices.values()),
             )
-            preflight_cost = conservative.cost(
+            conservative_cost = conservative.cost(
                 input_tokens=max(1, len(prompt) // 4), output_tokens=limit
             )
+            preflight_cost = max(estimated_cost_usd or 0.0, conservative_cost)
         cache_key = hashlib.sha256(f"{model}\0{limit}\0{prompt}".encode()).hexdigest()
         result = self._cache.get(cache_key) if self.cache_enabled else None
         cache_hit = result is not None

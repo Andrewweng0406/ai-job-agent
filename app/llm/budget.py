@@ -45,9 +45,6 @@ class SQLiteDailyBudget:
 
     def reconcile(self, reserved_usd: float, actual_usd: float, limit_usd: float) -> None:
         delta = actual_usd - reserved_usd
-        if delta > 0:
-            self.reserve(delta, limit_usd)
-            return
         if delta == 0:
             return
         key = date.today().isoformat()
@@ -57,14 +54,18 @@ class SQLiteDailyBudget:
                 "SELECT spent_usd FROM llm_daily_cost WHERE usage_date = ?", (key,)
             ).fetchone()
             spent = float(row[0]) if row else 0.0
+            reconciled = max(0.0, spent + delta)
             connection.execute(
                 """
                 INSERT INTO llm_daily_cost (usage_date, spent_usd) VALUES (?, ?)
                 ON CONFLICT(usage_date) DO UPDATE SET spent_usd = excluded.spent_usd
                 """,
-                (key, max(0.0, spent + delta)),
+                (key, reconciled),
             )
             connection.commit()
+        if reconciled > limit_usd:
+            # The provider already incurred this cost. Record it before failing closed.
+            raise RuntimeError("LLM_DAILY_BUDGET_EXCEEDED_AFTER_RESPONSE")
 
     def spent_today(self) -> float:
         with self._connect() as connection:

@@ -19,7 +19,6 @@ SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "live_dry_run.py
 SCRIPT = SCRIPT_PATH.read_text()
 
 
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P1: evidence run claims its lease with a 0s TTL (claim_next_application(..., datetime.now())) -> every run self-LEASE_LOSTs once _lease_check is wired")
 def test_evidence_lease_is_claimed_with_a_real_ttl():
     m = re.search(r"claim_next_application\([^)]*\)", SCRIPT)
     assert m, "no claim_next_application call found"
@@ -32,7 +31,6 @@ def test_evidence_lease_is_claimed_with_a_real_ttl():
     )
 
 
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P1: --approved-by has no URL allowlist / acknowledgment; it types the real .local.yaml profile into whatever --url points at")
 def test_approved_autofill_requires_an_explicit_url_acknowledgment():
     assert "--approved-by" in SCRIPT
     # some gate must exist: an allowlist, a per-run confirm flag, or a refusal when the profile is real

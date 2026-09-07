@@ -7,7 +7,7 @@ import hashlib
 import json
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 from uuid import uuid4
@@ -32,6 +32,10 @@ def main() -> int:
     args = _args()
     if args.real_submission_enabled:
         raise SystemExit("real_submission_enabled must remain false")
+    if args.lease_minutes < 1:
+        raise SystemExit("--lease-minutes must be at least 1")
+    if args.approved_by and args.confirm_apply_url != args.url:
+        raise SystemExit("--approved-by requires an exact --confirm-apply-url match")
     ats = args.ats
     run_id = args.run_id or f"{ats}-{uuid4().hex}"
     out = Path(args.output) / run_id
@@ -53,7 +57,7 @@ def main() -> int:
         repo.transition_application(application_id, status, "live evidence seed")
     worker_id = f"evidence-{run_id}"
     lease = repo.claim_next_application(ApplicationStatus.READY, worker_id,
-                                        datetime.now(timezone.utc))
+                                        datetime.now(timezone.utc) + timedelta(minutes=args.lease_minutes))
     if lease is None:
         raise SystemExit("could not acquire evidence worker lease")
     application_id, lease_epoch = lease
@@ -71,6 +75,7 @@ def main() -> int:
             page.goto(args.url, wait_until="domcontentloaded", timeout=args.timeout_ms)
             page_title = page.title()
             final_browser_url = page.url
+            job.title = _role_from_page_title(page_title, job.title)
             _form_screenshot(page, out / "before_fill.png")
             html = page.content()
             (out / "dom.sanitized.html").write_text(_sanitize_html(html), encoding="utf-8")
@@ -92,6 +97,8 @@ def main() -> int:
             if transcript is None:
                 autofill = None
             if transcript is not None and args.approved_by and result.dry_run.status == ApplicationStatus.READY:
+                if _canonical_url(final_browser_url) != _canonical_url(args.confirm_apply_url):
+                    raise RuntimeError("APPROVED_URL_MISMATCH")
                 repo.approve_dry_run_transcript(transcript.transcript_id, args.approved_by)
                 ApprovedAutofillPreviewBuilder(repo).build(transcript.transcript_id)
                 _action(actions, "APPROVAL_VERIFIED", lease_epoch=lease_epoch, success=True)
@@ -180,6 +187,8 @@ def _args():
     parser.add_argument("--run-id")
     parser.add_argument("--timeout-ms", type=int, default=30_000)
     parser.add_argument("--approved-by", help="Explicit reviewer identity; required before any browser autofill")
+    parser.add_argument("--confirm-apply-url", help="Exact approved application URL acknowledgment")
+    parser.add_argument("--lease-minutes", type=int, default=10)
     parser.add_argument("--real-submission-enabled", action="store_true")
     parser.add_argument("--test-only", action="store_true")
     return parser.parse_args()
@@ -208,6 +217,18 @@ def _job_from_url(url: str, company: str, role: str, ats: str) -> Job:
                job_family=JobFamily.UNKNOWN, metadata={"requisition_id": external_id})
 
 
+def _canonical_url(url: str | None) -> str:
+    if not url:
+        return ""
+    parsed = urlparse(url)
+    return f"{parsed.scheme.lower()}://{parsed.netloc.lower()}{parsed.path.rstrip('/')}"
+
+
+def _role_from_page_title(page_title: str, fallback: str) -> str:
+    match = re.search(r"Job Application for (.+?) at .+$", page_title, re.I)
+    return match.group(1).strip() if match else fallback
+
+
 def _sanitize_html(html: str) -> str:
     html = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "[REDACTED_EMAIL]", html)
     html = re.sub(r"(?<![\w])\+?\d{1,3}[ -]?(?:\(\d{3}\)|\d{3})[ -]\d{3}[ -]\d{4}(?!\w)", "[REDACTED_PHONE]", html)
@@ -217,10 +238,9 @@ def _sanitize_html(html: str) -> str:
 def _sanitize_payload(payload):
     clean = json.loads(json.dumps(payload))
     for field in clean.get("fields", []):
-        key = str(field.get("canonical_key") or "").lower()
-        if field.get("legal_sensitive") or key in {"email", "phone", "contact.email", "contact.phone"}:
-            if field.get("value") is not None:
-                field["value"] = "[REDACTED]"
+        # Evidence needs selector/status provenance, never the candidate's entered value.
+        if field.get("value") is not None:
+            field["value"] = "[REDACTED]"
     return clean
 
 

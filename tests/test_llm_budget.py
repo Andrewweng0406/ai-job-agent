@@ -30,3 +30,11 @@ def test_budget_reconciles_reserved_amount_to_actual(tmp_path):
     ledger.reserve(0.8, 1.0)
     ledger.reconcile(0.8, 0.2, 1.0)
     assert ledger.spent_today() == pytest.approx(0.2)
+
+
+def test_over_budget_actual_cost_is_recorded_before_failure(tmp_path):
+    ledger = SQLiteDailyBudget(tmp_path / "usage.sqlite3")
+    ledger.reserve(0.8, 1.0)
+    with pytest.raises(RuntimeError, match="EXCEEDED_AFTER_RESPONSE"):
+        ledger.reconcile(0.8, 1.2, 1.0)
+    assert ledger.spent_today() == pytest.approx(1.2)

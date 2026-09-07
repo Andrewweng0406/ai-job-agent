@@ -96,7 +96,6 @@ def test_prose_output_is_rejected_not_used_as_resume_text():
 
 
 # --------------------------------------------------------------- the gap
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P1 (latent): llm.send_candidate_pii is display-only; build_router / LLMFactSelector never consult it, so skill/education/project/experience fact values reach OpenAI whenever llm.enabled is true")
 def test_send_candidate_pii_false_prevents_fact_values_leaving_the_process():
     settings = {
         "llm": {

@@ -31,6 +31,8 @@ def runtime_status(settings: dict[str, Any]) -> LLMRuntimeStatus:
         reason = "LLM_PROVIDER_UNSUPPORTED"
     elif not configured:
         reason = "OPENAI_API_KEY_MISSING"
+    elif config.get("send_candidate_pii") is not True:
+        reason = "LLM_CANDIDATE_DATA_TRANSFER_DISABLED"
     else:
         reason = "READY"
     return LLMRuntimeStatus(

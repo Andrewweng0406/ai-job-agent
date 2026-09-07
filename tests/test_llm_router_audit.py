@@ -61,13 +61,14 @@ def test_negative_cost_rejected():
 
 # ---------------------------------------------------------------- gaps
 
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P2: cost is caller-supplied; estimated_cost_usd=0 bypasses the budget entirely — the router should derive cost from (model, input, output) via a price table")
 def test_zero_declared_cost_cannot_bypass_the_budget():
     r = _router(daily_cost_limit_usd=0.01)
-    # 1000 calls each declaring $0 -> should NOT all be free
-    for _ in range(1000):
-        r.complete(stage="3", model="expensive-model", prompt="x" * 5000, stage0_passed=True, estimated_cost_usd=0.0)
-    assert r.spent_usd > 0.01, "the router treated 1000 large generations as free"
+    # Repeated calls declaring $0 must hit the derived conservative budget.
+    with pytest.raises(RuntimeError, match="LLM_DAILY_BUDGET_EXCEEDED"):
+        for _ in range(1000):
+            r.complete(stage="3", model="expensive-model", prompt="x" * 5000,
+                       stage0_passed=True, estimated_cost_usd=0.0)
+    assert r.spent_usd > 0, "the router treated unknown-model generations as free"
 
 
 def test_daily_budget_persists_across_router_instances(tmp_path):

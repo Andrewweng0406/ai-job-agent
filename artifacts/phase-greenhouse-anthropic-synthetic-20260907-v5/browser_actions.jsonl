@@ -1,0 +1,4 @@
+{"action": "NAVIGATE", "lease_epoch": 1, "success": true, "timestamp": "2026-09-07T23:49:12.832667+00:00"}
+{"action": "SCAN_HARD_STOP", "lease_epoch": 1, "success": true, "timestamp": "2026-09-07T23:49:14.674018+00:00"}
+{"action": "EXTRACT_FIELDS", "field_count": 25, "lease_epoch": 1, "success": true, "timestamp": "2026-09-07T23:49:14.705121+00:00"}
+{"action": "POST_FILL_SCAN", "human_required": true, "lease_epoch": 1, "success": false, "timestamp": "2026-09-07T23:49:15.131711+00:00"}
