@@ -145,10 +145,14 @@ def _label_for(control: _Element, labels: dict[str, str], labelled_text: dict[st
 
 def _is_noninteractive(control: _Element) -> bool:
     attrs = control.attrs
-    if attrs.get("aria-hidden", "").lower() == "true" or attrs.get("tabindex") == "-1":
+    if "hidden" in attrs or "disabled" in attrs or attrs.get("aria-hidden", "").lower() == "true":
         return True
     style = attrs.get("style", "").replace(" ", "").lower()
-    return "display:none" in style or "visibility:hidden" in style
+    if "display:none" in style or "visibility:hidden" in style or "opacity:0" in style:
+        return True
+    if attrs.get("tabindex") == "-1" and ("hidden" in attrs.get("class", "").lower() or "offscreen" in attrs.get("class", "").lower()):
+        return True
+    return "position:absolute" in style and bool(re.search(r"(?:left|top):-?9\d{3,}", style))
 
 
 def _kind_for(tag: str, input_type: str, attrs: dict[str, str], options: list[str]) -> InputKind:

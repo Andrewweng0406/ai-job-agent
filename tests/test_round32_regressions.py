@@ -100,7 +100,6 @@ def test_honeypot_display_none_aria_hidden_is_excluded():
         "style='opacity:0'",
     ],
 )
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P2-21: _is_noninteractive misses bare hidden attr / disabled / offscreen / opacity:0")
 def test_other_hidden_field_techniques_are_also_excluded(hidden_attr):
     html = f"<form><label for=e>Email</label><input id=e name=email required><input type=text name=trap {hidden_attr}></form>"
     fields = HtmlFormFieldExtractor().extract(html, "greenhouse")
