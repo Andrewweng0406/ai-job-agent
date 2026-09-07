@@ -7,7 +7,7 @@ Codex remains the primary implementation owner. Claude Round 1 P0/P1 findings ha
 Latest local verification:
 
 - `python3 -m pytest -q`
-- Result: `329 passed, 1 skipped`
+- Result: `374 passed, 1 skipped`
 
 ## Claude Round 1 Findings
 
@@ -111,6 +111,7 @@ Latest local verification:
 - Approval-gated autofill preview builder and CLI rendering; it rejects unapproved, mutated-hash, and not-submit-ready transcripts.
 - Dry-run application worker integration that atomically claims READY work, fences stale leases before browser access, persists DOM transcripts, returns no-submit work to READY, and refuses real-submission mode.
 - First live Greenhouse DOM dry-run completed against Anthropic's public application page: 24 fields discovered, 3 safe fields filled, 14 human-required, `would_submit=false`, upload calls `0`, submit invocations `0`; audit report is in `docs/greenhouse_live_dry_run_report.json`.
+- Phase 4.2 safety closure: ordinary HTTP 4xx responses are no longer retried; live autofill requires explicit human invocation and performs a post-fill hard-stop scan; the live evidence bundle remains no-submit and candidate-profile TODO values remain HUMAN_REQUIRED.
 
 ## Next
 

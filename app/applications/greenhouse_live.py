@@ -7,6 +7,7 @@ from typing import Protocol
 from app.applications.browser_autofill import BrowserAutofillResult, DryRunBrowserAutofill
 from app.applications.greenhouse_dry_run import GreenhouseDryRunAdapter, GreenhouseDryRunResult
 from app.models.job import Job
+from app.models.enums import ApplicationStatus
 from app.resumes.profile import CandidateProfile
 
 
@@ -109,6 +110,19 @@ class GreenhouseLiveDryRunRunner:
                             adapter_result.dry_run.resolutions,
                             expected_resume_hash=payload.resume_hash,
                         )
+                        post_fill = self.adapter.capture.capture(
+                            page, ats_type="greenhouse", screenshot_path=payload.screenshot_path
+                        )
+                        if post_fill.human_required:
+                            from app.services.browser_hard_stop import persist_browser_hard_stop
+
+                            persist_browser_hard_stop(
+                                self.adapter.repository, payload.application_id, payload.job.id, post_fill
+                            )
+                            return GreenhouseLiveDryRunResult(
+                                GreenhouseDryRunResult(ApplicationStatus.HUMAN_REQUIRED, reason="BROWSER_HARD_STOP"),
+                                autofill,
+                            )
                     return GreenhouseLiveDryRunResult(adapter_result, autofill)
                 finally:
                     context.close()

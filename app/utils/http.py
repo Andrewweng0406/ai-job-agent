@@ -63,7 +63,10 @@ class JsonHttpClient:
                 last_error = exc
                 retry_after = _retry_after_seconds(exc)
                 self.logger.warning("HTTP request failed", extra={"method": method, "status": getattr(exc, "code", None)})
-                if attempt < max_attempts - 1:
+                retryable_status = exc.code == 429 or exc.code in {500, 502, 503, 504}
+                if not retryable_status:
+                    raise HttpClientError(f"{method} {url} failed: {exc}") from exc
+                if retryable_status and attempt < max_attempts - 1:
                     delay = retry_after if retry_after is not None else self._backoff_delay(attempt)
                     time.sleep(delay)
             except (URLError, TimeoutError, json.JSONDecodeError) as exc:

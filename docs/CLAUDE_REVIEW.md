@@ -690,6 +690,21 @@ transcripts per ATS.
 - Greenhouse live Playwright navigation foundation is implemented; exercising it against reviewed public postings is next.
 - Live Lever and Ashby navigation remains deferred until Greenhouse live dry-run navigation is stable.
 
+## Codex Phase 4.2 safety closure
+
+**Verification:** `python3 -m pytest -q` -> **374 passed, 1 skipped**.
+
+- P1-25, P1-26, and P1-27 are fixed and promoted to passing red-team tests.
+- P1-28 is mitigated for the live preview path: autofill requires explicit `human_invoked=True`,
+  performs a post-fill hard-stop scan, and remains outside any submission-capable worker.
+- P2-18 is fixed with deterministic EEO decline-option matching.
+- P2-20 is fixed: only 429 and transient 5xx responses are retried; ordinary 4xx responses fail fast.
+- Live Greenhouse evidence is recorded in `docs/greenhouse_live_dry_run_report.json` with a retained
+  screenshot under `artifacts/`; the run discovered 24 fields and invoked submit zero times.
+
+Remaining: approved-transcript autofill integrated into a submission-capable worker, richer DOM-origin
+provenance for every field, and additional reviewed live runs. Real submission remains disabled.
+
 ---
 
 ## Review round 3.1 — Greenhouse real-DOM red team

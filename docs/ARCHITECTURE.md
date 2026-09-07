@@ -34,3 +34,4 @@ Safety decisions:
 - Greenhouse, Lever, and Ashby have DOM-driven dry-run adapters against realistic fixture HTML. Greenhouse also has a no-submit live-navigation runner.
 - PDF upload eligibility is gated by resume validation status and PDF QA.
 - Live Greenhouse dry-run evidence is recorded in `docs/greenhouse_live_dry_run_report.json`; the runner navigates public application pages, extracts actual DOM fields, applies only resolved values, and has no submit operation in its dry-run path.
+- Live browser autofill is an explicit human-invoked preview operation with no submitting keypress; it rechecks for browser hard stops after filling and persists HUMAN_REQUIRED tasks when a challenge appears.

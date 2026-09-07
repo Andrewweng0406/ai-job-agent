@@ -70,6 +70,20 @@ def test_get_retries_5xx_with_http_date_retry_after(monkeypatch):
     assert 0 <= sleeps[0] <= 2.5
 
 
+def test_get_does_not_retry_ordinary_client_errors(monkeypatch):
+    calls = []
+
+    def fake_urlopen(request, timeout):
+        calls.append(request)
+        raise HTTPError(request.full_url, 404, "missing", Message(), None)
+
+    monkeypatch.setattr(http, "urlopen", fake_urlopen)
+    client = JsonHttpClient(HttpClientConfig(retries=5, per_host_requests_per_second=0))
+    with pytest.raises(HttpClientError):
+        client.get_json("https://api.example.test/missing")
+    assert len(calls) == 1
+
+
 def test_post_is_not_blind_retried(monkeypatch):
     calls = []
 
