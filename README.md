@@ -52,6 +52,7 @@ python "apply company.py" --prepare-next --tailoring-mode FAST
 python "apply company.py" --dry-run-next
 python "apply company.py" --autofill-preview <dry_run_transcript_id>
 python "apply company.py" --daily-report
+python scripts/live_dry_run.py --url <greenhouse_apply_url> --company <company> --role <role> --run-id <run_id>
 ```
 
 Optional browser dry-run work uses Playwright:
@@ -61,4 +62,4 @@ python -m pip install -e ".[browser]"
 python -m playwright install chromium
 ```
 
-Current verification: `374 passed, 1 skipped`.
+Current verification: `395 passed, 1 skipped`.
