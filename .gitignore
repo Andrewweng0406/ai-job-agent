@@ -22,3 +22,7 @@ logs/*
 
 # OS/editor
 .DS_Store
+
+# --- local, gitignored: real candidate PII lives here, never committed ---
+config/candidate_profile.local.yaml
+config/*.local.yaml

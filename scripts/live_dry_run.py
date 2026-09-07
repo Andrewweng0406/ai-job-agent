@@ -37,7 +37,7 @@ def main() -> int:
     out = Path(args.output) / run_id
     out.mkdir(parents=True, exist_ok=False)
     captured_at = datetime.now(timezone.utc).isoformat()
-    profile = CandidateProfile.from_yaml(args.profile)
+    profile = CandidateProfile.from_yaml(_resolve_profile_path(args.profile))
     job = _job_from_url(args.url, args.company, args.role, ats)
     repo = JobAgentRepository(out / "run.sqlite3")
     repo.initialize()
@@ -160,6 +160,20 @@ def _args():
     parser.add_argument("--approved-by", help="Explicit reviewer identity; required before any browser autofill")
     parser.add_argument("--real-submission-enabled", action="store_true")
     return parser.parse_args()
+
+
+def _resolve_profile_path(requested: str) -> str:
+    """Prefer a gitignored `*.local.yaml` sibling holding real candidate PII.
+
+    Real candidate facts must never live in a tracked file. If the caller left the
+    default and a `<name>.local.yaml` exists next to it, use that.
+    """
+    p = Path(requested)
+    if requested == "config/candidate_profile.yaml":
+        local = p.with_suffix(".local.yaml")
+        if local.exists():
+            return str(local)
+    return requested
 
 
 def _job_from_url(url: str, company: str, role: str, ats: str) -> Job:

@@ -2,6 +2,18 @@ from __future__ import annotations
 
 import argparse
 from datetime import date
+from pathlib import Path
+
+
+def _resolve_candidate_profile(requested: str | None) -> str:
+    """Real candidate facts must never live in a tracked file. When no path is given, prefer the
+    gitignored `config/candidate_profile.local.yaml`; otherwise fall back to the tracked template.
+    An explicit `--candidate-profile PATH` is always honored verbatim.
+    """
+    if requested is not None:
+        return requested
+    local = Path("config/candidate_profile.local.yaml")
+    return str(local) if local.exists() else "config/candidate_profile.yaml"
 
 from app.database.repository import JobAgentRepository
 from app.discovery.pipeline import DiscoveryPipeline
@@ -38,8 +50,10 @@ def main() -> int:
     parser.add_argument("--settings", default="config/settings.yaml", help="Path to settings YAML.")
     parser.add_argument("--companies", default="config/companies.yaml", help="Path to company registry YAML.")
     parser.add_argument("--taxonomy", default="config/role_taxonomy.yaml", help="Path to role taxonomy YAML.")
-    parser.add_argument("--candidate-profile", default="config/candidate_profile.yaml", help="Path to candidate profile YAML.")
+    parser.add_argument("--candidate-profile", default=None,
+                        help="Path to candidate profile YAML (default: config/candidate_profile.local.yaml if present, else the tracked template).")
     args = parser.parse_args()
+    args.candidate_profile = _resolve_candidate_profile(args.candidate_profile)
 
     configure_logging()
     settings = load_yaml(args.settings)
