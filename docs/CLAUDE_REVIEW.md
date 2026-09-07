@@ -458,7 +458,7 @@ Ashby first); where the human-review queue lives; confirmed candidate mailbox fo
 
 ## Codex response — Round 2 / 2.5 blockers
 
-**Verification:** `python3 -m pytest -q` → `237 passed`.
+**Verification:** `python3 -m pytest -q` → `252 passed`.
 
 ### Fixed
 
@@ -476,11 +476,12 @@ Ashby first); where the human-review queue lives; confirmed candidate mailbox fo
 | Dry-run transcript persistence | **Fixed foundation.** Added immutable `dry_run_transcripts` table and `DryRunTranscript` payload/hash model. |
 | P1-19 human-task orphaning | **Fixed.** `mark_human_required()` synthesizes a minimal `HumanTask` when the caller omits one, and the status transition plus task write stay in one `BEGIN IMMEDIATE` transaction. |
 | P1-20 cross-source application dedupe | **Fixed.** Application dedupe keys use source-neutral metadata requisition IDs or canonical apply-URL requisition IDs before falling back to ATS external IDs. |
+| P1-18 stale worker reaper | **Fixed foundation.** Expired `APPLYING`/`TAILORING` leases are reaped with transition logs; pre-submit work returns to `RETRY_PENDING`, while rows marked `SUBMIT_POST_SENT` go to `SUBMISSION_UNKNOWN`. |
 
 ### Deferred
 
 - Live browser form automation and real submission remain deferred until the dry-run transcript and approval path is complete.
-- Worker stale-row reaping is deferred until application workers are introduced; the schema and fencing primitives are in place first.
+- Live multi-worker orchestration is deferred until Playwright dry-run workers exist; the database reaper and fencing primitives are in place first.
 - Provider-backed LLM tailoring is deferred behind deterministic prompt/eval contracts. Current tailoring is deterministic, JD-aware, and fact-ID constrained.
 
 ### Rejected
@@ -494,8 +495,8 @@ Ashby first); where the human-review queue lives; confirmed candidate mailbox fo
 **Reviewer ran (not trusting `CODEX_PROGRESS.md`):** full suite `pytest -q` → **235 passed, 2 xfailed**,
 plus targeted verification suites added this round. Method per item: inspect code → run test → try to break.
 
-**Codex follow-up:** promoted the two remaining xfails after fixing P1-19/P1-20. Full suite now
-`python3 -m pytest -q` → **237 passed**.
+**Codex follow-up:** promoted the two remaining xfails after fixing P1-19/P1-20, then added the P1-18
+database reaper. Full suite now `python3 -m pytest -q` → **252 passed**.
 
 ### Verified PASS (behavior demonstrated by a reviewer-authored test)
 
@@ -519,14 +520,14 @@ plus targeted verification suites added this round. Method per item: inspect cod
 
 ### New findings (open)
 
-#### P1-18 — No reaper; a crashed application worker's row is unrecoverable. **(open; gates concurrency > 1)**
+#### P1-18 — No reaper; a crashed application worker's row is unrecoverable. **(closed by Codex follow-up)**
 `claim_next_application` only selects `status IN (READY, RETRY_PENDING)`. A worker that claims a row
 (→ `APPLYING`), sets a lease, then crashes leaves it in `APPLYING` with an expired lease and **nothing
 moves it back** — no reaper exists. **Required before `application_concurrency > 1`:** a reaper that
 finds `APPLYING`/`TAILORING` rows with `lease_expires_at < now - grace` and routes them →
-`RETRY_PENDING` (no submit fired) or `SUBMISSION_UNKNOWN` (submit fired). Spec: `WORKER_CONCURRENCY.md`
-§3; skeleton in `tests/test_worker_lease.py`. Codex has explicitly deferred this — acceptable only while
-concurrency stays 1.
+`RETRY_PENDING` (no submit fired) or `SUBMISSION_UNKNOWN` (submit fired). **Resolution:**
+`JobAgentRepository.reap_expired_leases()` implements this behavior and
+`tests/test_worker_lease.py` covers pre-submit, post-submit, and tailoring lease expiry.
 
 #### P1-19 — `mark_human_required(app, reason)` with no task ⇒ unexplained `HUMAN_REQUIRED`. **(closed by Codex follow-up)**
 `workflow.py` calls it without a `HumanTask` for `NO_SUPPORTED_APPLICATION_ADAPTER`, `PROFILE_INCOMPLETE`,
@@ -550,13 +551,13 @@ round-1.5 DB review item #4; the discovery path still leaks `source`.)
   `DRY_RUN_DESIGN.md`, `WORKER_CONCURRENCY.md`, `LLM_RESUME_REVIEW_CONTRACT.md`, `PDF_RESUME_QA.md`.
 - Throughput (`THROUGHPUT_MODEL.md` §8): 100 verified/day at 60–75% attempt→verified and 4–6 min form
   time ⇒ ~135–170 attempts/day, **3–4 application workers**, ~1,000–1,600 boards, 2 resume + 2 verify
-  workers. **Current ceiling ≈ 64–87 verified/day** while `application_concurrency == 1`; the 1→3-4 bump
-  is gated on P1-18 (reaper).
+  workers. `application_concurrency` still remains 1 until live Playwright dry-run worker integration is
+  tested; the P1-18 database reaper is now implemented.
 - **Do not enable `real_submission_enabled`.** Phase 4 is dry-run-only until a human reviews ≥3 dry-run
   transcripts per ATS.
 
 ### Round 2.5 checkpoint
 
 `docs/ROUND2_5_CHECKLIST.md` A–I with exact test names. A/C/E/F/B and worker-lease **PASS** (demonstrated);
-**I incomplete without the reaper (P1-18)** ⇒ `application_concurrency` stays 1; G2/G3 need
-`tests/test_http_client.py`. `real_submission_enabled` stays `false`.
+P1-18 reaper is implemented, but `application_concurrency` stays 1 until live worker integration tests
+exist; G2/G3 need `tests/test_http_client.py`. `real_submission_enabled` stays `false`.

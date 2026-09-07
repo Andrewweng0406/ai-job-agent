@@ -114,7 +114,7 @@ Any **xpass** = a gap Codex closed → promote that test to a plain assertion an
 | I2 | Atomic claim: 2/4/8 claimers on one row ⇒ exactly one wins | covered by `tests/test_repository.py::test_claim_next_application_is_lease_protected`; higher-concurrency stress test still deferred | PASS / partial |
 | I3 | Lease expiry ⇒ reclaim by another worker, `lease_epoch` bumped | `::test_lease_expiry_reclaim` | ☐ |
 | I4 | Fencing: returning zombie worker fails `lease_still_mine` ⇒ `submit()` not called | lease fencing primitive covered by `tests/test_repository.py::test_claim_next_application_is_lease_protected`; worker integration deferred | PASS / partial |
-| I5 | Reaper: `APPLYING` past grace, submit fired ⇒ `SUBMISSION_UNKNOWN`; not fired ⇒ `RETRY_PENDING` | deferred until application worker process exists | DEFERRED |
+| I5 | Reaper: `APPLYING` past grace, submit fired ⇒ `SUBMISSION_UNKNOWN`; not fired ⇒ `RETRY_PENDING` | `tests/test_worker_lease.py::test_reaper_routes_post_submit_crash_to_submission_unknown` and `::test_expired_lease_is_reclaimable_and_epoch_bumps` | PASS |
 | I6 | No scenario yields two `→ SUBMITTED` transitions for one `application_id` | `::test_no_double_submit` | ☐ |
 
 ---
@@ -123,8 +123,8 @@ Any **xpass** = a gap Codex closed → promote that test to a plain assertion an
 
 1. **A, C, E, F all PASS** — these are integrity gates. No exceptions.
 2. **B PASS** OR `discovery_concurrency` pinned to 1 with a written note.
-3. **I PASS** OR `application_concurrency` pinned to 1 with a written note (then throughput ceiling
-   ≈ 64–87 verified/day per `THROUGHPUT_MODEL.md` §8).
+3. **I PASS** at the DB primitive/reaper layer. `application_concurrency` remains pinned to 1 until live
+   Playwright worker integration tests exist.
 4. **G2/G3** PASS before any adapter does live HTTP at scale.
 5. Full suite green; every xpass promoted; new findings appended to `CLAUDE_REVIEW.md` with repro + patch
    + the test that should pass.

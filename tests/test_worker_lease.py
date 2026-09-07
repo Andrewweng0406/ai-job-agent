@@ -79,12 +79,63 @@ def test_expired_lease_is_reclaimable_and_epoch_bumps(tmp_path):
     repo = _repo(tmp_path)
     _ready_application(repo)
     app_id, epoch1 = repo.claim_next_application(ApplicationStatus.READY, "w1", _future(-1))  # already expired
-    # A second worker looking for READY work won't see it (row is APPLYING now) -> needs a reaper
-    # to return APPLYING -> RETRY_PENDING first. Document that expectation:
     assert repo.claim_next_application(ApplicationStatus.READY, "w2", _future(10)) is None
-    # Once a reaper requeues it:
-    repo.transition_application(app_id, ApplicationStatus.SUBMISSION_UNKNOWN, "reaper: submit not fired")  # placeholder
-    # (real reaper would route pre-submit -> RETRY_PENDING; see CLAUDE_REVIEW P1-18)
+
+    reaped = repo.reap_expired_leases()
+    assert reaped == [(app_id, ApplicationStatus.RETRY_PENDING)]
+    app_id2, epoch2 = repo.claim_next_application(ApplicationStatus.RETRY_PENDING, "w2", _future(10))
+    assert app_id2 == app_id
+    assert epoch2 == epoch1 + 1
+
+
+def test_reaper_routes_post_submit_crash_to_submission_unknown(tmp_path):
+    repo = _repo(tmp_path)
+    _ready_application(repo)
+    app_id, _epoch = repo.claim_next_application(ApplicationStatus.READY, "w1", _future(-1))
+    with repo.connect() as conn:
+        conn.execute("UPDATE applications SET notes = ? WHERE application_id = ?", ("SUBMIT_POST_SENT", app_id))
+
+    reaped = repo.reap_expired_leases()
+
+    assert reaped == [(app_id, ApplicationStatus.SUBMISSION_UNKNOWN)]
+    assert repo.get_application_status(app_id) == ApplicationStatus.SUBMISSION_UNKNOWN
+    assert repo.claim_next_application(ApplicationStatus.RETRY_PENDING, "w2", _future(10)) is None
+
+
+def test_reaper_routes_expired_tailoring_to_retry_pending(tmp_path):
+    repo = _repo(tmp_path)
+    app_id = _ready_application(repo)
+    repo.transition_application(app_id, ApplicationStatus.CLOSED, "close old ready")
+    job_id = repo.upsert_job(
+        Job(
+            external_job_id="job-tailor", company_id="acme", company_name="Acme", title="Data Analyst",
+            location="Remote", description="Entry-level analytics.", source="fixture",
+            source_url="https://example.test/job-tailor", apply_url="https://example.test/apply/job-tailor",
+            ats_type="fixture", job_family=JobFamily.DATA_ANALYTICS,
+        )
+    )
+    app = Application(
+        job_id=job_id, company="Acme", position="Data Analyst", location="Remote",
+        job_family=JobFamily.DATA_ANALYTICS, source="fixture", ats_type="fixture",
+    )
+    tailor_app_id = repo.insert_application(app)
+    repo.transition_application(tailor_app_id, ApplicationStatus.ELIGIBLE, "f")
+    repo.transition_application(tailor_app_id, ApplicationStatus.QUEUED, "q")
+    repo.transition_application(tailor_app_id, ApplicationStatus.TAILORING, "t")
+    with repo.connect() as conn:
+        conn.execute(
+            """
+            UPDATE applications
+            SET worker_id = ?, claimed_at = ?, lease_expires_at = ?, lease_epoch = lease_epoch + 1
+            WHERE application_id = ?
+            """,
+            ("tailor-worker", datetime.now(timezone.utc).isoformat(), _future(-1).isoformat(), tailor_app_id),
+        )
+
+    reaped = repo.reap_expired_leases()
+
+    assert reaped == [(tailor_app_id, ApplicationStatus.RETRY_PENDING)]
+    assert repo.get_application_status(tailor_app_id) == ApplicationStatus.RETRY_PENDING
 
 
 def test_fencing_blocks_zombie_after_lease_expiry(tmp_path):

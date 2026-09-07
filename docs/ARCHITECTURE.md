@@ -26,6 +26,7 @@ Safety decisions:
 - Candidate facts marked `TODO` are treated as missing and must not be guessed.
 - Resume generation refuses to produce an artifact while required profile facts are missing.
 - Worker claims are transactional and fenced by `worker_id` plus `lease_epoch`.
+- Expired worker leases are reaped: pre-submit crashes return to `RETRY_PENDING`; post-submit uncertainty goes to `SUBMISSION_UNKNOWN`.
 - Discovery application creation is conflict-safe by requisition-derived dedupe key.
 - Dry-run transcripts are immutable payload snapshots; approval and real submission are separate steps.
 - Legal/work-authorization form fields are never guessed; missing canonical answers open human tasks.

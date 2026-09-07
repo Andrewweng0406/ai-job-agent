@@ -290,6 +290,60 @@ class JobAgentRepository:
                 (application_id, worker_id, lease_epoch),
             )
 
+    def reap_expired_leases(self, *, grace_seconds: int = 0, now: datetime | None = None) -> list[tuple[str, ApplicationStatus]]:
+        machine = ApplicationStateMachine()
+        current_time = now or datetime.now(timezone.utc)
+        cutoff = current_time.timestamp() - grace_seconds
+        cutoff_dt = datetime.fromtimestamp(cutoff, tz=timezone.utc)
+        reaped: list[tuple[str, ApplicationStatus]] = []
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            rows = conn.execute(
+                """
+                SELECT application_id, status, notes
+                FROM applications
+                WHERE status IN ('APPLYING', 'TAILORING')
+                  AND lease_expires_at IS NOT NULL
+                  AND lease_expires_at < ?
+                ORDER BY lease_expires_at ASC, application_id ASC
+                """,
+                (dt(cutoff_dt),),
+            ).fetchall()
+            for row in rows:
+                current = ApplicationStatus(row["status"])
+                target = (
+                    ApplicationStatus.SUBMISSION_UNKNOWN
+                    if current == ApplicationStatus.APPLYING and "SUBMIT_POST_SENT" in (row["notes"] or "")
+                    else ApplicationStatus.RETRY_PENDING
+                )
+                transition = machine.transition(current, target, "expired worker lease reaped")
+                cursor = conn.execute(
+                    """
+                    UPDATE applications
+                    SET status = ?, worker_id = NULL, claimed_at = NULL, lease_expires_at = NULL
+                    WHERE application_id = ? AND status = ?
+                    """,
+                    (target.value, row["application_id"], current.value),
+                )
+                if cursor.rowcount != 1:
+                    continue
+                conn.execute(
+                    """
+                    INSERT INTO application_state_transitions (application_id, from_status, to_status, reason, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        row["application_id"],
+                        transition.from_status.value,
+                        transition.to_status.value,
+                        transition.reason,
+                        dt(current_time),
+                    ),
+                )
+                reaped.append((str(row["application_id"]), target))
+            conn.execute("COMMIT")
+        return reaped
+
     def get_application_status(self, application_id: str) -> ApplicationStatus:
         with self.connect() as conn:
             row = conn.execute(

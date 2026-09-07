@@ -7,7 +7,7 @@ Codex remains the primary implementation owner. Claude Round 1 P0/P1 findings ha
 Latest local verification:
 
 - `python3 -m pytest -q`
-- Result: `250 passed`
+- Result: `252 passed`
 
 ## Claude Round 1 Findings
 
@@ -97,10 +97,11 @@ Latest local verification:
 - `--dry-run-next` CLI command for READY applications with validated resume artifacts.
 - HTML form field extractor for Greenhouse/Lever/Ashby-style DOM snapshots, with a provider bridge into the dry-run engine.
 - Browser page capture abstraction that reads HTML/screenshots, detects CAPTCHA/MFA, and refuses field extraction when a human challenge is present.
+- Worker lease reaper that routes expired pre-submit work to `RETRY_PENDING` and expired post-submit work to `SUBMISSION_UNKNOWN`.
 
 ## Next
 
 1. Connect real Playwright navigation to the browser capture abstraction for Greenhouse, Lever, and Ashby dry-runs.
 2. Add approval-gated autofill previews backed by persisted dry-run transcripts.
-3. Add worker reaping/recovery and then raise application concurrency cautiously.
+3. Add live worker integration tests before raising application concurrency cautiously.
 4. Add provider-backed LLM tailoring only after deterministic prompt contracts and evals are in place.
