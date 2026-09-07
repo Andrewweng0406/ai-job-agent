@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from app.applications.form_engine import FormDryRunEngine, FormDryRunResult, InputKind, RawFormField
 from app.applications.human_tasks import HumanTask
+from app.applications.html_form_extractor import HtmlFormFieldExtractor
 from app.models.enums import ApplicationStatus, JobFamily
 from app.models.job import Job
 from app.resumes.profile import CandidateProfile
@@ -39,6 +40,18 @@ class StaticAtsFieldProvider:
         if normalized == "ashby":
             fields.append(RawFormField("Website", InputKind.TEXT, "ashby:website", required=False))
         return fields
+
+
+class HtmlAtsFieldProvider:
+    def __init__(self, html_by_ats: dict[str, str]) -> None:
+        self.html_by_ats = html_by_ats
+        self.extractor = HtmlFormFieldExtractor()
+
+    def fields_for(self, ats_type: str) -> list[RawFormField]:
+        html = self.html_by_ats.get(ats_type.lower()) or self.html_by_ats.get(ats_type)
+        if not html:
+            return StaticAtsFieldProvider().fields_for(ats_type)
+        return self.extractor.extract(html, ats_type)
 
 
 class ApplicationDryRunPreparer:

@@ -4,7 +4,7 @@ from app.models.enums import ApplicationStatus, JobFamily, Persona
 from app.models.job import Job
 from app.resumes.generator import ResumeArtifact
 from app.resumes.profile import CandidateFact, CandidateProfile
-from app.services.dry_run_preparer import ApplicationDryRunPreparer
+from app.services.dry_run_preparer import ApplicationDryRunPreparer, HtmlAtsFieldProvider
 
 
 def test_dry_run_next_persists_transcript_for_ready_application(tmp_path):
@@ -30,6 +30,29 @@ def test_dry_run_next_missing_resume_opens_human_task(tmp_path):
     with repo.connect() as conn:
         task = conn.execute("SELECT category FROM human_tasks WHERE application_id = ?", (app_id,)).fetchone()
     assert task["category"] == "RESUME_ARTIFACT_MISSING"
+
+
+def test_dry_run_next_can_use_extracted_html_fields(tmp_path):
+    repo, app_id = _seed_ready(tmp_path, with_resume=True)
+    provider = HtmlAtsFieldProvider(
+        {
+            "greenhouse": """
+            <form id="application_form">
+              <label for="email">Email</label><input id="email" required />
+              <label for="resume">Resume</label><input id="resume" type="file" required />
+            </form>
+            """
+        }
+    )
+
+    result = ApplicationDryRunPreparer(repo, field_provider=provider).dry_run_next(_complete_profile())
+
+    assert result.status == ApplicationStatus.READY
+    assert result.dry_run is not None
+    assert result.dry_run.transcript.would_submit
+    labels = [field["label"] for field in result.dry_run.transcript.payload["fields"]]
+    assert labels == ["Email", "Resume"]
+    assert repo.get_application_status(app_id) == ApplicationStatus.READY
 
 
 def _seed_ready(tmp_path, with_resume: bool):

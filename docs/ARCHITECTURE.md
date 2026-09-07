@@ -12,7 +12,7 @@ The system is organized around deterministic, auditable pipeline stages:
 6. Tailoring selects only candidate fact IDs from `config/candidate_profile.yaml`.
 7. Resume generation writes a structured JSON intermediate and an ATS-friendly PDF artifact.
 8. Application preparation moves queued rows through `TAILORING -> READY` and emits a preview.
-9. Browser/application work must feed extracted fields into the form dry-run engine before any submit path is considered.
+9. Browser/application work must feed HTML-extracted fields into the form dry-run engine before any submit path is considered.
 10. Application adapters prepare, fill, submit, and verify supported ATS workflows behind hard safety gates.
 11. SQLite stores jobs, applications, worker leases, state transitions, resumes, dry-run transcripts, human tasks, and confirmation evidence.
 12. Daily reporting converts stored UTC timestamps into the configured local timezone before counting daily KPIs.
@@ -29,3 +29,4 @@ Safety decisions:
 - Discovery application creation is conflict-safe by requisition-derived dedupe key.
 - Dry-run transcripts are immutable payload snapshots; approval and real submission are separate steps.
 - Legal/work-authorization form fields are never guessed; missing canonical answers open human tasks.
+- The current browser bridge is a deterministic HTML field extractor; live Playwright capture remains a no-submit integration step.
