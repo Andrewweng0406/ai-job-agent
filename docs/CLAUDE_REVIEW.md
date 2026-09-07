@@ -1133,3 +1133,47 @@ fail-closed daily budget when a cost is declared, negative-cost rejection.
   limiting / Retry-After. No per-stage sub-budgets. No `LLMRouter` consumer exists yet.
 
 `real_submission_enabled` stays `false`.
+
+---
+
+## Review round 3.7 — verifying `bd673cb` / `931d78d` / `83978b8` (autonomous)
+
+Suite: 500 passed / 1 skipped / 7 xfailed / 1 xpassed. Reviewer test: `tests/test_live_dry_run_lease_ttl.py`.
+
+### Codex claims — verified
+| Claim | Verdict |
+|---|---|
+| P1-29 per-field `lease_check` | **REVIEWER-VERIFIED PASS** — `apply(..., lease_check=lambda: _lease_check(...))`; `_lease_check` → `repo.lease_still_mine` → `RuntimeError("LEASE_LOST")`. |
+| P1-30 lease around nav/capture/autofill/post-fill | **PARTIAL** — only per-field (in `apply`) + pre-post-fill. `page.goto`, pre-fill `capture`, `adapter.dry_run` are still **not** lease-checked. Risk (typing PII) is fenced; the claim is broader than the code. |
+| P1-30b post-fill re-scan | **IMPROVED** — re-captures + logs `human_required`; `83978b8` also folds failed-action reasons (incl. `LEASE_LOST`) into `report.json.blocking_reasons`. Still: does not transition to HUMAN_REQUIRED / open a task on a post-fill wall; `post_fill_hard_stop` is hardcoded `True` in the blocked bundle (**P3** now that `blocking_reasons` is honest). |
+| P1-31 runtime `safety.json` differential | **PASS (happy path)** — `attempted/matched_field_count` = real fill count, `mismatch_count` from a `BROWSER_TRANSCRIPT_MISMATCH`. On an actual mismatch the script `raise`s and the bundle is not written (**P2**). |
+| P2 dead `_write_blocked_bundle` (`931d78d`) | **FIXED** — `transcript is None` no longer `raise SystemExit`; the blocked-bundle path runs. Hard-stopped runs now produce a full auditable bundle (see v4). |
+| P2-31 synthetic profile source | **IMPLEMENTED, wrong direction** — enforces "`--test-only` ⇒ synthetic profile"; does **not** stop a real `--approved-by` run from typing the real `.local.yaml` PII into a live form. |
+
+### NEW P1 — the evidence script self-`LEASE_LOST`s every run
+**`scripts/live_dry_run.py:55`** — `repo.claim_next_application(ApplicationStatus.READY, worker_id,
+`datetime.now(timezone.utc))` claims the lease with a **0-second TTL** (`timedelta` is not even
+imported). Before `931d78d` nothing checked the lease so it did not matter; now that `_lease_check`
+is wired, **every run fails `_lease_check` after the first slow browser op → `LEASE_LOST` → blocked
+bundle**. Verified in `artifacts/phase-greenhouse-anthropic-approved-20260907-v4/browser_actions.jsonl`:
+`NAVIGATE`(22:29:19) → `SCAN_HARD_STOP`(22:29:42, **23 s** later) → `EXTRACT_FIELDS`(24 fields, real DOM,
+**no CAPTCHA**) → **`LEASE_LOST`**(22:29:43). The tooling can no longer produce a passing
+transcript/autofill bundle. **Fix:** `datetime.now(timezone.utc) + timedelta(minutes=10)` (and import
+`timedelta`); renew the lease around slow ops if needed.
+**Test:** `tests/test_live_dry_run_lease_ttl.py::test_evidence_lease_is_claimed_with_a_real_ttl` (xfail).
+
+### OPEN P1 — no guard against typing real PII into an arbitrary live form
+`--approved-by` + the auto-preferred real `config/candidate_profile.local.yaml` + any `--url` = the real
+name/email/phone typed into that live employer form. No URL allowlist, no per-run acknowledgment, no
+refusal when the profile is `real`. **Required before any real approved run:** `--approved-by` must
+require (a) `--url` on a user-confirmed allowlist OR an explicit `--i-am-applying-to-this-job` flag,
+AND (b) refuse `profile_source=synthetic_test_only` on the autofill path.
+**Test:** `tests/test_live_dry_run_lease_ttl.py::test_approved_autofill_requires_an_explicit_url_acknowledgment` (xfail).
+
+### Status
+- **Greenhouse Gate G — still FAIL.** Two blockers: the 0-TTL lease bug (every run LEASE_LOSTs) and the
+  missing approval-URL guard. Anthropic's Greenhouse is intermittently reachable (v4 got 24 real fields,
+  no CAPTCHA) — so once the lease TTL is fixed, a capture bundle is achievable; an *approved* one still
+  needs the P1 URL guard.
+- Lever / Ashby — `--ats` dispatch only; no live run.
+- `real_submission_enabled` stays `false`. Local `.local.yaml` PII still unpushed / safe.
