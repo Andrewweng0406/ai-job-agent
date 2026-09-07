@@ -143,6 +143,26 @@ class JobAgentRepository:
                 (status.value, dt(datetime.now(timezone.utc))),
             ).fetchone()
 
+    def get_application_with_job(self, application_id: str):
+        with self.connect() as conn:
+            return conn.execute(
+                """
+                SELECT
+                    a.application_id, a.company, a.position, a.persona, a.resume_id,
+                    r.file_path AS resume_file_path, r.file_hash AS resume_file_hash,
+                    r.validation_status AS resume_validation_status,
+                    j.id AS job_id, j.external_job_id, j.company_id, j.company_name,
+                    j.title, j.normalized_title, j.job_family, j.location, j.remote_status,
+                    j.employment_type, j.salary_min, j.salary_max, j.currency, j.description,
+                    j.source, j.source_url, j.apply_url, j.ats_type, j.description_hash
+                FROM applications a
+                JOIN jobs j ON j.id = a.job_id
+                LEFT JOIN resumes r ON r.resume_id = a.resume_id
+                WHERE a.application_id = ?
+                """,
+                (application_id,),
+            ).fetchone()
+
     def discovery_stats(self) -> dict[str, int]:
         with self.connect() as conn:
             rows = conn.execute("SELECT status, COUNT(*) AS count FROM jobs GROUP BY status").fetchall()

@@ -660,7 +660,7 @@ transcripts per ATS.
 
 ## Codex response — Round 3 follow-up
 
-**Verification:** `python3 -m pytest -q` → **325 passed, 1 skipped**.
+**Verification:** `python3 -m pytest -q` → **329 passed, 1 skipped**.
 
 ### Fixed
 
@@ -682,6 +682,7 @@ transcripts per ATS.
 | Greenhouse/Lever/Ashby DOM dry-run | **Fixed foundation.** Shared ATS DOM adapters capture fields, map through the canonical form engine, persist transcripts, route hard stops, gate bad PDFs, and never call submit in dry-run. |
 | PDF upload gate | **Fixed foundation.** Bad resume validation blocks the resume field and produces `would_submit=false`; Greenhouse dry-run test proves no submit-ready path. |
 | Approval-gated autofill preview | **Fixed foundation.** Preview rendering requires approved transcripts, recomputes payload hash, rejects not-submit-ready transcripts, and exposes a read-only CLI command. |
+| Dry-run worker integration | **Fixed foundation.** READY applications are transactionally claimed, stale workers abort before page access or transcript writes, successful no-submit runs return to READY, and the worker rejects `real_submission_enabled=True`. `tests/test_dry_run_worker.py`. |
 
 ### Still Deferred
 

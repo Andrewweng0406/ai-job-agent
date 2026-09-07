@@ -7,7 +7,7 @@ Codex remains the primary implementation owner. Claude Round 1 P0/P1 findings ha
 Latest local verification:
 
 - `python3 -m pytest -q`
-- Result: `325 passed, 1 skipped`
+- Result: `329 passed, 1 skipped`
 
 ## Claude Round 1 Findings
 
@@ -109,9 +109,10 @@ Latest local verification:
 - PDF upload gate coverage proving invalid resume validation blocks the resume field before submit-ready state.
 - Optional Greenhouse live dry-run runner that performs read-only Playwright navigation, refuses `real_submission_enabled=True`, and hands the page to the no-submit dry-run adapter.
 - Approval-gated autofill preview builder and CLI rendering; it rejects unapproved, mutated-hash, and not-submit-ready transcripts.
+- Dry-run application worker integration that atomically claims READY work, fences stale leases before browser access, persists DOM transcripts, returns no-submit work to READY, and refuses real-submission mode.
 
 ## Next
 
 1. Exercise Greenhouse live dry-run navigation against reviewed public postings without submitting.
-2. Add live worker integration tests before raising application concurrency cautiously.
+2. Exercise the dry-run worker against reviewed live Greenhouse pages before considering application concurrency above one.
 3. Add provider-backed LLM tailoring only after deterministic prompt contracts and evals are in place.

@@ -16,6 +16,7 @@ ALLOWED_TRANSITIONS: dict[ApplicationStatus, set[ApplicationStatus]] = {
         ApplicationStatus.SUBMISSION_UNKNOWN,
         ApplicationStatus.FAILED,
         ApplicationStatus.RETRY_PENDING,
+        ApplicationStatus.READY,
         ApplicationStatus.HUMAN_REQUIRED,
         ApplicationStatus.CLOSED,
     },
