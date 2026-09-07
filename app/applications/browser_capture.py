@@ -34,6 +34,7 @@ class BrowserFieldCapture:
         re.I,
     )
     MFA_PATTERN = re.compile(r"\b(mfa|multi-factor|two-factor|verification\s+code|one-time\s+password|otp)\b", re.I)
+    EMAIL_VERIFICATION_PATTERN = re.compile(r"\b(email\s+verification|verify\s+your\s+email|verification\s+link)\b", re.I)
 
     def __init__(self, extractor: HtmlFormFieldExtractor | None = None) -> None:
         self.extractor = extractor or HtmlFormFieldExtractor()
@@ -49,7 +50,9 @@ class BrowserFieldCapture:
         reasons = []
         if self.CAPTCHA_PATTERN.search(html):
             reasons.append("CAPTCHA")
-        if self.MFA_PATTERN.search(html):
+        if self.EMAIL_VERIFICATION_PATTERN.search(html):
+            reasons.append("EMAIL_VERIFICATION")
+        elif self.MFA_PATTERN.search(html):
             reasons.append("MFA")
         saved_screenshot = None
         if screenshot_path is not None:

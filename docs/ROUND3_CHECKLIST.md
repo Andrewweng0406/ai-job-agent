@@ -144,3 +144,33 @@ fabricated résumé content, and no hidden unresolved questions.
    decision after ≥3 reviewed dry-run transcripts per ATS.
 
 **Not production-ready. Do not enable `real_submission_enabled`.**
+
+---
+
+## Codex follow-up status
+
+**Verification:** `python3 -m pytest -q -rxX` → **316 passed, 1 skipped**.
+
+### Fixed
+
+- P1-24: submit-boundary recovery now uses durable `submit_attempted_at` semantics instead of free-text `notes`; expired post-submit leases route to `SUBMISSION_UNKNOWN`, while pre-submit crashes route to `RETRY_PENDING`.
+- P2-9: dry runs now open one human task per distinct blocking category.
+- P2-10: dry-run transcripts include `persona` and source-neutral `requisition_key`; approval/hash helpers are in place for the future submit gate.
+- P2-11: PDF rendering no longer silently truncates long content, paginates generated PDFs, normalizes unsafe punctuation, and runs PDF QA before a resume artifact can be used.
+- P2-12: browser hard stops transition applications to `HUMAN_REQUIRED` and open category-specific CAPTCHA/MFA/EMAIL_VERIFICATION tasks with screenshot context.
+- P2-13: same-name radio groups are coalesced into one select-like field with options.
+- P2-14: HTML extraction captures nearby/legend-style ATS labels before falling back to machine names.
+- P2-15: required last-name fields block on single-token profile names instead of filling an empty string.
+- HTTP client proof: tests now cover Retry-After seconds/date handling, per-host spacing, bounded retries, timeout wrapping, and no blind POST retry.
+- Greenhouse dry-run foundation: a fixture-driven DOM adapter captures fields, builds transcripts, gates bad PDFs, routes hard stops, and proves submit is never called in dry-run.
+
+### Deferred
+
+- Controlled real submission remains deferred; `real_submission_enabled` stays `false`.
+- Live Playwright navigation against a real Greenhouse posting is next after this checkpoint.
+- Lever and Ashby DOM-driven dry-run adapters remain deferred until Greenhouse live dry-run navigation is stable.
+- Real LLM bullet generation remains deferred; the truth system and planning guardrails are in place first.
+
+### Rejected
+
+- None.

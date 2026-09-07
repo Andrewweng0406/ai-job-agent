@@ -660,7 +660,7 @@ transcripts per ATS.
 
 ## Codex response — Round 3 follow-up
 
-**Verification:** `python3 -m pytest -q` → **305 passed, 1 skipped**.
+**Verification:** `python3 -m pytest -q` → **316 passed, 1 skipped**.
 
 ### Fixed
 
@@ -677,8 +677,13 @@ transcripts per ATS.
 | P2-13 radio groups | **Fixed.** Same-name radio controls are coalesced into one select-like field with options. |
 | P2-14 custom labels | **Fixed foundation.** HTML extraction now prefers nearby question text before machine `name` attributes. |
 | P2-15 single-token name | **Fixed.** Required last-name derivation blocks with `PROFILE_INCOMPLETE:name.full` instead of filling an empty string. |
+| HTTP client proof | **Fixed.** Added `tests/test_http_client.py` covering per-host throttle, bounded GET retries, 429/503, Retry-After seconds/date, timeout wrapping, and no blind POST retry. |
+| P2-12 hard-stop state wiring | **Fixed foundation.** `persist_browser_hard_stop()` transitions the application to `HUMAN_REQUIRED` and opens category-specific CAPTCHA/MFA/EMAIL_VERIFICATION tasks. |
+| Greenhouse DOM dry-run | **Fixed foundation.** `GreenhouseDryRunAdapter` captures DOM fields, maps through the canonical form engine, persists transcripts, routes hard stops, gates bad PDFs, and never calls submit in dry-run. |
+| PDF upload gate | **Fixed foundation.** Bad resume validation blocks the resume field and produces `would_submit=false`; Greenhouse dry-run test proves no submit-ready path. |
 
 ### Still Deferred
 
 - Controlled real submission remains deferred. `real_submission_enabled` stays `false`.
-- Live Playwright navigation/worker state wiring is next; browser capture and dry-run transcript generation are implemented first.
+- Live Playwright navigation is next; browser capture and Greenhouse fixture-driven dry-run transcript generation are implemented first.
+- Lever and Ashby DOM-driven dry-run adapters remain deferred until Greenhouse live dry-run navigation is stable.

@@ -26,6 +26,8 @@ class _FormHtmlParser(HTMLParser):
         self._control_stack: list[_Element] = []
         self._option_text: list[str] | None = None
         self._last_text: list[str] = []
+        self._legend_text: list[str] | None = None
+        self._current_legend: str | None = None
 
     def handle_starttag(self, tag: str, attrs_raw: list[tuple[str, str | None]]) -> None:
         attrs = {key.lower(): value or "" for key, value in attrs_raw}
@@ -34,6 +36,8 @@ class _FormHtmlParser(HTMLParser):
             self._label_text = []
         elif tag in {"input", "select", "textarea"}:
             element = _Element(tag, attrs)
+            if self._current_legend:
+                element.attrs["data-group-label"] = self._current_legend
             preceding = _clean_text(" ".join(self._last_text[-3:]))
             if preceding:
                 element.text = preceding
@@ -42,6 +46,8 @@ class _FormHtmlParser(HTMLParser):
                 self._control_stack.append(element)
         elif tag == "option":
             self._option_text = []
+        elif tag == "legend":
+            self._legend_text = []
 
     def handle_endtag(self, tag: str) -> None:
         if tag == "label":
@@ -56,6 +62,9 @@ class _FormHtmlParser(HTMLParser):
             if option and self._control_stack:
                 self._control_stack[-1].options.append(option)
             self._option_text = None
+        elif tag == "legend":
+            self._current_legend = _clean_text(" ".join(self._legend_text or [])) or self._current_legend
+            self._legend_text = None
 
     def handle_data(self, data: str) -> None:
         text = _clean_text(data)
@@ -66,6 +75,8 @@ class _FormHtmlParser(HTMLParser):
             self._label_text.append(text)
         if self._option_text is not None:
             self._option_text.append(text)
+        if self._legend_text is not None:
+            self._legend_text.append(text)
         if self._control_stack and self._control_stack[-1].tag == "textarea":
             self._control_stack[-1].text += f" {text}"
 
@@ -163,6 +174,9 @@ def _is_required(control: _Element, label: str) -> bool:
 
 
 def _radio_group_label(name: str, controls: list[_Element], options: list[str]) -> str:
+    for control in controls:
+        if control.attrs.get("data-group-label"):
+            return _clean_text(control.attrs["data-group-label"])
     for control in controls:
         text = control.text
         for option in options:

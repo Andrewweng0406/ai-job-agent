@@ -31,3 +31,5 @@ Safety decisions:
 - Dry-run transcripts are immutable payload snapshots; approval and real submission are separate steps.
 - Legal/work-authorization form fields are never guessed; missing canonical answers open human tasks.
 - The current browser bridge is a deterministic page-capture plus HTML field extractor; live Playwright navigation remains a no-submit integration step.
+- Greenhouse has a DOM-driven dry-run adapter against realistic fixture HTML; Lever and Ashby should reuse the same capture/extract/resolve transcript path.
+- PDF upload eligibility is gated by resume validation status and PDF QA.

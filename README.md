@@ -6,7 +6,7 @@ postings and prepares/submits applications with **verified** confirmation.
 > Status: Phase 1-4 safety foundation. `real_submission_enabled: false`. No live submissions.
 > Discovery, filtering, queueing, deterministic tailoring, PDF artifact generation, previews, and
 > persisted dry-run transcripts are implemented. Browser automation remains no-submit/approval-gated work;
-> page capture and HTML field extraction are available for ATS form snapshots.
+> page capture, HTML field extraction, and a Greenhouse fixture-driven DOM dry-run adapter are available.
 
 ## Principles
 
@@ -51,3 +51,5 @@ python "apply company.py" --prepare-next --tailoring-mode FAST
 python "apply company.py" --dry-run-next
 python "apply company.py" --daily-report
 ```
+
+Current verification: `316 passed, 1 skipped`.
