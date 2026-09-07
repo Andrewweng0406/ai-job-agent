@@ -1263,3 +1263,94 @@ Codex pivoted to getting discovery running. Suite: 510 passed / 1 skipped / 14 x
 - P1 --approved-by has no URL allowlist / acknowledgment.
 - Greenhouse Gate G FAIL; Lever/Ashby not live-run. real_submission_enabled stays false.
 - Only 1 active company (OpenAI) - far from the ~1000+ boards the 100/day target needs.
+
+
+---
+
+## ROUND 4.0 — LLM PROVIDER BOUNDARY + COST LEDGER + GATE G v4 (Codex 4cf19be, 27960cf, 1d8d6b9; fact_selection WIP)
+
+Reviewer: Claude. Suite at review: 531 passed, 1 skipped, 13 xfailed.
+
+### What Codex shipped
+- `app/llm/openai_provider.py` — `OpenAIResponsesProvider`: stdlib urllib, Responses API, `store: false`,
+  `OPENAI_API_KEY` from process env only, bounded `max_output_tokens`, 30s timeout, **no blind retry** on an
+  unknown network result (`OPENAI_API_RESULT_UNKNOWN`). No prompt/key logging. First real external API surface.
+- `app/llm/budget.py` — `SQLiteDailyBudget`: date-keyed row, `BEGIN IMMEDIATE` atomic cross-process reserve,
+  fail-closed (`LLM_DAILY_BUDGET_EXCEEDED`), reconcile to actual token usage after the call.
+- `app/llm/router.py` — known-model cost now DERIVED from (tokens x price table), not caller-declared;
+  model-tier enforcement (`LLM_MODEL_TIER_VIOLATION` — strong model in a cheap-only stage); in-process
+  response cache keyed by (model, cap, prompt).
+- `app/llm/fact_selection.py` (WIP, uncommitted) — `LLMFactSelector`: the model returns ONLY a JSON list of
+  fact IDs drawn from a fixed allowlist; strict schema (exactly one key, list[str], no dups, subset of allowed);
+  any deviation -> fail closed to the deterministic selection. Candidate wording stays 100% deterministic
+  downstream. `WITHHELD_FACT_TYPES = {identity, contact, address, legal}` -> those fact VALUES never enter a prompt.
+- Wired into `--prepare-next` only when `llm.enabled: true` + key present; `settings.yaml` keeps
+  `enabled: false` and `send_candidate_pii: false`.
+
+### REVIEWER-VERIFIED — safe as configured
+- `enabled: false` -> `build_router` returns None -> `selector = None` -> zero LLM calls. Default is inert. PASS.
+- Fabrication firewall: model cannot introduce a fact ID outside the allowlist; prose output is rejected, not
+  used as resume text; provider failure -> fallback to deterministic selection. Structurally sound. PASS.
+  (`tests/test_llm_pii_boundary_audit.py`, `tests/test_llm_fact_selection.py`)
+- Provider: `store:false`, env-only key, no blind retry, bounded output, no logging of prompt/key. PASS.
+- Budget: atomic `BEGIN IMMEDIATE` reservation across processes, fail-closed. Fixes the earlier
+  in-memory-per-instance P2. PASS.
+- Model tiering enforced. Fixes the earlier "Stage 1 can call a strong model" xfail. PASS.
+- Known-model cost derived from tokens -> the "estimated_cost_usd=0 bypasses the budget" hole is closed for
+  every model in the price table (i.e. the entire wired path uses gpt-5-nano/gpt-5-mini). PASS for production wiring.
+
+### FINDINGS
+
+**P1 (latent, config-gated) — `llm.send_candidate_pii` is display-only and enforces nothing.**
+`--llm-status` and the dashboard present `Candidate PII allowed: false` as a safety property. No code path
+consults it: `build_router` returns a live provider-backed router whenever `enabled: true` + key present, and
+`LLMFactSelector` sends `allowed_facts = {id: str(value)}` for every non-withheld fact — i.e. skill / education /
+experience / project fact VALUES go to OpenAI regardless of the flag. The hardcoded `WITHHELD_FACT_TYPES` set is
+the only real guard. Not exploitable today (`enabled: false` -> router is None), so latent — but the toggle gives
+false assurance the moment someone flips `enabled: true` expecting it to hold.
+Fix: when `send_candidate_pii` is false, either (a) `build_router` refuses to attach the fact selector, or
+(b) the selector sends fact IDs + short type labels only, never values. Or delete the toggle.
+Test: `tests/test_llm_pii_boundary_audit.py::test_send_candidate_pii_false_prevents_fact_values_leaving_the_process` (xfail).
+
+**P2 (carried, incomplete guard) — zero declared cost still bypasses the budget for an UNKNOWN model.**
+`router.complete`: the conservative worst-case cost estimate only applies when `estimated_cost_usd is None`.
+Unknown model + `estimated_cost_usd=0.0` -> `preflight_cost = 0.0` -> no reservation. Not reachable in the wired
+path (gpt-5-nano/mini are priced), but the guard should not have a caller-controlled zero hole at all.
+Codex xfail retained: `tests/test_llm_router_audit.py::test_zero_declared_cost_cannot_bypass_the_budget`.
+
+**P3 — `SQLiteDailyBudget.reconcile` under-counts on a post-response top-up that itself exceeds the limit.**
+If `actual > reserved` and topping up `delta` would break the cap, `reserve(delta)` raises and rolls back, so
+the ledger keeps only the original reservation and the extra `delta` of real spend is never recorded. Small
+boundary drift; the call was already paid.
+
+**P3 — evidence run role label mismatch.** `artifacts/.../v4/report.json` has `role: "Software Engineer"` while
+`application_url` / `page_title` are "Account Executive, AI Native at Anthropic". The bundle's own role field does
+not match the posting it navigated. Traceability smell for a document meant to be audit evidence.
+
+**P3 — OpenAI provider sends no `temperature` / `seed`.** Acceptable for ID selection (output is validated), but
+a pinned seed would make the evidence bundles reproducible.
+
+**P3 — 3 abandoned Gate G artifact dirs** (`...-v2`, `...-v3` incomplete; `...-v4`) left in the working tree.
+`run.sqlite3` (143 KB) present in each — correctly gitignored (`artifacts/**/run.sqlite3`), none tracked. Verified.
+
+### GATE G — STILL FAIL (v4, unchanged failure mode)
+`artifacts/phase-greenhouse-anthropic-approved-20260907-v4/browser_actions.jsonl`:
+NAVIGATE (ok) -> SCAN_HARD_STOP 23s later (ok) -> EXTRACT_FIELDS **24 real fields, no CAPTCHA this time** ->
+**LEASE_LOST 0.3s later** -> POST_FILL_SCAN -> HUMAN_REQUIRED. `field_map.json: []`, `field_count: 0`,
+`transcript_available: false`, `approval_status: "not_approved"`, `autofill_performed: false`,
+`submit_invocation_count: 0`.
+
+The script reached a real Anthropic Greenhouse form and extracted 24 fields cleanly, then **self-inflicted
+LEASE_LOST** — the 0-second lease TTL in `scripts/live_dry_run.py` (~line 55: `claim_next_application(..., datetime.now(timezone.utc))`
+with no `+ timedelta(...)`; `timedelta` not imported) is STILL unfixed across v2/v3/v4. No approved-autofill was
+exercised, no before/after form diff, no transcript<->browser differential. Same verdict as Rounds 3.1-3.9.
+
+Safety properties that DID hold in v4: no submit invocation, no autofill, no upload, post-fill hard stop,
+sanitized DOM, real live browser, zero PII typed.
+
+### UNCHANGED BLOCKERS
+- **P1** `scripts/live_dry_run.py` 0-second lease TTL — #1 blocker to producing any passing Gate G bundle.
+- **P1** `--approved-by` has no URL allowlist / acknowledgment guard.
+- Greenhouse Gate G FAIL; Lever / Ashby never live-exercised.
+- Discovery precision P2 (Round 3.9): ~490 "ELIGIBLE" OpenAI roles are senior IC/research, not new-grad.
+- 1 active company. `real_submission_enabled` stays false.
