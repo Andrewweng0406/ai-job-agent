@@ -104,4 +104,30 @@ CREATE TABLE IF NOT EXISTS resumes (
     file_hash TEXT NOT NULL,
     FOREIGN KEY(job_id) REFERENCES jobs(id)
 );
+
+CREATE TABLE IF NOT EXISTS human_tasks (
+    task_id TEXT PRIMARY KEY,
+    application_id TEXT,
+    job_id INTEGER,
+    category TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'OPEN',
+    blocking_state TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    options_json TEXT NOT NULL DEFAULT '[]',
+    context_json TEXT NOT NULL DEFAULT '{}',
+    resume_token TEXT,
+    resolution_json TEXT,
+    resolved_by TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    expires_at TEXT,
+    FOREIGN KEY(application_id) REFERENCES applications(application_id),
+    FOREIGN KEY(job_id) REFERENCES jobs(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_human_tasks_status ON human_tasks(status, category);
+CREATE INDEX IF NOT EXISTS idx_human_tasks_app ON human_tasks(application_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_human_tasks_open_unique
+ON human_tasks(application_id, category)
+WHERE status IN ('OPEN', 'IN_PROGRESS');
 """

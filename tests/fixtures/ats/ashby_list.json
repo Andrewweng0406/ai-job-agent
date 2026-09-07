@@ -1,0 +1,41 @@
+{
+  "apiVersion": "1",
+  "jobs": [
+    {
+      "id": "8db2f7a1-1c2b-4e3d-9a5f-6b7c8d9e0f11",
+      "jobId": "7ac1e6b0-0b1a-3d2c-8949-5a6b7c8d9e00",
+      "title": "Associate Product Manager, New Grad",
+      "location": "Remote, US",
+      "isRemote": true,
+      "workplaceType": "Remote",
+      "employmentType": "FullTime",
+      "isListed": true,
+      "publishedAt": "2026-08-25T14:00:00.000Z",
+      "jobUrl": "https://jobs.ashbyhq.com/acmeco/8db2f7a1-1c2b-4e3d-9a5f-6b7c8d9e0f11",
+      "applyUrl": "https://jobs.ashbyhq.com/acmeco/8db2f7a1-1c2b-4e3d-9a5f-6b7c8d9e0f11/application",
+      "descriptionPlain": "Acme is hiring an Associate Product Manager. Requirements: 0-2 years. Comfortable with SQL. Sponsorship is available.",
+      "descriptionHtml": "<p>Acme is hiring an Associate Product Manager.</p>",
+      "department": "Product",
+      "team": "Core",
+      "compensation": {
+        "summaryComponents": [
+          { "compensationType": "Salary", "interval": "1 YEAR", "currencyCode": "USD", "minValue": 110000, "maxValue": 130000 }
+        ]
+      }
+    },
+    {
+      "id": "9ec3a8b2-2d3c-5f4e-ab60-7c8d9e0f1a22",
+      "jobId": "9ec3a8b2-2d3c-5f4e-ab60-7c8d9e0f1a22",
+      "title": "Director of Finance",
+      "location": "New York, NY",
+      "isRemote": false,
+      "employmentType": "FullTime",
+      "isListed": true,
+      "publishedAt": "2026-08-10T14:00:00.000Z",
+      "jobUrl": "https://jobs.ashbyhq.com/acmeco/9ec3a8b2-2d3c-5f4e-ab60-7c8d9e0f1a22",
+      "applyUrl": "https://jobs.ashbyhq.com/acmeco/9ec3a8b2-2d3c-5f4e-ab60-7c8d9e0f1a22/application",
+      "descriptionPlain": "Requirements: 12+ years of experience leading finance orgs.",
+      "compensation": { "summaryComponents": [] }
+    }
+  ]
+}

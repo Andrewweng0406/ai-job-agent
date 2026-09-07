@@ -1,0 +1,26 @@
+{
+  "jobs": [
+    {
+      "id": 6087345002,
+      "internal_job_id": 5501230002,
+      "requisition_id": "R-2026-0912",
+      "title": "Data Analyst, Growth (New Grad)",
+      "updated_at": "2026-08-30T17:04:11-04:00",
+      "location": { "name": "New York, NY" },
+      "absolute_url": "https://boards.greenhouse.io/acmeco/jobs/6087345002",
+      "content": "&lt;p&gt;Acme is hiring a &lt;strong&gt;Data Analyst&lt;/strong&gt; on the Growth team.&lt;/p&gt;&lt;h3&gt;Requirements&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;0-2 years of experience&lt;/li&gt;&lt;li&gt;SQL, Python&lt;/li&gt;&lt;/ul&gt;&lt;h3&gt;Preferred&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;Exposure to dashboarding tools&lt;/li&gt;&lt;/ul&gt;",
+      "metadata": []
+    },
+    {
+      "id": 6087345099,
+      "internal_job_id": 5501230099,
+      "requisition_id": "R-2026-0913",
+      "title": "Senior Data Scientist",
+      "updated_at": "2026-08-28T09:00:00-04:00",
+      "location": { "name": "London, United Kingdom" },
+      "absolute_url": "https://boards.greenhouse.io/acmeco/jobs/6087345099",
+      "content": "&lt;p&gt;Requirements: 8+ years of experience. Must have a security clearance.&lt;/p&gt;"
+    }
+  ],
+  "meta": { "total": 2 }
+}

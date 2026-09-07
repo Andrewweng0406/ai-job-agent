@@ -1,0 +1,36 @@
+{
+  "offset": 0,
+  "limit": 100,
+  "totalFound": 2,
+  "content": [
+    {
+      "id": "743999912345678",
+      "uuid": "0d1e2f3a-4b5c-6d7e-8f90-1a2b3c4d5e6f",
+      "refNumber": "REF-ACME-2026-4501",
+      "name": "Financial Analyst - Early Career",
+      "releasedDate": "2026-08-27T08:30:00.000Z",
+      "company": { "identifier": "AcmeCo", "name": "Acme Co" },
+      "location": { "city": "Chicago", "region": "IL", "country": "us", "remote": false },
+      "customField": [],
+      "ref": "https://api.smartrecruiters.com/v1/companies/AcmeCo/postings/743999912345678",
+      "applyUrl": "https://jobs.smartrecruiters.com/AcmeCo/743999912345678-financial-analyst-early-career",
+      "jobAd": {
+        "sections": {
+          "jobDescription": { "title": "Job Description", "text": "<p>Acme seeks a Financial Analyst.</p>" },
+          "qualifications": { "title": "Qualifications", "text": "<ul><li>0-2 years of experience</li><li>Excel, SQL</li></ul>" }
+        }
+      }
+    },
+    {
+      "id": "743999998765432",
+      "uuid": "1e2f3a4b-5c6d-7e8f-9012-2b3c4d5e6f70",
+      "refNumber": "REF-ACME-2026-4599",
+      "name": "VP, Data Platform",
+      "releasedDate": "2026-08-01T08:30:00.000Z",
+      "company": { "identifier": "AcmeCo", "name": "Acme Co" },
+      "location": { "city": "Bengaluru", "region": "KA", "country": "in", "remote": false },
+      "applyUrl": "https://jobs.smartrecruiters.com/AcmeCo/743999998765432-vp-data-platform",
+      "jobAd": { "sections": { "qualifications": { "text": "<p>15+ years of experience.</p>" } } }
+    }
+  ]
+}

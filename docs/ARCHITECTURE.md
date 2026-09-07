@@ -13,6 +13,7 @@ The system is organized around deterministic, auditable pipeline stages:
 7. Application adapters prepare, fill, submit, and verify supported ATS workflows.
 8. SQLite stores jobs, applications, state transitions, resumes, and confirmation evidence.
 9. Daily reporting converts stored UTC timestamps into the configured local timezone before counting daily KPIs.
+10. Human-required blockers are persisted as idempotent `human_tasks` rows keyed by application and category.
 
 Safety decisions:
 

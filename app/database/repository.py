@@ -12,6 +12,7 @@ from app.database.schema import SCHEMA_SQL
 from app.models.application import Application
 from app.models.enums import ApplicationStatus
 from app.models.job import Job, stable_hash
+from app.applications.human_tasks import HumanTask
 from app.resumes.generator import ResumeArtifact, artifact_to_db_tuple
 
 
@@ -225,6 +226,52 @@ class JobAgentRepository:
                 artifact_to_db_tuple(artifact),
             )
             return artifact.resume_id
+
+    def open_human_task(self, task: HumanTask) -> str:
+        now = datetime.now(timezone.utc)
+        created_at = dt(task.created_at or now)
+        updated_at = dt(task.updated_at or now)
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO human_tasks (
+                    task_id, application_id, job_id, category, status, blocking_state, prompt,
+                    options_json, context_json, resume_token, resolution_json, resolved_by,
+                    created_at, updated_at, expires_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(application_id, category) WHERE status IN ('OPEN', 'IN_PROGRESS') DO UPDATE SET
+                    prompt=excluded.prompt,
+                    context_json=excluded.context_json,
+                    updated_at=excluded.updated_at
+                """,
+                (
+                    task.task_id,
+                    task.application_id,
+                    task.job_id,
+                    task.category,
+                    task.status,
+                    task.blocking_state,
+                    task.prompt,
+                    json.dumps(task.options),
+                    json.dumps(task.context, sort_keys=True),
+                    task.resume_token,
+                    json.dumps(task.resolution, sort_keys=True) if task.resolution else None,
+                    task.resolved_by,
+                    created_at,
+                    updated_at,
+                    dt(task.expires_at),
+                ),
+            )
+            row = conn.execute(
+                """
+                SELECT task_id FROM human_tasks
+                WHERE category = ?
+                  AND status IN ('OPEN', 'IN_PROGRESS')
+                  AND (application_id = ? OR (application_id IS NULL AND ? IS NULL))
+                """,
+                (task.category, task.application_id, task.application_id),
+            ).fetchone()
+            return str(row["task_id"])
 
     def transition_application(self, application_id: str, target: ApplicationStatus, reason: str) -> None:
         machine = ApplicationStateMachine()

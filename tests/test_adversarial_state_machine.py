@@ -34,6 +34,11 @@ def test_submission_unknown_never_reenters_applying():
     unknown = ApplicationStatus["SUBMISSION_UNKNOWN"]
     assert not M.can_transition(unknown, ApplicationStatus.APPLYING)
     assert not M.can_transition(unknown, ApplicationStatus.RETRY_PENDING)
+    assert M.can_transition(unknown, ApplicationStatus.VERIFIED)
+
+
+def test_submitted_can_become_unknown_when_verify_window_expires():
+    assert M.can_transition(ApplicationStatus.SUBMITTED, ApplicationStatus.SUBMISSION_UNKNOWN)
 
 
 @pytest.mark.parametrize("frm", [ApplicationStatus.TAILORING, ApplicationStatus.APPLYING])

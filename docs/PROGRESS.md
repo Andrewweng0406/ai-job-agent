@@ -29,6 +29,8 @@ Completed additional foundation work:
 - Added deterministic, ATS-friendly text resume artifact generation with validation and artifact hashing.
 - Added explicit `docs/CODEX_PROGRESS.md` status tracking for Claude findings.
 - Updated discovery to use explicit candidate sponsorship configuration and ATS/requisition-derived application dedupe keys.
+- Added ATS-agnostic form field classification/resolution for common fields and legal fail-closed handling.
+- Added `human_tasks` schema and idempotent task creation.
 
 Next engineering phase:
 

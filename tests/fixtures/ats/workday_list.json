@@ -1,0 +1,19 @@
+{
+  "total": 2,
+  "jobPostings": [
+    {
+      "title": "Technology Analyst - University Graduate 2026",
+      "externalPath": "/job/New-York/Technology-Analyst---University-Graduate-2026_R-2026-11045",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 5 Days Ago",
+      "bulletFields": ["R-2026-11045"]
+    },
+    {
+      "title": "Principal Systems Engineer",
+      "externalPath": "/job/Remote/Principal-Systems-Engineer_R-2026-11099",
+      "locationsText": "2 Locations",
+      "postedOn": "Posted 30+ Days Ago",
+      "bulletFields": ["R-2026-11099"]
+    }
+  ]
+}

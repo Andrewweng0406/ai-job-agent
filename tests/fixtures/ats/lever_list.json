@@ -1,0 +1,28 @@
+[
+  {
+    "id": "b1f9c3a2-7e2d-4c8a-9f10-2a4b6c8d0e12",
+    "text": "Business Analyst - New Grad",
+    "hostedUrl": "https://jobs.lever.co/acmeco/b1f9c3a2-7e2d-4c8a-9f10-2a4b6c8d0e12",
+    "applyUrl": "https://jobs.lever.co/acmeco/b1f9c3a2-7e2d-4c8a-9f10-2a4b6c8d0e12/apply",
+    "createdAt": 1756400000000,
+    "categories": {
+      "location": "San Francisco, CA",
+      "team": "Operations",
+      "commitment": "Full-time"
+    },
+    "descriptionPlain": "Acme seeks a Business Analyst. Requirements: 1-3 years of experience. SQL and Excel. We provide visa sponsorship for this role.",
+    "description": "<p>Acme seeks a Business Analyst.</p>",
+    "lists": [
+      { "text": "Requirements", "content": "<ul><li>1-3 years of experience</li><li>SQL and Excel</li></ul>" }
+    ]
+  },
+  {
+    "id": "c2a0d4b3-8f3e-4d9b-a021-3b5c7d9e1f23",
+    "text": "Staff Product Manager",
+    "hostedUrl": "https://jobs.lever.co/acmeco/c2a0d4b3-8f3e-4d9b-a021-3b5c7d9e1f23",
+    "applyUrl": "https://jobs.lever.co/acmeco/c2a0d4b3-8f3e-4d9b-a021-3b5c7d9e1f23/apply",
+    "createdAt": 1756100000000,
+    "categories": { "location": "Toronto, Canada", "team": "Product", "commitment": "Full-time" },
+    "descriptionPlain": "Requirements: 10+ years of experience. This position does not offer sponsorship."
+  }
+]

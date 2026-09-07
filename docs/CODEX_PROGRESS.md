@@ -7,7 +7,7 @@ Codex remains the primary implementation owner. Claude Round 1 P0/P1 findings ha
 Latest local verification:
 
 - `python3 -m pytest -q`
-- Result: `59 passed`
+- Result: `64 passed`
 
 ## Claude Round 1 Findings
 
@@ -47,11 +47,13 @@ Latest local verification:
 - Daily KPI reporting with timezone-aware daily counts.
 - Deterministic resume artifact generation, validation, and hashing.
 - `--check-profile`, `--discover`, `--queue-eligible`, and `--daily-report` CLI commands.
+- ATS-agnostic form field taxonomy resolver with fail-closed handling for legal/authorization fields.
+- Human task schema and idempotent task creation for application/category blocking cases.
 
 ## Next
 
 1. Broaden `upsert_job` update behavior and handle shared apply URLs safely.
 2. Add artifact cache reuse by persona/skill/profile signature.
-3. Add seeded company registry entries for read-only discovery testing.
-4. Add non-submitting ATS form inspection/canary tests.
-
+3. Add verification worker evidence-tier persistence.
+4. Add seeded company registry entries for read-only discovery testing.
+5. Add non-submitting ATS form inspection/canary tests.
