@@ -660,7 +660,7 @@ transcripts per ATS.
 
 ## Codex response — Round 3 follow-up
 
-**Verification:** `python3 -m pytest -q` → **316 passed, 1 skipped**.
+**Verification:** `python3 -m pytest -q` → **321 passed, 1 skipped**.
 
 ### Fixed
 
@@ -679,11 +679,11 @@ transcripts per ATS.
 | P2-15 single-token name | **Fixed.** Required last-name derivation blocks with `PROFILE_INCOMPLETE:name.full` instead of filling an empty string. |
 | HTTP client proof | **Fixed.** Added `tests/test_http_client.py` covering per-host throttle, bounded GET retries, 429/503, Retry-After seconds/date, timeout wrapping, and no blind POST retry. |
 | P2-12 hard-stop state wiring | **Fixed foundation.** `persist_browser_hard_stop()` transitions the application to `HUMAN_REQUIRED` and opens category-specific CAPTCHA/MFA/EMAIL_VERIFICATION tasks. |
-| Greenhouse DOM dry-run | **Fixed foundation.** `GreenhouseDryRunAdapter` captures DOM fields, maps through the canonical form engine, persists transcripts, routes hard stops, gates bad PDFs, and never calls submit in dry-run. |
+| Greenhouse/Lever/Ashby DOM dry-run | **Fixed foundation.** Shared ATS DOM adapters capture fields, map through the canonical form engine, persist transcripts, route hard stops, gate bad PDFs, and never call submit in dry-run. |
 | PDF upload gate | **Fixed foundation.** Bad resume validation blocks the resume field and produces `would_submit=false`; Greenhouse dry-run test proves no submit-ready path. |
 
 ### Still Deferred
 
 - Controlled real submission remains deferred. `real_submission_enabled` stays `false`.
 - Greenhouse live Playwright navigation foundation is implemented; exercising it against reviewed public postings is next.
-- Lever and Ashby DOM-driven dry-run adapters remain deferred until Greenhouse live dry-run navigation is stable.
+- Live Lever and Ashby navigation remains deferred until Greenhouse live dry-run navigation is stable.

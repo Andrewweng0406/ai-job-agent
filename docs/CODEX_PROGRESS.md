@@ -7,7 +7,7 @@ Codex remains the primary implementation owner. Claude Round 1 P0/P1 findings ha
 Latest local verification:
 
 - `python3 -m pytest -q`
-- Result: `316 passed, 1 skipped`
+- Result: `321 passed, 1 skipped`
 
 ## Claude Round 1 Findings
 
@@ -105,14 +105,13 @@ Latest local verification:
 - Radio group coalescing, custom-question label fallback, stricter legal form routing, select-option validation, and single-token-name blocking.
 - HTTP client tests for per-host throttling, bounded retries, Retry-After seconds/HTTP-date, 5xx/429 behavior, timeouts, and no blind POST retry.
 - Browser hard-stop state wiring for CAPTCHA/MFA/email-verification tasks.
-- Greenhouse DOM-driven dry-run adapter against realistic fixture HTML; it stops before submit even when `would_submit=true`.
+- Shared DOM-driven dry-run adapter foundation with Greenhouse, Lever, and Ashby wrappers against realistic fixture HTML; they stop before submit even when `would_submit=true`.
 - PDF upload gate coverage proving invalid resume validation blocks the resume field before submit-ready state.
 - Optional Greenhouse live dry-run runner that performs read-only Playwright navigation, refuses `real_submission_enabled=True`, and hands the page to the no-submit dry-run adapter.
 
 ## Next
 
 1. Exercise Greenhouse live dry-run navigation against reviewed public postings without submitting.
-2. Reuse the DOM dry-run adapter pattern for Lever and Ashby.
-3. Add approval-gated autofill previews backed by persisted dry-run transcripts.
-4. Add live worker integration tests before raising application concurrency cautiously.
-5. Add provider-backed LLM tailoring only after deterministic prompt contracts and evals are in place.
+2. Add approval-gated autofill previews backed by persisted dry-run transcripts.
+3. Add live worker integration tests before raising application concurrency cautiously.
+4. Add provider-backed LLM tailoring only after deterministic prompt contracts and evals are in place.

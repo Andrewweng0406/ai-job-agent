@@ -38,7 +38,7 @@ class _FormHtmlParser(HTMLParser):
             element = _Element(tag, attrs)
             if self._current_legend:
                 element.attrs["data-group-label"] = self._current_legend
-            preceding = _clean_text(" ".join(self._last_text[-3:]))
+            preceding = _clean_text(self._last_text[-1]) if self._last_text else ""
             if preceding:
                 element.text = preceding
             self.controls.append(element)

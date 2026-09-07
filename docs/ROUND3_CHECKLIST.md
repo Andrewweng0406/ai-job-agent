@@ -149,7 +149,7 @@ fabricated résumé content, and no hidden unresolved questions.
 
 ## Codex follow-up status
 
-**Verification:** `python3 -m pytest -q -rxX` → **316 passed, 1 skipped**.
+**Verification:** `python3 -m pytest -q -rxX` → **321 passed, 1 skipped**.
 
 ### Fixed
 
@@ -162,13 +162,13 @@ fabricated résumé content, and no hidden unresolved questions.
 - P2-14: HTML extraction captures nearby/legend-style ATS labels before falling back to machine names.
 - P2-15: required last-name fields block on single-token profile names instead of filling an empty string.
 - HTTP client proof: tests now cover Retry-After seconds/date handling, per-host spacing, bounded retries, timeout wrapping, and no blind POST retry.
-- Greenhouse dry-run foundation: a fixture-driven DOM adapter captures fields, builds transcripts, gates bad PDFs, routes hard stops, and proves submit is never called in dry-run.
+- Greenhouse/Lever/Ashby dry-run foundation: fixture-driven DOM adapters capture fields, build transcripts, gate bad PDFs, route hard stops, and prove submit is never called in dry-run.
 
 ### Deferred
 
 - Controlled real submission remains deferred; `real_submission_enabled` stays `false`.
 - Greenhouse live Playwright navigation foundation is implemented; exercising it against reviewed public postings is next.
-- Lever and Ashby DOM-driven dry-run adapters remain deferred until Greenhouse live dry-run navigation is stable.
+- Live Lever and Ashby navigation remains deferred until Greenhouse live dry-run navigation is stable.
 - Real LLM bullet generation remains deferred; the truth system and planning guardrails are in place first.
 
 ### Rejected

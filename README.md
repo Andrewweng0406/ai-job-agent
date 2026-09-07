@@ -6,8 +6,8 @@ postings and prepares/submits applications with **verified** confirmation.
 > Status: Phase 1-4 safety foundation. `real_submission_enabled: false`. No live submissions.
 > Discovery, filtering, queueing, deterministic tailoring, PDF artifact generation, previews, and
 > persisted dry-run transcripts are implemented. Browser automation remains no-submit/approval-gated work;
-> page capture, HTML field extraction, a Greenhouse fixture-driven DOM dry-run adapter, and optional
-> read-only Greenhouse live navigation are available.
+> page capture, HTML field extraction, Greenhouse/Lever/Ashby fixture-driven DOM dry-run adapters,
+> and optional read-only Greenhouse live navigation are available.
 
 ## Principles
 
@@ -60,4 +60,4 @@ python -m pip install -e ".[browser]"
 python -m playwright install chromium
 ```
 
-Current verification: `316 passed, 1 skipped`.
+Current verification: `321 passed, 1 skipped`.
