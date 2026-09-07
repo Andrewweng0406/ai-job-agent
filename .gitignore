@@ -10,6 +10,7 @@ venv/
 # Local data and logs
 data/*.sqlite3
 data/*.db
+data/resumes/
 logs/*
 !logs/.gitkeep
 
@@ -20,4 +21,3 @@ logs/*
 
 # OS/editor
 .DS_Store
-

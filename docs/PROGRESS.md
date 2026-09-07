@@ -25,7 +25,9 @@ Completed additional foundation work:
 - Added application queueing and daily KPI reporting.
 - Added DB idempotency, foreign-key enforcement, WAL mode, and atomic status transitions.
 - Promoted reviewer adversarial xfails into normal passing tests.
+- Added candidate fact model loading and profile completeness gate.
+- Added deterministic, ATS-friendly text resume artifact generation with validation and artifact hashing.
 
 Next engineering phase:
 
-Implement resume artifact generation from the fact model, then add non-submitting ATS form inspection/canary tests before any real application adapter is allowed to submit.
+Add artifact cache reuse by persona/skill signature, then add non-submitting ATS form inspection/canary tests before any real application adapter is allowed to submit.

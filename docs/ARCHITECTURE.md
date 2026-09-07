@@ -1,6 +1,6 @@
 # Architecture
 
-This repository implements the Phase 1 foundation plus read-only discovery, safe queueing, deterministic truth checks, and daily reporting. It intentionally does not perform live application submission.
+This repository implements the Phase 1 foundation plus read-only discovery, safe queueing, deterministic resume artifacts, deterministic truth checks, and daily reporting. It intentionally does not perform live application submission.
 
 The system is organized around deterministic, auditable pipeline stages:
 
@@ -21,3 +21,4 @@ Safety decisions:
 - A submission counts only after `verify_submission()` returns reliable success evidence.
 - `SUBMISSION_UNKNOWN` is distinct from `SUBMITTED` and cannot automatically retry into `APPLYING`.
 - Candidate facts marked `TODO` are treated as missing and must not be guessed.
+- Resume generation refuses to produce an artifact while required profile facts are missing.

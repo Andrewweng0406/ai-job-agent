@@ -12,6 +12,7 @@ from app.database.schema import SCHEMA_SQL
 from app.models.application import Application
 from app.models.enums import ApplicationStatus
 from app.models.job import Job, stable_hash
+from app.resumes.generator import ResumeArtifact, artifact_to_db_tuple
 
 
 def dt(value: datetime | None) -> str | None:
@@ -211,6 +212,19 @@ class JobAgentRepository:
                 "INSERT INTO job_filter_results (job_id, allowed, reason, created_at) VALUES (?, ?, ?, ?)",
                 (job_id, int(allowed), reason, dt(datetime.now(timezone.utc))),
             )
+
+    def insert_resume_artifact(self, artifact: ResumeArtifact) -> str:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO resumes (
+                    resume_id, job_id, persona, base_version, generated_at, changes_json,
+                    validation_status, file_path, file_hash
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                artifact_to_db_tuple(artifact),
+            )
+            return artifact.resume_id
 
     def transition_application(self, application_id: str, target: ApplicationStatus, reason: str) -> None:
         machine = ApplicationStateMachine()

@@ -11,4 +11,4 @@ Core tables:
 - `job_filter_results`: append-only hard-filter decisions and skip reasons.
 - `resumes`: generated resume artifacts associated with exact jobs.
 
-The schema preserves historical applications and records the exact status, resume ID, failure category, human-required reason, and submission confirmation data.
+The schema preserves historical applications and records the exact status, resume ID, failure category, human-required reason, submission confirmation data, and generated resume artifact hash.

@@ -228,6 +228,9 @@ work-authorization answer engine cannot operate honestly.
 **Codex update:** Candidate profile now includes a v2 `facts` section with required fact IDs and literal-only
 authorization facts.
 
+**Codex update 2:** Added `CandidateProfile.from_yaml()` and `profile_completeness_gate()`; deterministic
+resume generation blocks with `PROFILE_INCOMPLETE` when required facts remain `TODO`.
+
 ---
 
 ### P1-7 — No US-location filter; non-US jobs will flood the queue.
