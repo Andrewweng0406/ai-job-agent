@@ -8,7 +8,7 @@ from app.models.enums import ApplicationStatus
 ALLOWED_TRANSITIONS: dict[ApplicationStatus, set[ApplicationStatus]] = {
     ApplicationStatus.DISCOVERED: {ApplicationStatus.ELIGIBLE, ApplicationStatus.SKIPPED, ApplicationStatus.HUMAN_REQUIRED, ApplicationStatus.CLOSED},
     ApplicationStatus.ELIGIBLE: {ApplicationStatus.QUEUED, ApplicationStatus.SKIPPED, ApplicationStatus.HUMAN_REQUIRED},
-    ApplicationStatus.QUEUED: {ApplicationStatus.TAILORING, ApplicationStatus.HUMAN_REQUIRED, ApplicationStatus.CLOSED},
+    ApplicationStatus.QUEUED: {ApplicationStatus.TAILORING, ApplicationStatus.SKIPPED, ApplicationStatus.HUMAN_REQUIRED, ApplicationStatus.CLOSED},
     ApplicationStatus.TAILORING: {ApplicationStatus.READY, ApplicationStatus.HUMAN_REQUIRED, ApplicationStatus.FAILED, ApplicationStatus.RETRY_PENDING, ApplicationStatus.CLOSED},
     ApplicationStatus.READY: {ApplicationStatus.APPLYING, ApplicationStatus.HUMAN_REQUIRED, ApplicationStatus.CLOSED},
     ApplicationStatus.APPLYING: {

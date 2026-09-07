@@ -50,7 +50,7 @@ class DeterministicResumeGenerator:
             )
 
         fact_text = profile.supported_fact_text(selected_fact_ids)
-        sections = self._render_sections(profile, job, persona, fact_text)
+        sections = self._render_sections(profile, job, persona, selected_fact_ids)
         required = check_required_fields(sections, [fact_id for fact_id, fact in profile.facts.items() if fact.required and fact.type == "education"])
         if not required.valid:
             return ResumeGenerationResult(
@@ -100,26 +100,44 @@ class DeterministicResumeGenerator:
         )
         return ResumeGenerationResult(artifact=artifact)
 
-    def _render_sections(self, profile: CandidateProfile, job: Job, persona: Persona, fact_text: list[str]) -> dict[str, str]:
+    def _render_sections(self, profile: CandidateProfile, job: Job, persona: Persona,
+                         selected_fact_ids: list[str]) -> dict[str, str]:
         name = str(profile.facts.get("name.full").value)
+        contact_values = [
+            str(fact.value) for fact in profile.facts.values()
+            if fact.type.lower() in {"contact", "link"} and not fact.is_missing
+        ]
         education = "\n".join(str(fact.value) for fact in profile.facts.values() if fact.type == "education")
-        facts = "\n".join(f"- {fact}" for fact in fact_text)
+        grouped: dict[str, list[str]] = {"skill": [], "project": [], "experience": [], "other": []}
+        for fact_id in selected_fact_ids:
+            fact = profile.facts.get(fact_id)
+            if fact is None or fact.literal_only or fact.is_missing:
+                continue
+            if fact.type.lower() in {"identity", "contact", "link", "legal", "education"}:
+                continue
+            group = fact.type.lower() if fact.type.lower() in grouped else "other"
+            grouped[group].append(str(fact.value))
+        all_facts = [value for values in grouped.values() for value in values]
         return {
-            "header": name,
+            "header": "\n".join([name, " | ".join(contact_values)] if contact_values else [name]),
             "target": f"Target Role: {job.title} | Persona: {persona.value}",
             "education": education,
-            "facts": facts,
+            "skills": "\n".join(f"- {value}" for value in grouped["skill"]),
+            "projects": "\n".join(f"- {value}" for value in grouped["project"]),
+            "experience": "\n".join(f"- {value}" for value in grouped["experience"]),
+            "other": "\n".join(f"- {value}" for value in grouped["other"]),
+            # Kept in the structured artifact for compatibility and provenance review.
+            "facts": "\n".join(f"- {value}" for value in all_facts),
         }
 
     def _render_text(self, sections: dict[str, str]) -> str:
-        return "\n\n".join(
-            [
-                sections["header"],
-                sections["target"],
-                "Education\n" + sections["education"],
-                "Relevant Facts\n" + sections["facts"],
-            ]
-        )
+        blocks = [sections["header"], sections["target"],
+                  "Education\n" + sections["education"]]
+        for key, heading in (("skills", "Skills"), ("projects", "Projects"),
+                             ("experience", "Experience"), ("other", "Additional")):
+            if sections[key]:
+                blocks.append(f"{heading}\n{sections[key]}")
+        return "\n\n".join(blocks)
 
 
 def artifact_to_db_tuple(artifact: ResumeArtifact) -> tuple[object, ...]:

@@ -157,6 +157,23 @@ Latest local verification:
   storing prompts or candidate PII.
 - Full suite: 528 passed, 1 skipped, 12 xfailed.
 
+## Resume Structure And Filter Reconciliation (2026-09-07)
+
+- Added typed Skills, Projects, and Experience sections to deterministic resume artifacts while
+  preserving verbatim candidate facts and the compatibility/provenance fact list.
+- Contact and profile links render only in the header; identity, contact, education, and legal facts
+  cannot leak into the generic resume bullet sections.
+- Converted Claude's missing resume-section xfail into a passing test.
+- Fixed U.S. state abbreviation matching so `ga` inside `Singapore` cannot make an overseas role appear
+  U.S.-eligible. Explicit foreign locations also override a generic `Remote` marker.
+- Discovery now reruns hard filters for unchanged postings and moves only unstarted `ELIGIBLE/QUEUED`
+  applications to `SKIPPED` when rules make them ineligible. Concurrent state changes are not overwritten.
+- A read-only OpenAI rediscovery processed 779 postings with zero errors and reconciled all Singapore
+  `ELIGIBLE/QUEUED/READY` rows to zero. No form filling or submission occurred.
+- The supplied resume was parsed into additional local candidate facts for PDF QA. Those facts and the
+  generated artifacts remain gitignored and were not committed.
+- Full suite: 535 passed, 1 skipped, 12 xfailed.
+
 ## Open-Source Reference Review
 
 ### Fixed / Adapted

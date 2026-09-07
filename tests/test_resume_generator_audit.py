@@ -68,7 +68,6 @@ def test_truth_step_is_currently_a_self_check():
     assert "sections[\"facts\"]" in body and "self._render" not in body, "bullets are extracted from the rendered fact list"
 
 
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P2: _render_sections emits only header/target/education/selected-facts — no experience/projects/skills sections, so a real deterministic resume is name + education + a flat fact list")
 def test_generator_renders_experience_and_projects():
     src = inspect.getsource(DeterministicResumeGenerator._render_sections)
     assert "experience" in src.lower() and ("project" in src.lower() or "skills" in src.lower())

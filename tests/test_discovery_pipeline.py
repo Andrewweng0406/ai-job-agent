@@ -47,8 +47,45 @@ def test_discovery_pipeline_creates_application_once(tmp_path):
         filters = conn.execute("SELECT COUNT(*) AS count FROM job_filter_results").fetchone()
         transitions = conn.execute("SELECT COUNT(*) AS count FROM application_state_transitions").fetchone()
     assert applications["count"] == 1
-    assert filters["count"] == 1
+    assert filters["count"] == 2
     assert transitions["count"] == 1
+
+
+def test_unchanged_job_is_rechecked_and_existing_application_is_skipped(tmp_path):
+    class MutableLocationSource(FakeSource):
+        location = "Remote"
+
+        def normalize_job(self, raw_job):
+            job = super().normalize_job(raw_job)
+            job.location = self.location
+            return job
+
+    repo = JobAgentRepository(tmp_path / "agent.sqlite3")
+    repo.initialize()
+    taxonomy = RoleTaxonomy({"DATA_ANALYTICS": {"title_keywords": ["data analyst"]}})
+    company = CompanyRegistryEntry(
+        "acme", "Acme", "https://example.test/careers", "fixture", "acme"
+    )
+    source = MutableLocationSource()
+    pipeline = DiscoveryPipeline(repo, taxonomy, source_factory=lambda *_args: source)
+
+    pipeline.run([company])
+    source.location = "Singapore"
+    second = pipeline.run([company])
+
+    assert second.new_or_updated_jobs == 0
+    with repo.connect() as conn:
+        application = conn.execute(
+            "SELECT status FROM applications"
+        ).fetchone()
+        transition = conn.execute(
+            """
+            SELECT reason FROM application_state_transitions
+            WHERE to_status = 'SKIPPED'
+            """
+        ).fetchone()
+    assert application["status"] == "SKIPPED"
+    assert "LOCATION_INELIGIBLE" in transition["reason"]
 
 
 class NoSponsorshipSource(FakeSource):

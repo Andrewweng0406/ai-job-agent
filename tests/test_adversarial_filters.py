@@ -111,6 +111,16 @@ def test_adv21_non_us_location_is_skipped():
     assert not r.allowed and r.reason == "LOCATION_INELIGIBLE"
 
 
+def test_state_abbreviation_does_not_match_inside_foreign_city():
+    r = apply_hard_filters(make_job(location="Singapore"), DATA)
+    assert not r.allowed and r.reason == "LOCATION_INELIGIBLE"
+
+
+def test_remote_does_not_override_explicit_foreign_location():
+    r = apply_hard_filters(make_job(location="Remote - Singapore"), DATA)
+    assert not r.allowed and r.reason == "LOCATION_INELIGIBLE"
+
+
 # ADV-22 -----------------------------------------------------------------------
 def test_adv22_unknown_location_is_kept():
     r = apply_hard_filters(make_job(location=""), DATA)

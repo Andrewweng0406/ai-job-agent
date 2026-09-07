@@ -145,9 +145,14 @@ def _location_ineligible(location: str | None) -> bool:
     normalized = " ".join((location or "").lower().replace(",", " ").split())
     if not normalized:
         return False
-    if any(term in normalized for term in US_LOCATION_TERMS):
+    if NON_US_LOCATION_PATTERN.search(normalized):
+        return True
+    if any(
+        re.search(rf"(?<![a-z]){re.escape(term)}(?![a-z])", normalized)
+        for term in US_LOCATION_TERMS
+    ):
         return False
-    return bool(NON_US_LOCATION_PATTERN.search(normalized))
+    return False
 
 
 def _has_negative_sponsorship(text: str) -> bool:

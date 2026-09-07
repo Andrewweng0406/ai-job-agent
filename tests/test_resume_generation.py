@@ -56,6 +56,13 @@ facts:
   - fact_id: project.retail
     type: project
     value: Built Tableau dashboards on retail data using SQL.
+  - fact_id: contact.email
+    type: contact
+    value: jane@example.test
+  - fact_id: auth.status
+    type: legal
+    value: authorized
+    literal_only: true
 application_answers: {}
 """,
         encoding="utf-8",
@@ -80,7 +87,7 @@ application_answers: {}
         profile,
         job,
         Persona.DATA,
-        selected_fact_ids=["skill.sql", "project.retail"],
+        selected_fact_ids=["skill.sql", "project.retail", "contact.email", "auth.status"],
     )
 
     assert result.artifact is not None
@@ -88,3 +95,10 @@ application_answers: {}
     pdf_path = tmp_path / "resumes" / result.artifact.file_path.split("/")[-1]
     assert pdf_path.read_bytes().startswith(b"%PDF-")
     assert result.artifact.changes["structured_json_path"].endswith(".json")
+    import json
+    sections = json.loads(next((tmp_path / "resumes").glob("*.json")).read_text())["sections"]
+    assert "SQL" in sections["skills"]
+    assert "Built Tableau dashboards" in sections["projects"]
+    assert "jane@example.test" in sections["header"]
+    assert "jane@example.test" not in sections["facts"]
+    assert "authorized" not in sections["facts"]

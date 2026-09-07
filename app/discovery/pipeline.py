@@ -67,14 +67,18 @@ class DiscoveryPipeline:
                     seen_keys.update(identity_keys)
                     job.status = self._incremental_status(job)
                     job_id = self.repository.upsert_job(job)
+                    filter_result = apply_hard_filters(
+                        job,
+                        self.taxonomy.accepted_family_names(),
+                        requires_visa_sponsorship=self.requires_visa_sponsorship,
+                    )
+                    self.repository.record_job_filter_result(
+                        job_id, filter_result.allowed, filter_result.reason
+                    )
+                    if not filter_result.allowed:
+                        self._reconcile_existing_ineligible(job_id, filter_result.reason)
                     if job.status in {JobStatus.NEW, JobStatus.UPDATED}:
                         changed_count += 1
-                        filter_result = apply_hard_filters(
-                            job,
-                            self.taxonomy.accepted_family_names(),
-                            requires_visa_sponsorship=self.requires_visa_sponsorship,
-                        )
-                        self.repository.record_job_filter_result(job_id, filter_result.allowed, filter_result.reason)
                         if filter_result.allowed:
                             eligible_count += 1
                             application = Application(
@@ -127,6 +131,26 @@ class DiscoveryPipeline:
             applications_created=created_count,
             errors=errors,
         )
+
+    def _reconcile_existing_ineligible(self, job_id: int, reason: str | None) -> None:
+        with self.repository.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT application_id FROM applications
+                WHERE job_id = ? AND status IN ('ELIGIBLE', 'QUEUED')
+                """,
+                (job_id,),
+            ).fetchall()
+        for row in rows:
+            try:
+                self.repository.transition_application(
+                    row["application_id"],
+                    ApplicationStatus.SKIPPED,
+                    f"hard-filter re-evaluation: {reason or 'INELIGIBLE'}",
+                )
+            except RuntimeError:
+                # A concurrent worker won the transition; never overwrite it.
+                logger.info("Application changed during hard-filter re-evaluation")
 
     def _incremental_status(self, job: Job) -> JobStatus:
         with self.repository.connect() as conn:
