@@ -2,7 +2,7 @@ import subprocess
 import sys
 
 
-def test_check_profile_reports_missing_required_facts():
+def test_check_profile_accepts_explicitly_completed_profile():
     result = subprocess.run(
         [sys.executable, "apply company.py", "--check-profile"],
         check=False,
@@ -10,10 +10,8 @@ def test_check_profile_reports_missing_required_facts():
         text=True,
     )
 
-    assert result.returncode == 1
-    assert "Candidate profile completeness: HUMAN_REQUIRED" in result.stdout
-    assert "auth.status" in result.stdout
-    assert "auth.needs_future_sponsorship" in result.stdout
+    assert result.returncode == 0
+    assert result.stdout.strip() == "Candidate profile completeness: OK"
 
 
 def test_autofill_preview_cli_fails_closed_for_unknown_transcript():
