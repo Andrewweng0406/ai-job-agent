@@ -43,6 +43,11 @@ def job_identity_keys(job: Job) -> set[str]:
     return keys
 
 
+def strong_job_identity_keys(job: Job) -> set[str]:
+    """Keys safe for a global seen-set; excludes boilerplate-prone shingles."""
+    return {key for key in job_identity_keys(job) if not key.startswith("description_shingle:")}
+
+
 def is_duplicate(job: Job, seen_keys: set[str]) -> bool:
     return bool(job_identity_keys(job) & seen_keys)
 

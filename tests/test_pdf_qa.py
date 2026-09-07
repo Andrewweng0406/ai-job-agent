@@ -70,3 +70,11 @@ def test_pdf_qa_module_exists_for_upload_gate():
     from app.resumes import pdf_qa
 
     assert hasattr(pdf_qa, "run_pdf_qa") or hasattr(pdf_qa, "PdfQaResult")
+
+
+def test_pdf_qa_accepts_parentheses_escaped_by_pdf_renderer():
+    from app.resumes.pdf import render_simple_pdf
+    from app.resumes.pdf_qa import run_pdf_qa
+
+    line = "Phone: (415) 555-0100"
+    assert run_pdf_qa(render_simple_pdf([line]), [line]).passed

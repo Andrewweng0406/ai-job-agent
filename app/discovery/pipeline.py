@@ -11,7 +11,7 @@ from app.models.application import Application, application_dedupe_key_for_job
 from app.models.company_registry import CompanyRegistryEntry
 from app.models.enums import ApplicationStatus, JobStatus
 from app.models.job import Job
-from app.normalization.deduplication import job_identity_keys
+from app.normalization.deduplication import strong_job_identity_keys
 
 
 logger = logging.getLogger(__name__)
@@ -60,10 +60,11 @@ class DiscoveryPipeline:
                 for raw_job in raw_jobs:
                     job = source.normalize_job(raw_job)
                     normalized_count += 1
-                    if set(job_identity_keys(job)) & seen_keys:
+                    identity_keys = strong_job_identity_keys(job)
+                    if identity_keys & seen_keys:
                         skipped_count += 1
                         continue
-                    seen_keys.update(job_identity_keys(job))
+                    seen_keys.update(identity_keys)
                     job.status = self._incremental_status(job)
                     job_id = self.repository.upsert_job(job)
                     if job.status in {JobStatus.NEW, JobStatus.UPDATED}:

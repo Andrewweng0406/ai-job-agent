@@ -228,7 +228,8 @@ class JobAgentRepository:
                 SELECT application_id, job_family, status
                 FROM applications
                 WHERE status = ?
-                ORDER BY discovered_at ASC, application_id ASC
+                ORDER BY CASE WHEN job_family = 'UNKNOWN' THEN 1 ELSE 0 END,
+                         discovered_at ASC, application_id ASC
                 LIMIT ?
                 """,
                 (status.value, limit),

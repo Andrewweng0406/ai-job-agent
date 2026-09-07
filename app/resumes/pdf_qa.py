@@ -26,7 +26,8 @@ def run_pdf_qa(pdf: bytes, expected_text: list[str] | None = None) -> PdfQaResul
         decoded = pdf.decode("latin-1", "replace")
         for line in expected_text:
             safe_line = _safe_text(line)
-            if safe_line and safe_line not in decoded:
+            escaped_line = safe_line.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+            if safe_line and safe_line not in decoded and escaped_line not in decoded:
                 failures.append(f"TEXT_MISSING:{safe_line[:40]}")
     return PdfQaResult(passed=not failures, failures=failures)
 
