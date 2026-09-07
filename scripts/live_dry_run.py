@@ -87,9 +87,11 @@ def main() -> int:
                                      screenshot_path=out / "before_fill.png")
             transcript = result.dry_run.transcript if result.dry_run else None
             resolutions = result.dry_run.resolutions if result.dry_run else []
+            # A provider hard-stop is an auditable outcome, not a process error.
+            # Leave transcript unset so the common blocked-bundle writer runs.
             if transcript is None:
-                raise SystemExit("live page did not produce a transcript")
-            if args.approved_by and result.dry_run.status == ApplicationStatus.READY:
+                autofill = None
+            if transcript is not None and args.approved_by and result.dry_run.status == ApplicationStatus.READY:
                 repo.approve_dry_run_transcript(transcript.transcript_id, args.approved_by)
                 ApprovedAutofillPreviewBuilder(repo).build(transcript.transcript_id)
                 _action(actions, "APPROVAL_VERIFIED", lease_epoch=lease_epoch, success=True)
@@ -108,7 +110,13 @@ def main() -> int:
             else:
                 autofill = None
             _form_screenshot(page, out / "after_fill.png")
-            _lease_check(repo, application_id, worker_id, lease_epoch)
+            if transcript is not None:
+                try:
+                    _lease_check(repo, application_id, worker_id, lease_epoch)
+                except RuntimeError as exc:
+                    _action(actions, "LEASE_LOST", lease_epoch=lease_epoch, success=False,
+                            reason=str(exc))
+                    transcript = None
             post_fill = BrowserFieldCapture().capture(page, ats_type=ats)
             _action(actions, "POST_FILL_SCAN", lease_epoch=lease_epoch,
                     success=not post_fill.human_required,
