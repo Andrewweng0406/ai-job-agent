@@ -124,3 +124,84 @@ Application submissions to a single company: **1 at a time**, with a cooldown af
 
 LLM spend scales with ~150 applications/day and ~215 Stage-1 extractions/day, not with 1,430 raw
 postings (Stage 0 decides ~80% for free). Dominant line is ~45 resume generations/day.
+
+---
+
+## 8. Expanded scenario grid (round 2.5)
+
+### 8.1 Attempts/day required for 100 and 150 VERIFIED, by net submit→verified success rate
+
+`attempts = target / (success_rate)` where `success_rate` here = attempt→VERIFIED (form completes,
+submit fires, evidence tier met). Rounded up.
+
+| attempt→verified | attempts/day for 100 | attempts/day for 150 |
+|---|---|---|
+| 40% | **250** | 375 |
+| 50% | **200** | 300 |
+| 60% | **167** | 250 |
+| 70% | **143** | 214 |
+| 80% | **125** | 188 |
+
+Realistic band for mature GH/Lever/Ashby no-account adapters: **60–75%** ⇒ **135–167 attempts/day** for
+100 verified. Below 60% the human-task and retry load makes 100/day impractical on one operator.
+
+### 8.2 Attempts per hour per application worker, by average completion time
+
+`per_hour = 60 / (avg_minutes + overhead)`, overhead = browser context spin-up + navigation + dry-run
+build + pacing gaps ≈ **1.5 min/attempt**. Effective attempts/hour, and per a **10-hour** active window:
+
+| avg form time | min/attempt (incl. overhead) | attempts/hr/worker | attempts/day/worker (10h) |
+|---|---|---|---|
+| 2 min | 3.5 | 17.1 | **171** |
+| 4 min | 5.5 | 10.9 | **109** |
+| 6 min | 7.5 | 8.0 | **80** |
+| 10 min | 11.5 | 5.2 | **52** |
+
+These are gross; multiply by an availability factor **0.8** (crashes, reaper requeues, domain-slot
+waits, human-task diversions) ⇒ usable/day/worker ≈ **137 / 87 / 64 / 42**.
+
+### 8.3 Workers needed for 100 verified/day (using 65% success ⇒ ~154 attempts/day)
+
+| avg form time | usable attempts/day/worker | workers for ~154 attempts |
+|---|---|---|
+| 2 min | 137 | **2** (buffer 3) |
+| 4 min | 87 | **2** (tight) → **3** |
+| 6 min | 64 | **3** → **4** |
+| 10 min | 42 | **4** → **5** |
+
+For **150 verified/day** (~231 attempts at 65%): 2/3-min → 2–3 workers; 4-min → 3–4; 6-min → 4–5;
+10-min → 6.
+
+### 8.4 Overheads folded in
+
+| Factor | Modeled as |
+|---|---|
+| `HUMAN_REQUIRED` (12% of attempts) | not counted toward verified; ~18–20 tasks/day for the operator at 154 attempts |
+| CAPTCHA (~2–5% of GH/Lever attempts) | subset of HUMAN_REQUIRED; triggers per-company 45-min cooldown |
+| Rate limits | per-company ≥45 s between submits, 1 concurrent/company — rarely binding at 3–4 workers across ~1,000 companies |
+| Retry delays | transient pre-submit retries folded into the 0.8 availability factor |
+| Resume generation | async, ahead of the apply worker; ~45 real generations/day + cache; not on the critical path if resume workers keep the `READY` queue non-empty |
+| LLM latency | Stage-1/Stage-3 latency hidden by pipelining; only bites if `READY` queue drains |
+| ATS domain limits | see rate limits; Ashby gentler (4 rps) |
+| Browser startup | the 1.5 min/attempt overhead above; reuse of a warm browser (new *context*, not new *process*) keeps it there |
+
+### 8.5 Answer — architecture to realistically hit 100 verified/day
+
+1. **3–4 application workers** (assumes 4–6 min average form time) sharing the queue via the atomic
+   claim + lease model (`WORKER_CONCURRENCY.md`). Not more — per-company limits and anti-bot exposure,
+   not raw worker count, are the ceiling.
+2. **Lease + fencing + reaper** in place so those 3–4 workers never double-submit and crashes self-heal.
+3. **`applications.dedupe_key`** requisition-based; `SUBMISSION_UNKNOWN` a dead-end for auto-retry.
+4. **Registry of ~1,000–1,600 active boards**, 6–12 h crawl cadence, feeding ~135–170 eligible
+   postings/day after dedupe+filters.
+5. **2 resume workers + artifact cache** keeping the `READY` queue ahead of the apply workers.
+6. **2 verify workers** running the async evidence loop (T1–T5) so `VERIFIED` — not `SUBMITTED` — is
+   the counted number.
+7. **Shared rate-limited HTTP client** (per-host + per-ATS buckets, `Retry-After`).
+8. **10-hour active window**, paced. A longer window reduces worker count but raises per-IP anti-bot
+   exposure; mitigate with pacing and per-company cooldowns, never with evasion.
+9. **1 operator** can service the ~18–20 human tasks/day; above ~30/day (i.e. `human_required_pct` > 20%)
+   the classifier needs tightening or a second reviewer.
+
+Until the Round 2.5 gates pass, `application_concurrency` stays **1** ⇒ ceiling ≈ **64–87 verified/day**
+(4–6 min form time). The 1→3-4 bump is the single change that unlocks 100+/day.

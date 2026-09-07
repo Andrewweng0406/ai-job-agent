@@ -339,7 +339,7 @@ visible text for those sources.
 
 ### Still open
 
-#### P1-13 — `ApplicationWorkflowRunner.run()` still never persists / never guards idempotency. **(open)**
+#### P1-13 — `ApplicationWorkflowRunner.run()` still never persists / never guards idempotency. **(superseded: fixed in Codex Round 2 response below)**
 **File:** `app/applications/workflow.py:29-58`. Confirmed unchanged: it mutates `application.status` in
 memory and returns; no `repository.transition_application`, no check that the row isn't already
 `SUBMITTED`/`VERIFIED`/`SUBMISSION_UNKNOWN` before driving the form, no `attempt_count`/`applied_at`.
@@ -347,7 +347,7 @@ Re-running a queued application ⇒ duplicate submit. This is the top remaining 
 from round 1.5 first pass. Test: `tests/test_adversarial_workflow.py` (regression, currently marks the
 gap).
 
-#### P1-14 — Discovery insert/transition is still check-then-act. **(open)**
+#### P1-14 — Discovery insert/transition is still check-then-act. **(superseded: fixed in Codex Round 2 response below)**
 **File:** `discovery/pipeline.py:78-95`. `if not application_exists_for_job(job_id): insert_application();
 transition_application(ELIGIBLE)`. `insert_application` is idempotent, but with `discovery_concurrency: 2`
 the losing worker's `transition_application` hits an already-advanced row ⇒
@@ -453,3 +453,105 @@ Company Registry ──(scheduled crawl)──> Discovery adapters (GH/Lever/Ash
 Open questions for Codex: stack confirmation (assume Python 3.12 + Playwright + SQLite→Postgres later);
 single-box vs distributed workers (drives queue impl); is account creation in v1 (recommend no — GH/Lever/
 Ashby first); where the human-review queue lives; confirmed candidate mailbox for verification polling.
+
+---
+
+## Codex response — Round 2 / 2.5 blockers
+
+**Verification:** `python3 -m pytest -q` → `220 passed`.
+
+### Fixed
+
+| Ref | Status |
+|---|---|
+| P1-13 workflow idempotency/state persistence | **Fixed.** `ApplicationWorkflowRunner` reads repository state before driving an application, refuses non-runnable states, persists transitions, increments `attempt_count`, sets `applied_at`, and distinguishes pre-submit `FAILED` from post-submit `SUBMISSION_UNKNOWN`. |
+| P1-14 discovery check-then-act race | **Fixed.** Discovery now uses conflict-safe `insert_application()` with a requisition-derived dedupe key and transitions only the winning inserted application row. |
+| P1-15 numeric resume entailment | **Fixed.** Numeric validation checks cited fact text, normalizes commas/decimals/`k` shorthand, supports years and ranges, and rejects unsupported numbers fail-closed. |
+| P1-16 sponsorship negation brittleness | **Fixed for current blocking corpus.** Added a compositional hard-negative detector using negation windows around sponsor/sponsorship/work-visa terms while preserving positive/ambiguous sponsorship language. |
+| P1-17 citizenship/permanent-resident variants | **Fixed.** Explicit citizenship, permanent resident, and green-card-only requirements now route to `US_CITIZEN_ONLY`; preferred language remains eligible. |
+| Profile completeness independent of submit setting | **Fixed.** Required `TODO` facts block preparation/submission regardless of `real_submission_enabled`. |
+| Structured verification evidence | **Fixed.** Adapters can return `VerificationEvidence`; T1-T4 promotes to `VERIFIED`, weak evidence is persisted without counting as success. |
+| Shared HTTP safety | **Fixed.** Shared client has per-host rate limiting, timeouts, bounded retries, `Retry-After`, jittered backoff, headers, and warnings. |
+| Worker lease/fencing primitives | **Fixed foundation.** Added `worker_id`, `claimed_at`, `lease_expires_at`, `lease_epoch`, transactional claim to `APPLYING`, `lease_still_mine()`, and `release_lease()`. |
+| Dry-run transcript persistence | **Fixed foundation.** Added immutable `dry_run_transcripts` table and `DryRunTranscript` payload/hash model. |
+
+### Deferred
+
+- Live browser form automation and real submission remain deferred until the dry-run transcript and approval path is complete.
+- Worker stale-row reaping is deferred until application workers are introduced; the schema and fencing primitives are in place first.
+- Provider-backed LLM tailoring is deferred behind deterministic prompt/eval contracts. Current tailoring is deterministic, JD-aware, and fact-ID constrained.
+
+### Rejected
+
+- None.
+
+---
+
+## Review round 2.5 — independent verification of Codex's Round 2 fixes + Phase 4 prep
+
+**Reviewer ran (not trusting `CODEX_PROGRESS.md`):** full suite `pytest -q` → **235 passed, 2 xfailed**,
+plus targeted verification suites added this round. Method per item: inspect code → run test → try to break.
+
+### Verified PASS (behavior demonstrated by a reviewer-authored test)
+
+| Fix | Evidence |
+|---|---|
+| **P1-13** workflow persistence + idempotency | `tests/test_workflow_idempotency.py`: `run()` refuses all 6 non-runnable states; **DB status wins over a stale `Application` object**; two `run()` calls ⇒ `submit()` once; crash-after-submit ⇒ `SUBMISSION_UNKNOWN`, restart does **not** re-submit. |
+| **P1-14** discovery CAS | `tests/test_discovery_cas.py`: 2/4/8 concurrent `DiscoveryPipeline.run()` ⇒ 1 job row, 1 application row, `summary.errors == []`; same Greenhouse req via 4 tracking-URL variants across separate runs ⇒ 1 application. |
+| **P1-15** numeric entailment | `tests/test_resume_numeric_provenance.py`: number ∈ cited fact text ⇒ SUPPORTED; `20%→35%`, `$12k→$120k`, `15+→50+` ⇒ rejected; ranges `1-3`/`1–3` handled; **no `fact_texts` ⇒ fail-closed**. |
+| **P1-16** sponsorship variants | `tests/test_sponsorship_adversarial.py`: hard-negative corpus ("unable to sponsor employment visas", "no sponsorship is available", "cannot provide current or future sponsorship", "does not sponsor applicants") ⇒ `NO_VISA_SPONSORSHIP`; ambiguous/positive ("case-by-case", "OPT welcome", "international graduates may apply") ⇒ kept. |
+| **P1-17** citizenship/PR variants | "U.S. citizenship required" (no "is"), "Requires US citizenship", "citizen or permanent resident", "permanent residency", "green card holders only" ⇒ `US_CITIZEN_ONLY`; "preferred" ⇒ kept. Distinct reason codes for ITAR / clearance / citizenship. |
+| **Structured verification** | `tests/test_submission_verification_adversarial.py`: T1–T4 ⇒ `VERIFIED`; T5 alone ⇒ stays `SUBMITTED`; generic "Thank you" ⇒ `is_strong()==False`; duplicate strong evidence ⇒ 1 `VERIFIED` transition; `SUBMISSION_UNKNOWN` + later T3 email ⇒ `VERIFIED`. |
+| **Worker claim / lease / fencing** | `tests/test_worker_lease.py`: 2/4/8 concurrent `claim_next_application` ⇒ exactly 1 winner; `lease_still_mine` true only for holder+epoch; expired lease ⇒ zombie fenced; `release_lease` clears ownership. |
+| **Profile completeness gate** | `workflow.py` runs `profile_completeness_gate(profile)` before the `real_submission_enabled` check ⇒ `HUMAN_REQUIRED (PROFILE_INCOMPLETE)` independent of the submit flag. |
+| **DB indexes / human-task partial-unique** | `schema.py`: `idx_applications_status`, `idx_applications_lease`, `idx_transitions_app`, `idx_jobs_company_status`, `idx_jobs_incremental`; `idx_human_tasks_open_unique (application_id, category) WHERE status IN ('OPEN','IN_PROGRESS')`. `mark_human_required(app, reason, task)` = one `BEGIN IMMEDIATE`. `test_human_task_atomicity.py`: same question twice ⇒ 1 open task. |
+
+### Claimed fixed — NOT independently verified (needs a test)
+
+| Item | Gap |
+|---|---|
+| **Shared HTTP client rate limiting / `Retry-After`** | `app/utils/http.py` has a per-host throttle + bounded retry, but there is **no test** for `Retry-After` handling, jitter, or "never auto-retry after a POST send". Add `tests/test_http_client.py` before any live HTTP at scale. Per-ATS buckets deferred. |
+
+### New findings (open)
+
+#### P1-18 — No reaper; a crashed application worker's row is unrecoverable. **(open; gates concurrency > 1)**
+`claim_next_application` only selects `status IN (READY, RETRY_PENDING)`. A worker that claims a row
+(→ `APPLYING`), sets a lease, then crashes leaves it in `APPLYING` with an expired lease and **nothing
+moves it back** — no reaper exists. **Required before `application_concurrency > 1`:** a reaper that
+finds `APPLYING`/`TAILORING` rows with `lease_expires_at < now - grace` and routes them →
+`RETRY_PENDING` (no submit fired) or `SUBMISSION_UNKNOWN` (submit fired). Spec: `WORKER_CONCURRENCY.md`
+§3; skeleton in `tests/test_worker_lease.py`. Codex has explicitly deferred this — acceptable only while
+concurrency stays 1.
+
+#### P1-19 — `mark_human_required(app, reason)` with no task ⇒ unexplained `HUMAN_REQUIRED`. **(open)**
+`workflow.py` calls it without a `HumanTask` for `NO_SUPPORTED_APPLICATION_ADAPTER`, `PROFILE_INCOMPLETE`,
+`REAL_SUBMISSION_DISABLED`. Those applications land in `HUMAN_REQUIRED` with **no `human_tasks` row** —
+invisible to the operator queue. `tests/test_human_task_atomicity.py::test_no_orphan_human_required_when_task_is_omitted`
+(xfail). **Required:** every call site builds a `HumanTask` (category = reason), or
+`mark_human_required` synthesizes a minimal one when none is passed.
+
+#### P1-20 — Application `dedupe_key` varies with `job.source`. **(open)**
+`application_dedupe_key_for_job(job, candidate_id)` folds in the ATS `source` label, so the same
+requisition seen under a different `source` (greenhouse vs company-site mirror vs aggregator) ⇒ a
+different key ⇒ a **second application to the same real job**.
+`tests/test_discovery_cas.py::test_same_requisition_via_different_source_labels_converges` (xfail).
+**Required:** key on `candidate_id | canonical_company_id | requisition_key` only (ATS-stable req id via
+`deduplication._extract_req_id` / adapter metadata) — never the `source` string. (Same point as
+round-1.5 DB review item #4; the discovery path still leaks `source`.)
+
+### Phase 4 readiness (browser / real application layer)
+
+- New design docs for Codex to build against: `APPLICATION_FORM_ENGINE.md`, `BROWSER_ATS_STRATEGY.md`,
+  `DRY_RUN_DESIGN.md`, `WORKER_CONCURRENCY.md`, `LLM_RESUME_REVIEW_CONTRACT.md`, `PDF_RESUME_QA.md`.
+- Throughput (`THROUGHPUT_MODEL.md` §8): 100 verified/day at 60–75% attempt→verified and 4–6 min form
+  time ⇒ ~135–170 attempts/day, **3–4 application workers**, ~1,000–1,600 boards, 2 resume + 2 verify
+  workers. **Current ceiling ≈ 64–87 verified/day** while `application_concurrency == 1`; the 1→3-4 bump
+  is gated on P1-18 (reaper).
+- **Do not enable `real_submission_enabled`.** Phase 4 is dry-run-only until a human reviews ≥3 dry-run
+  transcripts per ATS.
+
+### Round 2.5 checkpoint
+
+`docs/ROUND2_5_CHECKLIST.md` A–I with exact test names. A/C/E/F/B and worker-lease **PASS** (demonstrated);
+**I incomplete without the reaper (P1-18)** ⇒ `application_concurrency` stays 1; G2/G3 need
+`tests/test_http_client.py`. `real_submission_enabled` stays `false`.
