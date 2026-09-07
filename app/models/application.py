@@ -18,6 +18,7 @@ class Application:
     source: str
     ats_type: str
     application_id: str = field(default_factory=lambda: str(uuid4()))
+    dedupe_key: str | None = None
     match_score: float | None = None
     persona: Persona | None = None
     resume_id: str | None = None
@@ -32,4 +33,3 @@ class Application:
     human_required_reason: str | None = None
     confirmation_data: dict[str, Any] = field(default_factory=dict)
     notes: str | None = None
-

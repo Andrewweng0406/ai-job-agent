@@ -20,27 +20,22 @@ def test_retry_pending_cannot_skip_straight_to_submitted():
         M.transition(ApplicationStatus.RETRY_PENDING, ApplicationStatus.SUBMITTED, "shortcut")
 
 
-# ADV-20 / P0-1: distinct unknown + verified states ---------------------------
-@pytest.mark.xfail(strict=False, reason="P0-1: no SUBMISSION_UNKNOWN state; APPLYING has no unknown outcome")
 def test_adv20_submission_unknown_state_exists_and_is_reachable_from_applying():
     unknown = ApplicationStatus["SUBMISSION_UNKNOWN"]
     assert M.can_transition(ApplicationStatus.APPLYING, unknown)
 
 
-@pytest.mark.xfail(strict=False, reason="P0-1: SUBMITTED is terminal; cannot advance to a VERIFIED state")
 def test_submitted_advances_to_verified():
     verified = ApplicationStatus["VERIFIED"]
     assert M.can_transition(ApplicationStatus.SUBMITTED, verified)
 
 
-@pytest.mark.xfail(strict=False, reason="P0-1: SUBMISSION_UNKNOWN must never auto-return to APPLYING")
 def test_submission_unknown_never_reenters_applying():
     unknown = ApplicationStatus["SUBMISSION_UNKNOWN"]
     assert not M.can_transition(unknown, ApplicationStatus.APPLYING)
     assert not M.can_transition(unknown, ApplicationStatus.RETRY_PENDING)
 
 
-@pytest.mark.xfail(strict=False, reason="P0-1: no '* -> CLOSED' for a posting that 404s mid-flow")
 @pytest.mark.parametrize("frm", [ApplicationStatus.TAILORING, ApplicationStatus.APPLYING])
 def test_posting_can_close_midflow(frm):
     assert M.can_transition(frm, ApplicationStatus.CLOSED)

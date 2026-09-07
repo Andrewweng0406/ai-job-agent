@@ -1,8 +1,6 @@
 """Adversarial dedup tests. See docs/CLAUDE_REVIEW.md P1-3 and docs/FAILURE_MODEL.md ADV-11/12."""
 from __future__ import annotations
 
-import pytest
-
 from app.normalization.deduplication import is_duplicate, job_identity_keys
 from tests.adv_helpers import make_job
 
@@ -13,8 +11,6 @@ def test_exact_same_apply_url_is_duplicate():
     assert is_duplicate(b, job_identity_keys(a))
 
 
-# ADV-12 ---------------------------------------------------------------------
-@pytest.mark.xfail(strict=False, reason="P1-3: apply_url tracking params not stripped before hashing")
 def test_adv12_apply_url_tracking_params_are_ignored():
     # Same posting, different tracking URL, different source id, and a trivially
     # different description string (view counter / timestamp injected by the mirror).
@@ -33,8 +29,6 @@ def test_adv12_apply_url_tracking_params_are_ignored():
     assert is_duplicate(b, job_identity_keys(a))
 
 
-# ADV-11 ---------------------------------------------------------------------
-@pytest.mark.xfail(strict=False, reason="P1-3: no requisition-number / normalized-location near-dedupe")
 def test_adv11_same_req_via_two_sources_is_deduped():
     gh = make_job(
         external_job_id="gh-1",
@@ -62,7 +56,6 @@ def test_repost_with_new_id_identical_description_is_deduped():
     assert is_duplicate(repost, job_identity_keys(original))
 
 
-@pytest.mark.xfail(strict=False, reason="P1-3: near-identical (not byte-identical) JD repost needs simhash, not exact hash")
 def test_near_identical_repost_is_deduped():
     original = make_job(
         external_job_id="1",

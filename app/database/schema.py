@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 
 CREATE TABLE IF NOT EXISTS applications (
     application_id TEXT PRIMARY KEY,
+    dedupe_key TEXT NOT NULL UNIQUE,
     job_id INTEGER NOT NULL,
     company TEXT NOT NULL,
     position TEXT NOT NULL,
@@ -87,7 +88,7 @@ CREATE TABLE IF NOT EXISTS job_filter_results (
     job_id INTEGER NOT NULL,
     allowed INTEGER NOT NULL,
     reason TEXT,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TEXT NOT NULL,
     FOREIGN KEY(job_id) REFERENCES jobs(id)
 );
 

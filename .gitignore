@@ -1,11 +1,23 @@
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .venv/
 venv/
+
+# Local data and logs
+data/*.sqlite3
+data/*.db
+logs/*
+!logs/.gitkeep
+
+# Secrets
 .env
-*.sqlite3
-*.db
-.pytest_cache/
-node_modules/
+*.pem
+*.key
+
+# OS/editor
 .DS_Store
-data/local/
+

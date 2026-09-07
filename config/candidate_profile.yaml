@@ -1,5 +1,43 @@
 # Source of truth for candidate facts.
 # Fill TODO values before enabling real application submission.
+meta:
+  candidate_id: TODO
+  schema_version: 2
+facts:
+  - fact_id: name.full
+    type: identity
+    value: TODO
+    required: true
+  - fact_id: edu.primary.school
+    type: education
+    value: TODO
+    required: true
+  - fact_id: edu.primary.degree
+    type: education
+    value: TODO
+    required: true
+  - fact_id: edu.primary.grad_date
+    type: education
+    value: TODO
+    required: true
+  - fact_id: auth.status
+    type: legal
+    value: TODO
+    required: true
+    literal_only: true
+  - fact_id: auth.needs_future_sponsorship
+    type: legal
+    value: TODO
+    required: true
+    literal_only: true
+  - fact_id: certifications
+    type: closed_set
+    value: []
+  - fact_id: clearance
+    type: closed_set
+    value: []
+
+# Legacy-shaped fields are kept for convenience while the fact model is filled.
 personal_information:
   full_name: TODO
   email: TODO
@@ -28,4 +66,3 @@ salary_preferences:
   minimum: TODO
   currency: USD
 application_answers: {}
-

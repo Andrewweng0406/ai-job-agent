@@ -8,7 +8,7 @@ Core tables:
 - `jobs`: normalized job records with uniqueness on source requisition ID and apply URL.
 - `applications`: one application tracking record per queued job.
 - `application_state_transitions`: append-only status transition log.
+- `job_filter_results`: append-only hard-filter decisions and skip reasons.
 - `resumes`: generated resume artifacts associated with exact jobs.
 
 The schema preserves historical applications and records the exact status, resume ID, failure category, human-required reason, and submission confirmation data.
-

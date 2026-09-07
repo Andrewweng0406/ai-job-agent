@@ -49,6 +49,9 @@ Nothing counts as success without an evidence tier (see `ATS_MATRIX.md` §4).
 Also add `* -> CLOSED` for "posting 404'd mid-flow" from `TAILORING`, `READY`, `APPLYING`,
 `SUBMISSION_UNKNOWN`.
 
+**Codex update:** Implemented `SUBMISSION_UNKNOWN`, `VERIFIED`, and mid-flow `CLOSED` transitions. `VERIFIED`
+is the only terminal success state intended for KPI counting.
+
 ---
 
 ### P0-2 — No idempotency guarantee against duplicate applications.
@@ -62,6 +65,9 @@ Also add `* -> CLOSED` for "posting 404'd mid-flow" from `TAILORING`, `READY`, `
 - `insert_application` must `INSERT ... ON CONFLICT(dedupe_key) DO NOTHING` and return the existing row.
 - Write the row with status `QUEUED`/`APPLYING` **before** the adapter opens the external form, so a crash
   after submit leaves a recoverable `APPLYING`/`SUBMISSION_UNKNOWN` row rather than nothing.
+
+**Codex update:** Added application `dedupe_key`, idempotent insert behavior, and tests for duplicate insert
+no-op behavior. The current key defaults to the local candidate plus job id until candidate identity is filled.
 
 ---
 
@@ -89,6 +95,8 @@ Fire only if `NO_SPONSORSHIP_PATTERN` and not `POSITIVE_SPONSORSHIP`. Reason cod
 This is P0 because without it the system queues jobs the candidate is *definitionally* disqualified from,
 burns throughput, and pushes the answer engine toward a dishonest "no, I don't need sponsorship".
 
+**Codex update:** Added negative sponsorship filtering with positive sponsorship allowance.
+
 ---
 
 ### P0-4 — FK enforcement is OFF for all runtime DB operations.
@@ -101,6 +109,8 @@ with FK enforcement **disabled** — orphan applications and dangling transition
 conn.execute("PRAGMA foreign_keys = ON")
 conn.execute("PRAGMA journal_mode = WAL")   # also helps concurrent readers
 ```
+
+**Codex update:** Enabled foreign keys, WAL, and busy timeout on every repository connection.
 
 ---
 
@@ -123,6 +133,8 @@ Per PRIMARY PRINCIPLE, ambiguous experience language should **keep** the job, no
 - On genuine ambiguity → keep + tag `experience_ambiguous` for the LLM stage.
 Adversarial cases in `tests/test_adversarial_filters.py`.
 
+**Codex update:** Implemented requirements-region experience scanning and range guards.
+
 ---
 
 ### P1-2 — `CLEARANCE_PATTERN` matches bare "secret".
@@ -140,6 +152,9 @@ CLEARANCE_PATTERN = re.compile(
 )
 ```
 Keep `allow_security_clearance` default `False` (correct — candidate can't get one).
+
+**Codex update:** Clearance matching now requires clearance/security context and no longer matches bare
+"secret".
 
 ---
 
@@ -159,6 +174,9 @@ Fails when:
 - Add a within-company near-dupe check: SimHash/MinHash over normalized JD text + title, threshold-based.
 Adversarial cases in `tests/test_adversarial_dedup.py`.
 
+**Codex update:** Implemented canonical URL, req-like URL, normalized title/location/company, and description
+shingle keys.
+
 ---
 
 ### P1-4 — `transition_application` is a read-modify-write race.
@@ -177,6 +195,8 @@ if cur.rowcount != 1:
 ```
 Open the connection with `isolation_level=None` + explicit `BEGIN IMMEDIATE`, or `PRAGMA busy_timeout`.
 
+**Codex update:** `transition_application` now uses `BEGIN IMMEDIATE` and conditional update rowcount checks.
+
 ---
 
 ### P1-5 — `truth_validation` stub gives false confidence.
@@ -190,6 +210,9 @@ stays disabled. Full target design: `RESUME_TRUTH_SYSTEM.md`.
 **Required before any resume generation ships:** fact-ID provenance + claim decomposition + per-claim
 entailment check + unsupported-number detection + required-field omission check.
 
+**Codex update:** Added deterministic MVP for semantic support, required-field checks, application answer
+guarding, and fact-id provenance validation.
+
 ---
 
 ### P1-6 — `candidate_profile.yaml` has no fact IDs and no completeness gate.
@@ -202,6 +225,9 @@ work-authorization answer engine cannot operate honestly.
 - Add a `profile_completeness_gate`: real submission (and resume generation) hard-refuses while any
   `required: true` fact is `TODO`. Do not rely solely on `real_submission_enabled`.
 
+**Codex update:** Candidate profile now includes a v2 `facts` section with required fact IDs and literal-only
+authorization facts.
+
 ---
 
 ### P1-7 — No US-location filter; non-US jobs will flood the queue.
@@ -210,6 +236,8 @@ Greenhouse/Lever/Ashby boards are global. Nothing restricts to US / Remote-US.
 **Required change:** location normalizer + filter: allow US states/metros + "Remote - US" + unknown
 (`location_unknown`, kept per PRIMARY PRINCIPLE); drop clearly non-US ("London", "Bengaluru", "Toronto"
 unless a US location is also listed).
+
+**Codex update:** Added conservative US/remote allow behavior and clearly non-US skip behavior.
 
 ---
 

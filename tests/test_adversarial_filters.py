@@ -32,14 +32,12 @@ def test_adv03_must_be_us_citizen_is_skipped():
     assert not r.allowed and r.reason == "US_CITIZEN_ONLY"
 
 
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P0-3/P1: 'US citizenship is required' phrasing not matched")
 def test_adv03b_citizenship_is_required_phrasing_is_skipped():
     r = apply_hard_filters(make_job(description="U.S. citizenship is required for this position."), DATA)
     assert not r.allowed and r.reason == "US_CITIZEN_ONLY"
 
 
 # ADV-04 -----------------------------------------------------------------------
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P0-3: no NO_SPONSORSHIP_PATTERN yet")
 @pytest.mark.parametrize(
     "text",
     [
@@ -63,7 +61,6 @@ def test_adv05_sponsorship_available_is_allowed():
 
 
 # ADV-06 -----------------------------------------------------------------------
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P1-1: experience scan hits Preferred section / whole blob")
 def test_adv06_years_only_in_preferred_section_is_allowed():
     desc = (
         "Requirements:\n- 0-2 years of experience\n- SQL, Excel\n\n"
@@ -82,14 +79,12 @@ def test_adv07_minimum_7_years_is_skipped():
 
 
 # ADV-08 -----------------------------------------------------------------------
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P1-1: range '1-5 years' includes new grads, should not be dropped")
 def test_adv08_year_range_including_newgrad_is_allowed():
     r = apply_hard_filters(make_job(description="1-5 years of experience with SQL."), DATA)
     assert r.allowed
 
 
 # ADV-09 -----------------------------------------------------------------------
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P1-2: bare word 'secret' matches clearance pattern")
 @pytest.mark.parametrize(
     "text",
     [
@@ -111,7 +106,6 @@ def test_adv10_tssci_clearance_required_is_skipped():
 
 
 # ADV-21 -----------------------------------------------------------------------
-@pytest.mark.xfail(strict=False, reason="CLAUDE_REVIEW P1-7: no US-location filter")
 def test_adv21_non_us_location_is_skipped():
     r = apply_hard_filters(make_job(location="London, United Kingdom"), DATA)
     assert not r.allowed and r.reason == "LOCATION_INELIGIBLE"
