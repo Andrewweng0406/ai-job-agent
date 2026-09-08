@@ -16,6 +16,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -38,7 +39,8 @@ def _wait_for_form(page, timeout_ms: int = 15_000) -> bool:
         page.wait_for_load_state("networkidle", timeout=timeout_ms)
     except Exception:
         pass
-    for sel in ('form input:not([type=hidden])', 'form textarea',
+    for sel in ('input:not([type=hidden]):not([type=submit]):not([type=button])',
+                'textarea', 'form input:not([type=hidden])', 'form textarea',
                 'input[type=email]', 'input[name*="name" i]', '[role="textbox"]'):
         try:
             page.wait_for_selector(sel, timeout=4_000, state="visible")
@@ -49,7 +51,11 @@ def _wait_for_form(page, timeout_ms: int = 15_000) -> bool:
 
 
 def _slug(company: str, url: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", f"{company}-{url.rsplit('/', 1)[-1]}".lower()).strip("-")[:80]
+    segments = [segment for segment in urlparse(url).path.split("/") if segment]
+    identity = segments[-1] if segments else "application"
+    if identity.lower() in {"application", "apply"} and len(segments) > 1:
+        identity = segments[-2]
+    return re.sub(r"[^a-z0-9]+", "-", f"{company}-{identity}".lower()).strip("-")[:80]
 
 
 def _normalize_apply_url(url: str) -> str:
@@ -82,6 +88,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--limit", type=int, default=10)
     ap.add_argument("--company", default=None, help="only prepare applications whose company contains this")
+    ap.add_argument("--application-id", default=None, help="prepare one exact application record")
     ap.add_argument("--profile", default="config/candidate_profile.local.yaml")
     ap.add_argument("--standard-answers", default="config/standard_answers.local.yaml")
     ap.add_argument("--resume-pdf", default="data/resumes/andrew_weng_master.pdf")
@@ -102,7 +109,10 @@ def main() -> int:
     if not resume_pdf:
         print(f"! résumé not found at {args.resume_pdf} — records will note a missing resume")
 
-    todo = _candidates(repo, args.limit if not args.company else 200)
+    candidate_limit = 1000 if args.application_id else (args.limit if not args.company else 200)
+    todo = _candidates(repo, candidate_limit)
+    if args.application_id:
+        todo = [row for row in todo if row["application_id"] == args.application_id]
     if args.company:
         todo = [r for r in todo if args.company.lower() in (r["company"] or "").lower()][:args.limit]
     if not todo:

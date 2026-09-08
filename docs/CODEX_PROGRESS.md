@@ -241,3 +241,11 @@ Latest local verification:
 - Fixed missing screenshot rendering and disabled the batch fill action for blocked/unready records.
 - Verified the current Scale AI Greenhouse DOM without submission. All supported widgets now fill; the record remains correctly blocked only on the candidate's unknown education start year.
 - Safety state remained unchanged: no submit path was added and no application was submitted.
+
+## 2026-09-07 Notion Ashby form-load repair
+
+- Fixed batch form readiness detection for React ATS pages that render controls without a traditional `<form>` wrapper.
+- Fixed Ashby evidence-directory collisions caused by every application URL ending in `/application`; slugs now use the requisition UUID.
+- Added exact-application selection to the diagnostic batch command.
+- Added a separate official-site link to the review UI, while keeping agent-assisted fill disabled for blocked or unresolved records.
+- Re-captured Notion's live Ashby DOM without submission. The form loads correctly; the AI Early Career record is now `attention` only because one required AI-technologies answer needs candidate review.

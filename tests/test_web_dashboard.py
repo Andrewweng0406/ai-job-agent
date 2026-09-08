@@ -37,6 +37,9 @@ def test_batch_routes_run_no_submit_scripts_and_guard_paths():
 def test_batch_ui_disables_fill_for_unready_records_and_hides_missing_images():
     assert "bApprove.disabled=!rec.ready" in DASHBOARD_HTML
     assert "bShot.style.display='none'" in DASHBOARD_HTML
+    assert "button:disabled" in DASHBOARD_HTML
+    assert "Open application website" in DASHBOARD_HTML
+    assert "rel=\"noopener noreferrer\"" in DASHBOARD_HTML
 
 
 def test_assisted_fill_route_launches_the_no_submit_script_headed():

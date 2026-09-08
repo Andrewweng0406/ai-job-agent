@@ -337,6 +337,8 @@ body{font:15px system-ui;margin:28px;background:#f5f6f8;color:#17202a}main{max-w
 header{display:flex;justify-content:space-between;align-items:center}
 button{padding:8px 13px;border:1px solid #87909a;border-radius:6px;background:#fff;cursor:pointer}
 button.primary{background:#12603a;color:#fff;border-color:#12603a}
+button:disabled{background:#e5e7eb;color:#7a828a;border-color:#c9ced4;cursor:not-allowed}
+.button-link{display:inline-block;padding:8px 13px;border:1px solid #87909a;border-radius:6px;color:#17202a;text-decoration:none;background:#fff}
 section{background:#fff;border:1px solid #d8dde3;border-radius:6px;padding:18px;margin:16px 0}
 table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:8px;border-bottom:1px solid #e5e8eb;vertical-align:top}
 .status{font-weight:650}.safe{color:#147d45}.warn{color:#a45b00}
@@ -403,6 +405,7 @@ textarea{min-height:70px}.q{border-top:1px solid #eee;padding-top:10px;margin-to
   <img id=bShot alt="filled form" style="max-width:100%;border:1px solid #ccc;margin:8px 0">
   <div id=bFields class=hint></div>
   <p>
+    <a id=bVisit class=button-link target="_blank" rel="noopener noreferrer">Open application website</a>
     <button id=bApprove class=primary onclick="batchApprove()">Open browser &amp; fill (you submit)</button>
     <button onclick="batchSkip()">Skip</button>
     <span id=bDMsg class=hint></span>
@@ -445,6 +448,7 @@ async function openBatch(dir){
   const rec=x.record;
   BCUR=dir; bDetail.style.display='block'; bDetail.scrollIntoView({behavior:'smooth'});
   bTitle.textContent=`${rec.role||'?'} @ ${rec.company||'?'}`;
+  bVisit.href=String(rec.apply_url||'').startsWith('https://')?rec.apply_url:'#';
   bApprove.disabled=true;
   if(rec.blocked){bBlockers.textContent='Blocked: '+((rec.reasons||[]).join(', '));bEssay.innerHTML='';bShot.removeAttribute('src');bShot.style.display='none';bFields.innerHTML='';return;}
   bBlockers.textContent=(rec.blockers||[]).length?('Still needs you in the browser: '+rec.blockers.join('; ')):'';
