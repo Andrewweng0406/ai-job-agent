@@ -94,6 +94,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
             except json.JSONDecodeError:
                 continue
             fields = raw.get("fields", [])
+            resolved_sources = {"profile", "standard_answer", "essay"}
+            required_fields = [field for field in fields if field.get("required")]
+            required_resolved = sum(
+                1 for field in required_fields if field.get("source") in resolved_sources
+            )
+            total_resolved = sum(
+                1 for field in fields if field.get("source") in resolved_sources
+            )
             out.append({
                 "dir": d.name,
                 "company": raw.get("company", "?"),
@@ -103,6 +111,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 "ready": bool(raw.get("ready")) and not raw.get("blocked"),
                 "skipped": (d / ".skipped").is_file(),
                 "auto_count": sum(1 for f in fields if f.get("source") in {"profile", "standard_answer", "essay"}),
+                "required_count": len(required_fields),
+                "required_resolved": required_resolved,
+                "required_coverage": round(100 * required_resolved / len(required_fields)) if required_fields else 0,
+                "total_coverage": round(100 * total_resolved / len(fields)) if fields else 0,
                 "blocker_count": len(raw.get("blockers", [])),
                 "has_essay": bool(raw.get("essay_text")),
                 "has_shot": (d / "filled.png").is_file(),
@@ -430,8 +442,8 @@ async function load(){
 let BCUR=null;
 async function loadBatch(){
   const {items}=await (await fetch('/api/batch')).json();
-  batch.innerHTML='<tr><th>Company</th><th>Role</th><th>Auto-filled</th><th>Needs you</th><th>Status</th><th></th></tr>'+
-    (items.map(it=>`<tr><td>${esc(it.company)}</td><td>${esc(it.role)}</td><td>${it.auto_count}</td>
+  batch.innerHTML='<tr><th>Company</th><th>Role</th><th>Required coverage</th><th>Total coverage</th><th>Needs you</th><th>Status</th><th></th></tr>'+
+    (items.map(it=>`<tr><td>${esc(it.company)}</td><td>${esc(it.role)}</td><td>${it.blocked?'—':it.required_coverage+'% ('+it.required_resolved+'/'+it.required_count+')'}</td><td>${it.blocked?'—':it.total_coverage+'%'}</td>
       <td>${it.blocked?'—':it.blocker_count}</td>
       <td>${it.skipped?'<span class=pill>skipped</span>':it.blocked?('<span class=pill>'+esc((it.reasons||['blocked'])[0])+'</span>'):it.ready?'<span class="pill safe">ready</span>':'<span class=pill>attention</span>'}</td>
       <td><button onclick="openBatch('${esc(it.dir)}')">Open</button></td></tr>`).join('') || '<tr><td>No prepared applications. Click “Prepare 10”.</td></tr>');

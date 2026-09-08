@@ -58,3 +58,21 @@ def test_scanner_distinguishes_resume_from_cover_letter_upload(page):
         ("id=resume", "Resume/CV"),
         ("id=cover_letter", "Cover Letter"),
     ]
+
+
+def test_scanner_groups_ashby_options_under_question_label(page):
+    page.set_content("""
+      <fieldset class="ashby-application-form-input-radio-group">
+        <label class="ashby-application-form-question-title required">Work Authorization Status</label>
+        <div><label for="any">Can work for any employer</label><input id="any" name="auth" type="radio"></div>
+        <div><label for="current">Can work for current employer</label><input id="current" name="auth" type="radio"></div>
+      </fieldset>
+    """)
+
+    fields = scan_form(page)
+
+    assert len(fields) == 1
+    assert fields[0].label == "Work Authorization Status"
+    assert fields[0].selector == "name=auth"
+    assert fields[0].required
+    assert fields[0].options == ["Can work for any employer", "Can work for current employer"]

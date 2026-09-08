@@ -29,7 +29,9 @@ _EXPERIENCE_RE = re.compile(
     r"describe (a|your|an)|tell us about a time|tell us about your|walk us through|"
     r"give an example|provide an example|outline your experience|"
     r"what.{0,20}experience (do you have|with)|how have you|"
-    r"share an example|example of a time|biggest challenge|a project you",
+    r"share an example|example of a time|biggest challenge|a project you|"
+    r"what.{0,40}\b(tools|technologies)\b.{0,80}(using|use|comfortable)|"
+    r"which.{0,40}\b(tools|technologies)\b.{0,80}(using|use|comfortable)",
     re.I,
 )
 

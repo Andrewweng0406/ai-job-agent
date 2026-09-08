@@ -249,3 +249,11 @@ Latest local verification:
 - Added exact-application selection to the diagnostic batch command.
 - Added a separate official-site link to the review UI, while keeping agent-assisted fill disabled for blocked or unresolved records.
 - Re-captured Notion's live Ashby DOM without submission. The form loads correctly; the AI Early Career record is now `attention` only because one required AI-technologies answer needs candidate review.
+
+## 2026-09-07 Field-coverage audit
+
+- Replaced the misleading raw auto-fill count in batch review with required-field and total-field coverage percentages.
+- Fixed Ashby radio/checkbox extraction so option labels no longer masquerade as separate questions, and required styling is recognized as required state.
+- Routed AI tool/technology experience prompts through the verified-facts drafting path.
+- Live Benchling result: 6/8 required fields are safely resolved (75%). The remaining privacy acknowledgement and nuanced work-authorization category require explicit candidate choices; after those two choices the form can reach 100% required coverage.
+- The 90% target is treated as a coverage objective, never as permission to infer legal status or consent.

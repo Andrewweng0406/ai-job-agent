@@ -53,9 +53,11 @@ _SCAN_JS = r"""
     if (p && clean(p.innerText)) return clean(p.innerText);
     return clean(el.getAttribute('aria-label') || el.value || '');
   };
-  const questionOf = el => {
-    const direct = explicitLabel(el);
-    if (direct) return direct;
+  const questionOf = (el, grouped = false) => {
+    if (!grouped) {
+      const direct = explicitLabel(el);
+      if (direct) return direct;
+    }
     const box = el.closest(FIELD);
     if (box) {
       const lab = box.querySelector(':scope > label, :scope > legend, :scope > [class*="label" i], :scope > div, :scope > p, :scope > span');
@@ -98,7 +100,7 @@ _SCAN_JS = r"""
     const isCheck = type === 'checkbox' || role === 'checkbox';
 
     if (isRadio || isCheck) {
-      const q = questionOf(el);
+      const q = questionOf(el, true);
       const box = el.closest(FIELD);
       const gkey = (box ? (box.className + '|' + q) : (el.name || q)) + '|' + (isCheck ? 'c' : 'r');
       if (doneGroup.has(gkey)) continue;
@@ -113,7 +115,9 @@ _SCAN_JS = r"""
       const names = [...new Set(peers.map(p => p.name).filter(Boolean))];
       const sel = names.length === 1 ? ('name=' + names[0]) : ('q=' + q);
       push({ label: q, kind: isCheck ? 'checkbox_group' : 'radio_group',
-             selector: sel, required: peers.some(p => requiredOf(p, q)), options: opts });
+             selector: sel, required: peers.some(p => requiredOf(p, q)) ||
+               !!(box && box.querySelector('[class*="required" i], [aria-required="true"]')),
+             options: opts });
       continue;
     }
 
