@@ -5,7 +5,9 @@ import json
 
 import pytest
 
-from app.applications.batch_prepare import BatchRecord, build_batch_record
+from app.applications.batch_prepare import BatchRecord, build_batch_record, resolve_scanned
+from app.applications.live_field_scan import ScannedField
+from app.resumes.profile import CandidateFact, CandidateProfile
 from app.applications.form_engine import FormFieldResolution, FormFieldStatus, InputKind, RawFormField
 from app.applications.form_fields import FieldPolicy
 from app.applications.standard_answers import StandardAnswers
@@ -15,11 +17,12 @@ STD = StandardAnswers.from_yaml("config/standard_answers.local.yaml") if __impor
 
 _RULES = json.dumps({
     "answers": {"work_authorized_us": "Yes", "salary_expectation": "Open / negotiable",
-                "gender": "Decline to self-identify"},
+                "gender": "Decline to self-identify", "degree_level": "Bachelor's Degree"},
     "match": [
         {"key": "work_authorized_us", "phrases": ["authorized to work"]},
         {"key": "salary_expectation", "phrases": ["salary expectation"]},
         {"key": "gender", "phrases": ["gender identity"]},
+        {"key": "degree_level", "phrases": ["degree"]},
     ],
 })
 
@@ -152,3 +155,85 @@ def test_record_round_trips_through_dict(std):
     again = BatchRecord.from_dict(json.loads(json.dumps(rec.to_dict())))
     assert again.fill_map() == rec.fill_map()
     assert again.ready == rec.ready
+
+
+def test_scanned_combobox_uses_standard_degree_level_and_never_drafts_location(std):
+    profile = CandidateProfile(
+        candidate_id="candidate",
+        schema_version=2,
+        facts={
+            "edu.primary.degree": CandidateFact(
+                "edu.primary.degree", "education", "B.S. Data Science"
+            )
+        },
+        application_answers={},
+    )
+    scanned = [
+        ScannedField("Degree*", "combobox", "id=degree", True),
+        ScannedField("Location (City)*", "combobox", "id=location", True),
+    ]
+
+    rec = resolve_scanned(
+        company="Acme", role="Analyst", apply_url="https://example.test/job",
+        ats="greenhouse", resume_pdf="resume.pdf", scanned=scanned, profile=profile,
+        standard_answers=std, essay_writer=_EssayOK(),
+    )
+
+    assert rec.fields[0].source == "standard_answer"
+    assert rec.fields[0].value == "Bachelor's Degree"
+    assert rec.fields[1].source == "unresolved"
+    assert rec.fields[1].value is None
+
+
+def test_resume_is_not_uploaded_as_cover_letter(std):
+    profile = CandidateProfile("candidate", 2, {}, {})
+    scanned = [
+        ScannedField("Resume/CV*", "file", "id=resume", True),
+        ScannedField("Cover Letter", "file", "id=cover", False),
+    ]
+
+    rec = resolve_scanned(
+        company="Acme", role="Analyst", apply_url="https://example.test/job",
+        ats="greenhouse", resume_pdf="resume.pdf", scanned=scanned, profile=profile,
+        standard_answers=std,
+    )
+
+    assert rec.fill_map() == {"id=resume": "resume.pdf"}
+    assert rec.fields[1].source == "unresolved"
+
+
+def test_education_dates_do_not_use_job_availability_answer(std):
+    profile = CandidateProfile("candidate", 2, {}, {})
+    scanned = [ScannedField("Start date year*", "numeric", "id=start-year", True)]
+
+    rec = resolve_scanned(
+        company="Acme", role="Analyst", apply_url="https://example.test/job",
+        ats="greenhouse", resume_pdf="resume.pdf", scanned=scanned, profile=profile,
+        standard_answers=std,
+    )
+
+    assert rec.fields[0].source == "unresolved"
+    assert rec.fields[0].value is None
+
+
+def test_graduation_confirmation_is_derived_from_exact_profile_date(std):
+    profile = CandidateProfile(
+        "candidate", 2,
+        {"edu.primary.grad_date": CandidateFact(
+            "edu.primary.grad_date", "education", "May 2027"
+        )},
+        {},
+    )
+    scanned = [ScannedField(
+        "I confirm that my graduation date will be either Fall 2026 or Spring 2027*",
+        "combobox", "id=confirm-grad", True, ["Yes", "No"],
+    )]
+
+    rec = resolve_scanned(
+        company="Acme", role="Analyst", apply_url="https://example.test/job",
+        ats="greenhouse", resume_pdf="resume.pdf", scanned=scanned, profile=profile,
+        standard_answers=std,
+    )
+
+    assert rec.fields[0].source == "profile"
+    assert rec.fields[0].value == "Yes"

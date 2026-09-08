@@ -192,8 +192,7 @@ def _fill_one(page, selector: str, value: str) -> None:
         return
     loc = page.locator(_css(selector)).first
     if page.locator(_css(selector)).count() == 0:
-        print(f"  ! selector not found, skipped: {selector}")
-        return
+        raise RuntimeError(f"FILL_SELECTOR_NOT_FOUND:{selector}")
     try:
         loc.wait_for(state="attached", timeout=4_000)
         loc.scroll_into_view_if_needed(timeout=3_000)
@@ -206,8 +205,7 @@ def _fill_one(page, selector: str, value: str) -> None:
             timeout=4_000,
         )
     except Exception:
-        print(f"  ! {selector}: element not stable — left for you")
-        return
+        raise RuntimeError(f"FILL_ELEMENT_UNSTABLE:{selector}")
     tag = (meta["tag"] or "").lower()
     input_type = (meta["type"] or "").lower()
     role = (meta["role"] or "").lower()
@@ -219,7 +217,8 @@ def _fill_one(page, selector: str, value: str) -> None:
         if _P(value).is_file():
             loc.set_input_files(value, timeout=T)
             return
-    if "candidate-location" in selector or (loc.get_attribute("aria-autocomplete", timeout=3_000) or "") == "list":
+    classes = (loc.get_attribute("class", timeout=3_000) or "").lower()
+    if "candidate-location" in selector or "pac-target-input" in classes:
         _fill_places_autocomplete(page, loc, value, selector)
         return
     group_n = page.locator(_css(selector)).count()
@@ -250,8 +249,7 @@ def _fill_group_by_question(page, question: str, value: str) -> None:
     if box.count() == 0:
         box = page.locator(f"xpath=//*[contains(normalize-space(.), {_xpath_lit(q[:40])})][.//button or .//input]").last
     if box.count() == 0:
-        print(f"  ! group '{q[:40]}…' not found — left for you")
-        return
+        raise RuntimeError(f"FILL_GROUP_NOT_FOUND:{q[:80]}")
 
     clickable = box.locator("label, [class*='_option'], button, [role=radio], [role=checkbox]")
     pairs = []
@@ -264,15 +262,13 @@ def _fill_group_by_question(page, question: str, value: str) -> None:
         if t:
             pairs.append((el, t))
     if not pairs:
-        print(f"  ! group '{q[:40]}…' has no clickable options — left for you")
-        return
+        raise RuntimeError(f"FILL_GROUP_HAS_NO_OPTIONS:{q[:80]}")
 
     for wanted in ([value] if not _looks_multi(value) else re.split(r"[;,]", value)):
         wanted = wanted.strip()
         picked = _map_to_option(wanted, [t for _, t in pairs])
         if picked is None:
-            print(f"  ! no option like '{wanted}' for '{q[:40]}…' — left for you")
-            continue
+            raise RuntimeError(f"FILL_OPTION_NOT_FOUND:{q[:80]}")
         for el, t in pairs:
             if t == picked:
                 inner = el.locator("input[type=radio], input[type=checkbox], [role=radio], [role=checkbox]").first
@@ -287,7 +283,7 @@ def _fill_group_by_question(page, question: str, value: str) -> None:
                         except Exception:
                             continue
                     if not ok:
-                        print(f"  ! could not click '{picked}' for '{q[:30]}'")
+                        raise RuntimeError(f"FILL_OPTION_NOT_CLICKABLE:{q[:80]}")
                 break
 
 
@@ -343,7 +339,7 @@ def _check_matching_in_group(page, selector: str, value: str, *, kind: str) -> N
                     print(f"  ! {selector}: could not check '{picked}'")
                 break
     if not checked_any and want_values:
-        print(f"  ! {selector}: '{value}' did not match any option — left for you")
+        raise RuntimeError(f"FILL_OPTION_NOT_FOUND:{selector}")
 
 
 def _try_check(page, el) -> bool:
@@ -375,8 +371,7 @@ def _select_option_fuzzy(loc, value: str, selector: str) -> None:
     from app.applications.standard_answers import _map_to_option
     options = loc.evaluate("el => [...el.options].map(o => o.textContent.trim()).filter(Boolean)")
     if not options:
-        print(f"  ! <select> {selector} has no options")
-        return
+        raise RuntimeError(f"FILL_SELECT_HAS_NO_OPTIONS:{selector}")
     try:
         loc.select_option(label=value)
         return
@@ -384,8 +379,7 @@ def _select_option_fuzzy(loc, value: str, selector: str) -> None:
         pass
     mapped = _map_to_option(value, options)
     if mapped is None:
-        print(f"  ! no option like '{value}' for {selector} — left for you")
-        return
+        raise RuntimeError(f"FILL_OPTION_NOT_FOUND:{selector}")
     loc.select_option(label=mapped)
 
 
@@ -395,17 +389,17 @@ def _fill_places_autocomplete(page, loc, value: str, selector: str) -> None:
         loc.click(timeout=6000)
         loc.fill(value, timeout=6000)
     except Exception:
-        print(f"  ! {selector}: not interactable — left for you")
-        return
+        raise RuntimeError(f"FILL_NOT_INTERACTABLE:{selector}")
     page.wait_for_timeout(900)
-    for sel in ('.pac-item', '[role="option"]', 'ul[role="listbox"] li', '.dropdown-item'):
+    for sel in ('.pac-item:visible', '[role="option"]:visible',
+                'ul[role="listbox"] li:visible', '.dropdown-item:visible'):
         opts = page.locator(sel)
         if opts.count():
-            opts.first.click()
+            opts.first.click(timeout=4_000)
             page.wait_for_timeout(150)
             return
     # no suggestions surfaced — leave the typed text, better than empty
-    print(f"  ~ {selector}: typed '{value}', no suggestion list appeared")
+    raise RuntimeError(f"FILL_AUTOCOMPLETE_UNCONFIRMED:{selector}")
 
 
 def _fill_react_select(page, loc, value: str, selector: str) -> None:
@@ -418,8 +412,7 @@ def _fill_react_select(page, loc, value: str, selector: str) -> None:
     try:
         loc.click(timeout=6000)
     except Exception:
-        print(f"  ! {selector}: not interactable — left for you")
-        return
+        raise RuntimeError(f"FILL_NOT_INTERACTABLE:{selector}")
     page.wait_for_timeout(300)
     texts = read_options()
 
@@ -451,8 +444,7 @@ def _fill_react_select(page, loc, value: str, selector: str) -> None:
 
     if target is None:
         page.keyboard.press("Escape")
-        print(f"  ! no option like '{value}' for {selector} — left for you to pick")
-        return
+        raise RuntimeError(f"FILL_OPTION_NOT_FOUND:{selector}")
     target.click()
     page.wait_for_timeout(150)
 

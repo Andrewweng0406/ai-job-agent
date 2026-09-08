@@ -30,6 +30,9 @@ def main() -> int:
         print(f"record is blocked: {raw.get('reasons')}")
         return 2
     record = BatchRecord.from_dict(raw)
+    if not record.ready:
+        print(f"record has unresolved or failed fields: {record.blockers}")
+        return 2
     fill_map = record.fill_map()
     print(f"{record.role} @ {record.company}")
     print(f"{len(fill_map)} fields to fill; résumé: {record.resume_pdf or '(none)'}")

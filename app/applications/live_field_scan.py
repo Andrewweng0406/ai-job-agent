@@ -23,7 +23,29 @@ _SCAN_JS = r"""
     return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none';
   };
   const FIELD = 'fieldset, [role=radiogroup], [role=group], [class*="fieldEntry" i], ' +
-                '[class*="form-field" i], [class*="_field_" i], [class*="question" i]';
+                '[class*="form-field" i], [data-field], [class*="question" i]';
+  const explicitLabel = el => {
+    if (el.id) {
+      const lab = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+      if (lab) return clean(lab.innerText || lab.textContent);
+    }
+    const labelledBy = clean(el.getAttribute('aria-labelledby'));
+    if (labelledBy) {
+      const text = labelledBy.split(/\s+/).map(id => document.getElementById(id))
+        .filter(Boolean).map(n => clean(n.innerText || n.textContent)).join(' ');
+      if (text) return text;
+    }
+    const aria = clean(el.getAttribute('aria-label'));
+    if (aria) return aria;
+    const wrapping = el.closest('label');
+    if (wrapping) {
+      const clone = wrapping.cloneNode(true);
+      clone.querySelectorAll('input,select,textarea,button').forEach(n => n.remove());
+      const text = clean(clone.innerText || clone.textContent);
+      if (text) return text;
+    }
+    return '';
+  };
   const optLabel = el => {
     if (el.id) { const l = document.querySelector(`label[for="${CSS.escape(el.id)}"]`); if (l) return clean(l.innerText); }
     const w = el.closest('label'); if (w) return clean(w.innerText);
@@ -32,16 +54,18 @@ _SCAN_JS = r"""
     return clean(el.getAttribute('aria-label') || el.value || '');
   };
   const questionOf = el => {
+    const direct = explicitLabel(el);
+    if (direct) return direct;
     const box = el.closest(FIELD);
     if (box) {
       const lab = box.querySelector(':scope > label, :scope > legend, :scope > [class*="label" i], :scope > div, :scope > p, :scope > span');
       if (lab) {
         // the label node, not an option row
         const t = clean(lab.innerText);
-        if (t && !lab.querySelector('input, button')) return t;
+        if (t && t.length <= 280 && !lab.querySelector('input, button')) return t;
       }
       const first = clean(box.innerText).split('\n')[0];
-      if (first) return first;
+      if (first && first.length <= 280) return first;
     }
     // generic: nearest previous heading/label-ish text
     let n = el;
@@ -50,7 +74,7 @@ _SCAN_JS = r"""
       const c = n.querySelector(':scope > label, :scope > legend, :scope > p, :scope > [class*="label" i], :scope > [class*="title" i]');
       if (c && clean(c.innerText) && !c.querySelector('input,button') && clean(c.innerText).length < 280) return clean(c.innerText);
     }
-    return '';
+    return clean(el.getAttribute('placeholder') || el.name || el.id || '');
   };
   const nameSel = el => el.id ? 'id=' + el.id : (el.name ? 'name=' + el.name :
                   (el.getAttribute('data-testid') ? 'data-testid=' + el.getAttribute('data-testid') : ''));
@@ -152,6 +176,12 @@ def scan_form(page) -> list[ScannedField]:
     for item in raw or []:
         label = (item.get("label") or "").strip()
         selector = (item.get("selector") or "").strip()
+        selector_lower = selector.lower()
+        if label.lower() in {"attach", "upload", "choose file"}:
+            if "resume" in selector_lower or "cv" in selector_lower:
+                label = "Resume/CV"
+            elif "cover" in selector_lower:
+                label = "Cover Letter"
         if not label or not selector or selector in {"q=", "id=", "name="}:
             continue
         key = f"{selector}\0{item.get('kind')}"
@@ -159,7 +189,7 @@ def scan_form(page) -> list[ScannedField]:
             continue
         seen.add(key)
         fields.append(ScannedField(
-            label=label[:300],
+            label=label[:280],
             kind=str(item.get("kind") or "text"),
             selector=selector,
             required=bool(item.get("required")),

@@ -75,9 +75,16 @@ class StandardAnswers:
         return cls(values=values, rules=rules)
 
     def answer_key_for(self, label: str) -> str | None:
-        low = " ".join((label or "").lower().split())
+        low = " ".join(re.sub(r"[^a-z0-9]+", " ", (label or "").lower()).split())
+        # Prefer the narrow city answer over generic location rules. This matters
+        # for autocomplete widgets, which often reject a full postal location.
+        if re.search(r"\bcity\b", low) and any(key == "city" for key, _ in self.rules):
+            return "city"
         for key, phrases in self.rules:
-            if any(p in low for p in phrases):
+            normalized_phrases = (
+                " ".join(re.sub(r"[^a-z0-9]+", " ", p).split()) for p in phrases
+            )
+            if any(p and p in low for p in normalized_phrases):
                 return key
         return None
 

@@ -12,6 +12,7 @@ free-text personal-narrative question is present. Nothing here submits.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+import re
 
 from app.applications.form_engine import FormFieldStatus, RawFormField, FormFieldResolution
 from app.applications.standard_answers import (
@@ -94,7 +95,28 @@ _PROFILE_LABEL_MAP = [
 
 
 def _profile_value(profile: CandidateProfile, label: str) -> tuple[str, str] | None:
-    low = label.lower()
+    low = " ".join(label.lower().replace("*", " ").split())
+    if "preferred" in low or "nickname" in low:
+        return None
+    if "i confirm" in low and "graduation date" in low:
+        fact = profile.facts.get("edu.primary.grad_date")
+        value = "" if fact is None or fact.is_missing else str(fact.value)
+        match = re.search(
+            r"\b(january|february|march|april|may|june|july|august|"
+            r"september|october|november|december)\s+(20\d{2})\b",
+            value,
+            re.I,
+        )
+        if match:
+            month = match.group(1).lower()
+            year = match.group(2)
+            spring = month in {"january", "february", "march", "april", "may", "june"}
+            season = "spring" if spring else "fall"
+            if f"{season} {year}" in low:
+                return ("Yes", "edu.primary.grad_date")
+    if low in {"name", "candidate name"}:
+        fact = profile.facts.get("name.full")
+        return (str(fact.value), "name.full") if fact and not fact.is_missing else None
     for needles, fid in _PROFILE_LABEL_MAP:
         if any(n in low for n in needles):
             if fid == "name.first":
@@ -134,21 +156,26 @@ def resolve_scanned(
         opts = list(sf.options)
 
         if kind == "file":
-            fields.append(BatchField(fid, label, sel, kind, required, "profile",
-                                     resume_pdf or None, "résumé" if resume_pdf else "",
-                                     None if resume_pdf else "no résumé configured"))
-            if required and not resume_pdf:
-                blockers.append("no résumé to upload")
+            is_resume = any(word in label.lower() for word in ("resume", "résumé", "cv"))
+            value = resume_pdf if is_resume else None
+            source = "profile" if value else "unresolved"
+            fields.append(BatchField(fid, label, sel, kind, required, source,
+                                     value, "résumé" if value else "",
+                                     None if value else "non-resume upload left for human"))
+            if required and not value:
+                blockers.append(f"required file needs you: {label[:60]}")
             continue
 
-        pv = _profile_value(profile, label) if kind in {"text", "long_text"} else None
+        pv = _profile_value(profile, label) if kind in {"text", "long_text", "combobox", "select"} else None
         if pv:
             fields.append(BatchField(fid, label, sel, kind, required, "profile", pv[0],
                                      _hint(label, pv[0]), None))
             continue
 
         low = label.lower()
-        looks_essay = is_essay_question(label) or (low.startswith("why") and company.split()[0].lower() in low)
+        looks_essay = kind == "long_text" and (
+            is_essay_question(label) or (low.startswith("why") and company.split()[0].lower() in low)
+        )
         if looks_essay and essay_writer is not None:
             if essay_text is None and essay_reason is None:
                 r = essay_writer.write(company=company, role=role, jd_excerpt=jd_excerpt, question=label)
@@ -163,7 +190,7 @@ def resolve_scanned(
                     blockers.append(f"essay rejected ({essay_reason})")
             continue
 
-        if is_experience_question(label) and essay_writer is not None:
+        if kind == "long_text" and is_experience_question(label) and essay_writer is not None:
             d = essay_writer.answer_experience(question=label, role=role)
             if d.ok:
                 fields.append(BatchField(fid, label, sel, kind, required, "essay", d.text,
@@ -182,7 +209,10 @@ def resolve_scanned(
                 blockers.append(f"needs you: {label[:60]}")
             continue
 
-        answer = standard_answers.resolve(label, opts or None)
+        # ATS education rows often call attendance controls "Start date". That is
+        # not the candidate's job-availability date and must never use that answer.
+        education_date = bool(re.search(r"\b(start|end) date (month|year)\b", low))
+        answer = None if education_date else standard_answers.resolve(label, opts or None)
         if answer:
             fields.append(BatchField(fid, label, sel, kind, required, "standard_answer", answer,
                                      answer[:60], None))

@@ -28,9 +28,15 @@ def test_batch_routes_run_no_submit_scripts_and_guard_paths():
     assert "scripts/batch_fill.py" in src
     # approve refuses a blocked record
     assert 'get("blocked")' in inspect.getsource(DashboardHandler._batch_approve)
+    assert "record has unresolved or failed fields" in inspect.getsource(DashboardHandler._batch_approve)
     # screenshot + item routes are path-traversal guarded via _safe_batch_dir
     assert "_safe_batch_dir" in inspect.getsource(DashboardHandler._batch_detail)
     assert "_safe_batch_dir" in inspect.getsource(DashboardHandler._batch_screenshot)
+
+
+def test_batch_ui_disables_fill_for_unready_records_and_hides_missing_images():
+    assert "bApprove.disabled=!rec.ready" in DASHBOARD_HTML
+    assert "bShot.style.display='none'" in DASHBOARD_HTML
 
 
 def test_assisted_fill_route_launches_the_no_submit_script_headed():

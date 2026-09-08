@@ -231,3 +231,13 @@ Latest local verification:
 ### Rejected
 
 - Direct auto-submit and weaker “success” assumptions from reference implementations were rejected because they conflict with submission verification, `SUBMISSION_UNKNOWN`, transcript/hash approval, and `real_submission_enabled=false` invariants.
+## 2026-09-07 Live batch review correctness hardening
+
+- Fixed Playwright live-field labels leaking entire Greenhouse form-region text into every field. Labels now prefer exact `for`/ARIA associations and reject oversized ancestor text.
+- Prevented non-text controls such as location comboboxes from entering the LLM essay path.
+- Prevented the resume artifact from being reused for cover-letter or other upload fields.
+- Normalized punctuation in standard-answer matching, preferred city-specific answers for city autocomplete widgets, and kept unknown education attendance dates unresolved.
+- Added fail-closed behavior for missing/unstable selectors, unmatched options, and unconfirmed autocomplete values. Unready batch records are rejected by both the dashboard endpoint and the headed fill script.
+- Fixed missing screenshot rendering and disabled the batch fill action for blocked/unready records.
+- Verified the current Scale AI Greenhouse DOM without submission. All supported widgets now fill; the record remains correctly blocked only on the candidate's unknown education start year.
+- Safety state remained unchanged: no submit path was added and no application was submitted.

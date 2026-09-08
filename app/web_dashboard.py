@@ -9,6 +9,7 @@ import sys
 from urllib.parse import urlparse, parse_qs
 
 from app.applications.assisted_answers import AnswersError, load_answers
+from app.applications.batch_prepare import BatchRecord
 from app.applications.review_packet import ReviewPacket
 from app.database.repository import JobAgentRepository
 from app.llm.budget import SQLiteDailyBudget
@@ -113,7 +114,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if d is None or not (d / "record.json").is_file():
             self.send_error(404)
             return
-        self._json({"dir": name, "record": json.loads((d / "record.json").read_text())})
+        self._json({"dir": name, "has_shot": (d / "filled.png").is_file(),
+                    "record": json.loads((d / "record.json").read_text())})
 
     def _batch_screenshot(self, name: str) -> None:
         d = self._safe_batch_dir(name)
@@ -140,8 +142,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if d is None or not (d / "record.json").is_file():
             self._json({"ok": False, "error": "unknown record"})
             return
-        if json.loads((d / "record.json").read_text()).get("blocked"):
+        raw = json.loads((d / "record.json").read_text())
+        if raw.get("blocked"):
             self._json({"ok": False, "error": "record is blocked"})
+            return
+        if not BatchRecord.from_dict(raw).ready:
+            self._json({"ok": False, "error": "record has unresolved or failed fields"})
             return
         keep = max(60, min(3600, int(body.get("keep_open_seconds") or 900)))
         subprocess.Popen([sys.executable, "scripts/batch_fill.py", "--record", str(d),
@@ -397,7 +403,7 @@ textarea{min-height:70px}.q{border-top:1px solid #eee;padding-top:10px;margin-to
   <img id=bShot alt="filled form" style="max-width:100%;border:1px solid #ccc;margin:8px 0">
   <div id=bFields class=hint></div>
   <p>
-    <button class=primary onclick="batchApprove()">Open browser &amp; fill (you submit)</button>
+    <button id=bApprove class=primary onclick="batchApprove()">Open browser &amp; fill (you submit)</button>
     <button onclick="batchSkip()">Skip</button>
     <span id=bDMsg class=hint></span>
   </p>
@@ -435,18 +441,22 @@ async function batchPrepare(){
   setTimeout(loadBatch,4000);
 }
 async function openBatch(dir){
-  const {record:rec}=await (await fetch('/api/batch/item?dir='+encodeURIComponent(dir))).json();
+  const x=await (await fetch('/api/batch/item?dir='+encodeURIComponent(dir))).json();
+  const rec=x.record;
   BCUR=dir; bDetail.style.display='block'; bDetail.scrollIntoView({behavior:'smooth'});
   bTitle.textContent=`${rec.role||'?'} @ ${rec.company||'?'}`;
-  if(rec.blocked){bBlockers.textContent='Blocked: '+((rec.reasons||[]).join(', '));bEssay.innerHTML='';bShot.removeAttribute('src');bFields.innerHTML='';return;}
+  bApprove.disabled=true;
+  if(rec.blocked){bBlockers.textContent='Blocked: '+((rec.reasons||[]).join(', '));bEssay.innerHTML='';bShot.removeAttribute('src');bShot.style.display='none';bFields.innerHTML='';return;}
   bBlockers.textContent=(rec.blockers||[]).length?('Still needs you in the browser: '+rec.blockers.join('; ')):'';
   const drafts=(rec.fields||[]).filter(f=>f.source==='essay'&&f.value);
   bEssay.innerHTML=drafts.length?('<h3>AI drafts — read before submitting</h3>'+drafts.map(f=>
     `<p class=hint style="margin:6px 0 2px">${esc(f.label)}</p><p style="white-space:pre-wrap;background:#f6f8fa;padding:10px;border-radius:5px">${esc(f.value)}</p>`).join('')):'';
-  bShot.src='/batch/'+encodeURIComponent(dir)+'/filled.png?t='+Date.now();
+  if(x.has_shot){bShot.src='/batch/'+encodeURIComponent(dir)+'/filled.png?t='+Date.now();bShot.style.display='block';}
+  else{bShot.removeAttribute('src');bShot.style.display='none';}
   const need=(rec.fields||[]).filter(f=>['unresolved','must_queue'].includes(f.source));
   bFields.innerHTML=(need.length?('<h3 class=warn>You finish these in the browser</h3>'+need.map(f=>`• ${esc(f.label)} <span class=hint>(${esc(f.reason||f.source)})</span>`).join('<br>')+'<br><br>'):'')
     +'<h3>All fields</h3>'+(rec.fields||[]).map(f=>`<span class=hint>${esc(f.source)}</span> · ${esc(f.label)} → ${esc(f.display||'')}`).join('<br>');
+  bApprove.disabled=!rec.ready;
 }
 async function batchApprove(){
   if(!confirm('Open a browser and pre-fill this application? It will NOT be submitted — you review and click Submit.'))return;
