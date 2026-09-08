@@ -15,7 +15,7 @@ from dataclasses import asdict, dataclass, field
 
 from app.applications.form_engine import FormFieldStatus, RawFormField, FormFieldResolution
 from app.applications.standard_answers import (
-    StandardAnswers, is_essay_question, is_must_queue_question,
+    StandardAnswers, is_essay_question, is_experience_question, is_must_queue_question,
 )
 
 
@@ -111,7 +111,20 @@ def build_batch_record(
             continue
 
         # HUMAN_REQUIRED / BLOCKED
-        if is_must_queue_question(r.label):
+        if is_experience_question(r.label) and essay_writer is not None:
+            draft = essay_writer.answer_experience(question=r.label, role=role)
+            if draft.ok:
+                fields.append(BatchField(fid, r.label, r.selector, r.kind.value, r.required,
+                                         "essay", draft.text, draft.text[:60] + "…",
+                                         "AI draft — review before submitting"))
+                continue
+            fields.append(BatchField(fid, r.label, r.selector, r.kind.value, r.required,
+                                     "unresolved", None, "", f"draft rejected: {draft.reason}"))
+            if r.required:
+                blockers.append(f"you write: {r.label[:55]}")
+            continue
+
+        if is_must_queue_question(r.label) or is_experience_question(r.label):
             fields.append(BatchField(fid, r.label, r.selector, r.kind.value, r.required,
                                      "must_queue", None, "", "personal narrative — you write this"))
             if r.required:

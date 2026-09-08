@@ -43,6 +43,13 @@ class _EssayRejected:
         return EssayResult(False, reason="ESSAY_OVERREACH:senior engineer")
 
 
+class _ExperienceOK:
+    def answer_experience(self, **_):
+        from app.llm.essay import EssayResult
+        return EssayResult(True, text="On my Earnings Radar project I built an NLP pipeline in Python "
+                                      "that parsed transcripts and surfaced the metrics that drove our picks.")
+
+
 def _raw(label, sel, required=True, options=None, kind=InputKind.TEXT):
     return RawFormField(label=label, kind=kind, selector=sel, required=required, options=options or [])
 
@@ -101,11 +108,30 @@ def test_rejected_essay_blocks_and_is_not_filled(std):
     assert rec.essay_reason == "ESSAY_OVERREACH:senior engineer"
 
 
-def test_personal_narrative_question_always_blocks(std):
-    raw = [_raw("Describe a time you resolved a conflict.", "id=story", kind=InputKind.LONG_TEXT)]
-    res = [_res("Describe a time you resolved a conflict.", "id=story", FormFieldStatus.HUMAN_REQUIRED,
+def test_experience_question_is_drafted_when_a_writer_is_available(std):
+    raw = [_raw("Describe a time you used data to improve a decision.", "id=story", kind=InputKind.LONG_TEXT)]
+    res = [_res("Describe a time you used data to improve a decision.", "id=story",
+               FormFieldStatus.HUMAN_REQUIRED, kind=InputKind.LONG_TEXT)]
+    rec = _build(std, raw, res, essay_writer=_ExperienceOK())
+    assert rec.ready
+    assert rec.fields[0].source == "essay"
+    assert "id=story" in rec.fill_map()
+
+
+def test_experience_question_blocks_without_a_writer(std):
+    raw = [_raw("Describe a time you used data to improve a decision.", "id=story", kind=InputKind.LONG_TEXT)]
+    res = [_res("Describe a time you used data to improve a decision.", "id=story",
+               FormFieldStatus.HUMAN_REQUIRED, kind=InputKind.LONG_TEXT)]
+    rec = _build(std, raw, res, essay_writer=None)
+    assert not rec.ready
+    assert rec.fields[0].source == "must_queue"
+
+
+def test_reference_request_always_blocks(std):
+    raw = [_raw("Please provide two professional references.", "id=refs", kind=InputKind.LONG_TEXT)]
+    res = [_res("Please provide two professional references.", "id=refs", FormFieldStatus.HUMAN_REQUIRED,
                kind=InputKind.LONG_TEXT)]
-    rec = _build(std, raw, res, essay_writer=_EssayOK())
+    rec = _build(std, raw, res, essay_writer=_ExperienceOK())
     assert not rec.ready
     assert rec.fields[0].source == "must_queue"
 

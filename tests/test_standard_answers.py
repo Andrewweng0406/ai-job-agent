@@ -82,14 +82,25 @@ def test_essay_questions_detected(label):
 
 
 @pytest.mark.parametrize("label", [
-    "Describe a project you are proud of.",
-    "Tell us about a time you overcame a challenge.",
     "Please provide two references.",
     "Link to your GitHub or portfolio.",
     "Anything else you'd like us to know?",
+    "Do you agree to the arbitration agreement?",
+    "Have you ever interviewed at Acme before?",
 ])
 def test_must_queue_questions_detected(label):
     assert is_must_queue_question(label)
+
+
+@pytest.mark.parametrize("label", [
+    "Describe a project you are proud of.",
+    "Tell us about a time you overcame a challenge.",
+    "Outline your experience with data analysis.",
+])
+def test_experience_questions_are_draftable_not_must_queue(label):
+    from app.applications.standard_answers import is_experience_question
+    assert is_experience_question(label)
+    assert not is_must_queue_question(label)
 
 
 @pytest.mark.parametrize("label", ["First name", "Country", "Email address", "Start date"])

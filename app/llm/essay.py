@@ -58,6 +58,39 @@ class EssayWriter:
         self._fact_texts = [str(f.value) for f in profile.facts.values() if not f.is_missing]
         self._allow = _build_allowlist(self._fact_texts)
 
+    def answer_experience(self, *, question: str, role: str = "") -> EssayResult:
+        """Draft an answer to a 'describe your experience / a time you…' prompt using
+        only the candidate's real projects and roles. Same fabrication guards."""
+        self._role_tokens = {w.lower() for w in re.findall(r"[A-Za-z][A-Za-z0-9&.\-]+", role)}
+        prompt = _experience_prompt(question, self._fact_texts)
+        try:
+            resp = self.router.complete(stage="3", model=self.model, prompt=prompt,
+                                        stage0_passed=True, max_tokens=900)
+        except (RuntimeError, ValueError) as exc:
+            return EssayResult(False, reason=f"LLM_UNAVAILABLE:{str(exc).split(':', 1)[0]}")
+        text = (resp.text or "").strip().strip('"')
+        if len(text) < 40:
+            return EssayResult(False, text=text, reason="ESSAY_TOO_SHORT")
+        if len(text) > _MAX_CHARS + 300:
+            return EssayResult(False, text=text, reason="ESSAY_TOO_LONG")
+        facts_blob = " ".join(self._fact_texts).lower()
+        hard = _HARD_OVERREACH_RE.search(text)
+        if hard and hard.group(0).lower() not in facts_blob:
+            return EssayResult(False, text=text, reason=f"ESSAY_OVERREACH:{hard.group(0).strip()}")
+        for number in _NUMBER_RE.findall(text):
+            if number.strip("%") in {"1", "2", "3"}:
+                continue
+            if not _number_supported(number, self._fact_texts):
+                return EssayResult(False, text=text, reason=f"ESSAY_UNSUPPORTED_NUMBER:{number}")
+        for noun in _PROPER_NOUN_RE.findall(text):
+            n = noun.strip().lower()
+            if n in _ALLOWED_NOUNS or n in self._role_tokens or len(n) <= 2:
+                continue
+            if any(n in a for a in self._allow) or any(a in n for a in self._allow):
+                continue
+            return EssayResult(False, text=text, reason=f"ESSAY_UNVERIFIED_ENTITY:{noun}")
+        return EssayResult(True, text=text, used_model=self.model)
+
     def write(self, *, company: str, role: str, jd_excerpt: str, question: str) -> EssayResult:
         prompt = _prompt(company, role, jd_excerpt, question, self._fact_texts)
         # role-title tokens are not "unverified entities"
@@ -138,4 +171,22 @@ def _prompt(company: str, role: str, jd: str, question: str, fact_texts: list[st
         "  or external/enterprise scope.\n"
         "- Do NOT mention work authorization, visa status, salary, or start dates.\n"
         "- Output ONLY the answer text, no preamble, no quotes.\n"
+    )
+
+
+def _experience_prompt(question: str, fact_texts: list[str]) -> str:
+    facts = "\n".join(f"- {t}" for t in fact_texts)
+    return (
+        "Draft the candidate's answer to this application question, in their own first-person voice.\n"
+        f"QUESTION: {question}\n\n"
+        "CANDIDATE FACTS — the ONLY experiences, projects, tools, and results you may use:\n"
+        f"{facts}\n\n"
+        "Rules:\n"
+        "- 3 to 6 sentences. Concrete: name the project, what was done, what resulted.\n"
+        "- Use ONLY facts above. Do NOT invent metrics, employers, titles, dates, team\n"
+        "  sizes, tools, or outcomes. Do NOT claim seniority, production scale, or\n"
+        "  managing people.\n"
+        "- If the facts do not really cover the question, answer with the closest\n"
+        "  genuine experience rather than inventing one.\n"
+        "- Output ONLY the answer text.\n"
     )

@@ -23,20 +23,34 @@ _ESSAY_RE = re.compile(
     re.I,
 )
 
-# Free-text prompts that require a genuine personal narrative / artifact — never
-# auto-answered and never auto-submitted; always routed to the human.
+# Free-text prompts asking for a narrative about the candidate's real experience.
+# The LLM may DRAFT these from verified facts; the human reviews before it is sent.
+_EXPERIENCE_RE = re.compile(
+    r"describe (a|your|an)|tell us about a time|tell us about your|walk us through|"
+    r"give an example|provide an example|outline your experience|"
+    r"what.{0,20}experience (do you have|with)|how have you|"
+    r"share an example|example of a time|biggest challenge|a project you",
+    re.I,
+)
+
+# Prompts that need a genuine artifact / reference / disclosure — never drafted,
+# never auto-answered.
 _MUST_QUEUE_RE = re.compile(
-    r"describe (a|your|an)|tell us about a time|walk us through|give an example|"
-    r"provide an example|writing sample|portfolio|references?|list (your|three|two)|"
-    r"greatest (weakness|strength|achievement)|proudest|biggest challenge|"
-    r"what is a project|share a project|link to (your )?(github|portfolio|work)|"
-    r"additional information|anything else (you|we should)",
+    r"writing sample|portfolio|references?|list (your|three|two)|"
+    r"greatest (weakness|strength)|link to (your )?(github|portfolio|work)|"
+    r"additional information|anything else (you|we should)|"
+    r"arbitration|agree(ment)? to|acknowledge|consent to the|"
+    r"policy for application|have you (ever )?(interviewed|applied|been employed)",
     re.I,
 )
 
 
 def is_essay_question(label: str) -> bool:
     return bool(_ESSAY_RE.search(label or ""))
+
+
+def is_experience_question(label: str) -> bool:
+    return bool(_EXPERIENCE_RE.search(label or "")) and not _MUST_QUEUE_RE.search(label or "")
 
 
 def is_must_queue_question(label: str) -> bool:
