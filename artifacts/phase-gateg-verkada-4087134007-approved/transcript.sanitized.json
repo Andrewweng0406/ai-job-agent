@@ -1,0 +1,209 @@
+{
+  "blocking_reasons": [
+    "FORM_MAPPING"
+  ],
+  "browser_evidence": {
+    "drift_reasons": [],
+    "form_detected": true,
+    "screenshot_path": "artifacts/phase-gateg-verkada-4087134007-approved-v2/before_fill.png",
+    "submit_control_detected": true,
+    "validation_errors": []
+  },
+  "fields": [
+    {
+      "canonical_key": "personal.first_name",
+      "confidence": "AUTO_FROM_PROFILE",
+      "kind": "text",
+      "label": "First Name *",
+      "legal_sensitive": false,
+      "policy": "PROFILE_REQUIRED",
+      "reason": null,
+      "required_by_form": true,
+      "selector": "id=first_name",
+      "source": {
+        "fact_id": "name.full"
+      },
+      "status": "FILLED",
+      "value": "[REDACTED]"
+    },
+    {
+      "canonical_key": "personal.last_name",
+      "confidence": "AUTO_FROM_PROFILE",
+      "kind": "text",
+      "label": "Last Name *",
+      "legal_sensitive": false,
+      "policy": "PROFILE_REQUIRED",
+      "reason": null,
+      "required_by_form": true,
+      "selector": "id=last_name",
+      "source": {
+        "fact_id": "name.full"
+      },
+      "status": "FILLED",
+      "value": "[REDACTED]"
+    },
+    {
+      "canonical_key": "email",
+      "confidence": "AUTO_FROM_PROFILE",
+      "kind": "text",
+      "label": "Email *",
+      "legal_sensitive": false,
+      "policy": "PROFILE_REQUIRED",
+      "reason": null,
+      "required_by_form": true,
+      "selector": "id=email",
+      "source": {
+        "fact_id": "contact.email"
+      },
+      "status": "FILLED",
+      "value": "[REDACTED]"
+    },
+    {
+      "canonical_key": null,
+      "confidence": null,
+      "kind": "select",
+      "label": "Country *",
+      "legal_sensitive": false,
+      "policy": null,
+      "reason": "FORM_MAPPING",
+      "required_by_form": true,
+      "selector": "id=country",
+      "source": {},
+      "status": "HUMAN_REQUIRED",
+      "value": null
+    },
+    {
+      "canonical_key": null,
+      "confidence": null,
+      "kind": "select",
+      "label": "Search",
+      "legal_sensitive": false,
+      "policy": null,
+      "reason": "OPTIONAL_SKIP",
+      "required_by_form": false,
+      "selector": "id=iti-0__search-input",
+      "source": {},
+      "status": "SKIPPED",
+      "value": null
+    },
+    {
+      "canonical_key": "phone",
+      "confidence": "AUTO_FROM_PROFILE",
+      "kind": "text",
+      "label": "Phone *",
+      "legal_sensitive": false,
+      "policy": "PROFILE_REQUIRED",
+      "reason": null,
+      "required_by_form": true,
+      "selector": "id=phone",
+      "source": {
+        "fact_id": "contact.phone"
+      },
+      "status": "FILLED",
+      "value": "[REDACTED]"
+    },
+    {
+      "canonical_key": null,
+      "confidence": null,
+      "kind": "select",
+      "label": "Location (City) *",
+      "legal_sensitive": false,
+      "policy": null,
+      "reason": "FORM_MAPPING",
+      "required_by_form": true,
+      "selector": "id=candidate-location",
+      "source": {},
+      "status": "HUMAN_REQUIRED",
+      "value": null
+    },
+    {
+      "canonical_key": null,
+      "confidence": null,
+      "kind": "file",
+      "label": "Attach",
+      "legal_sensitive": false,
+      "policy": null,
+      "reason": "OPTIONAL_SKIP",
+      "required_by_form": false,
+      "selector": "id=resume",
+      "source": {},
+      "status": "SKIPPED",
+      "value": null
+    },
+    {
+      "canonical_key": null,
+      "confidence": null,
+      "kind": "file",
+      "label": "Attach",
+      "legal_sensitive": false,
+      "policy": null,
+      "reason": "OPTIONAL_SKIP",
+      "required_by_form": false,
+      "selector": "id=cover_letter",
+      "source": {},
+      "status": "SKIPPED",
+      "value": null
+    },
+    {
+      "canonical_key": "application.linkedin_url",
+      "confidence": null,
+      "kind": "text",
+      "label": "LinkedIn Profile",
+      "legal_sensitive": false,
+      "policy": "OPTIONAL_SKIP",
+      "reason": "OPTIONAL_SKIP",
+      "required_by_form": false,
+      "selector": "id=question_4544073007",
+      "source": {},
+      "status": "SKIPPED",
+      "value": null
+    },
+    {
+      "canonical_key": null,
+      "confidence": null,
+      "kind": "text",
+      "label": "Website",
+      "legal_sensitive": false,
+      "policy": null,
+      "reason": "OPTIONAL_SKIP",
+      "required_by_form": false,
+      "selector": "id=question_4544074007",
+      "source": {},
+      "status": "SKIPPED",
+      "value": null
+    }
+  ],
+  "job": {
+    "apply_url": "https://job-boards.greenhouse.io/verkada/jobs/4087134007",
+    "ats": "greenhouse",
+    "company": "Verkada",
+    "company_id": "verkada",
+    "job_content_hash": "740796416e34ab2025be88f1afa79bf8fd9b3b6550b40dca7a45f586810fade3",
+    "job_id": 1,
+    "job_url": "https://job-boards.greenhouse.io/verkada/jobs/4087134007",
+    "requisition_key": "req:4087134007",
+    "role": "Account Executive, France"
+  },
+  "persona": null,
+  "real_submission_enabled": false,
+  "resume": {
+    "file": "tests/fixtures/synthetic_resume.pdf",
+    "file_hash": "sha256:50947c796e50ede13626bbd62bf2b435912541c9f9dbb5b1db2bac9c5bcb779a",
+    "resume_id": "synthetic",
+    "truth_validation": "VALIDATED"
+  },
+  "sanitized": true,
+  "unresolved": [
+    {
+      "kind": "field",
+      "reason": "FORM_MAPPING",
+      "ref": "Country *"
+    },
+    {
+      "kind": "field",
+      "reason": "FORM_MAPPING",
+      "ref": "Location (City) *"
+    }
+  ],
+  "would_submit": false
+}

@@ -44,6 +44,16 @@ def main() -> int:
     profile = CandidateProfile.from_yaml(_resolve_profile_path(args.profile))
     if args.test_only and profile.profile_source != "synthetic_test_only":
         raise SystemExit("TEST_ONLY requires meta.profile_source=synthetic_test_only")
+    resume_path = ""
+    resume_hash = ""
+    resume_status = "PDF_QA_FAILED"
+    if args.resume_pdf:
+        resume_file = Path(args.resume_pdf)
+        if not resume_file.is_file():
+            raise SystemExit(f"--resume-pdf not found: {resume_file}")
+        resume_hash = "sha256:" + hashlib.sha256(resume_file.read_bytes()).hexdigest()
+        resume_path = str(resume_file)
+        resume_status = "VALIDATED"
     job = _job_from_url(args.url, args.company, args.role, ats)
     repo = JobAgentRepository(out / "run.sqlite3")
     repo.initialize()
@@ -87,24 +97,33 @@ def main() -> int:
                            "ashby": AshbyDryRunAdapter}[ats]
             adapter = adapter_cls(repo, real_submission_enabled=False)
             result = adapter.dry_run(page=page, application_id=application_id, job=job,
-                                     profile=profile, resume_id="none", resume_path="",
-                                     resume_hash="", resume_validation_status="PDF_QA_FAILED",
+                                     profile=profile,
+                                     resume_id="synthetic" if resume_path else "none",
+                                     resume_path=resume_path,
+                                     resume_hash=resume_hash,
+                                     resume_validation_status=resume_status,
                                      screenshot_path=out / "before_fill.png")
             transcript = result.dry_run.transcript if result.dry_run else None
             resolutions = result.dry_run.resolutions if result.dry_run else []
             # A provider hard-stop is an auditable outcome, not a process error.
             # Leave transcript unset so the common blocked-bundle writer runs.
-            if transcript is None:
-                autofill = None
-            if transcript is not None and args.approved_by and result.dry_run.status == ApplicationStatus.READY:
+            autofill = None
+            autofill_mode = "none"
+            fillable = [r for r in resolutions
+                        if r.status.value == "FILLED" and r.value is not None]
+            ready = result.dry_run.status == ApplicationStatus.READY if result.dry_run else False
+            if transcript is not None and args.approved_by and fillable:
                 if _canonical_url(final_browser_url) != _canonical_url(args.confirm_apply_url):
                     raise RuntimeError("APPROVED_URL_MISMATCH")
                 repo.approve_dry_run_transcript(transcript.transcript_id, args.approved_by)
-                ApprovedAutofillPreviewBuilder(repo).build(transcript.transcript_id)
-                _action(actions, "APPROVAL_VERIFIED", lease_epoch=lease_epoch, success=True)
+                preview = ApprovedAutofillPreviewBuilder(repo).build(
+                    transcript.transcript_id, allow_partial=not ready)
+                autofill_mode = preview.mode
+                _action(actions, "APPROVAL_VERIFIED", lease_epoch=lease_epoch, success=True,
+                        mode=autofill_mode)
                 try:
                     autofill = DryRunBrowserAutofill().apply(
-                        page, resolutions, expected_resume_hash="",
+                        page, resolutions, expected_resume_hash=resume_hash,
                         lease_check=lambda: _lease_check(repo, application_id, worker_id, lease_epoch)
                     )
                 except RuntimeError as exc:
@@ -114,8 +133,6 @@ def main() -> int:
                     raise
                 for selector in autofill.filled_selectors:
                     _action(actions, "FILL_TEXT", field_id=selector, lease_epoch=lease_epoch, success=True)
-            else:
-                autofill = None
             _form_screenshot(page, out / "after_fill.png")
             if transcript is not None:
                 try:
@@ -151,7 +168,7 @@ def main() -> int:
         "planned_field_count": len(resolutions), "attempted_field_count": len(autofill.filled_selectors) if autofill else 0,
         "matched_field_count": len(autofill.filled_selectors) if autofill else 0, "mismatch_count": mismatch_count, "unplanned_browser_actions": 0,
         "unfilled_required_fields": [r.label for r in resolutions if r.required and r.status.value != "FILLED"],
-        "submit_invocation_count": 0,
+        "submit_invocation_count": 0, "autofill_mode": autofill_mode,
     }, indent=2, sort_keys=True), encoding="utf-8")
     report = {
         "run_id": run_id, "captured_at": captured_at, "company": job.company_name,
@@ -168,6 +185,7 @@ def main() -> int:
         "upload_reason": "PDF_QA_FAILED / no validated artifact supplied", "post_fill_hard_stop": False,
         "would_submit": False, "submit_invocation_count": 0, "approval_status": "approved" if args.approved_by else "not_approved_capture_only",
         "approved_by": args.approved_by, "source": "live_capture", "sanitized": True,
+        "autofill_mode": autofill_mode,
     }
     (out / "report.json").write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
     repo.release_lease(application_id, worker_id, lease_epoch)
@@ -188,6 +206,7 @@ def _args():
     parser.add_argument("--timeout-ms", type=int, default=30_000)
     parser.add_argument("--approved-by", help="Explicit reviewer identity; required before any browser autofill")
     parser.add_argument("--confirm-apply-url", help="Exact approved application URL acknowledgment")
+    parser.add_argument("--resume-pdf", help="Path to a validated resume PDF for the file-upload field")
     parser.add_argument("--lease-minutes", type=int, default=10)
     parser.add_argument("--real-submission-enabled", action="store_true")
     parser.add_argument("--test-only", action="store_true")

@@ -28,8 +28,15 @@ def test_script_never_calls_a_submit_primitive():
 
 
 def test_script_gates_autofill_behind_approval_builder():
-    assert "ApprovedAutofillPreviewBuilder(repo).build(transcript.transcript_id)" in SCRIPT
-    assert "if args.approved_by" in SCRIPT
+    assert "ApprovedAutofillPreviewBuilder(repo).build(" in SCRIPT
+    assert "args.approved_by and fillable" in SCRIPT
+    # approval + payload-hash integrity are enforced by the builder in both modes;
+    # partial mode is only entered when the transcript is not fully submit-ready
+    assert "allow_partial=not ready" in SCRIPT
+
+
+def test_script_partial_autofill_only_targets_already_FILLED_resolutions():
+    assert 'r.status.value == "FILLED" and r.value is not None' in SCRIPT
 
 
 def test_script_writes_a_blocked_bundle_on_hard_stop():

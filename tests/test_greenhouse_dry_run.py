@@ -62,8 +62,9 @@ def test_greenhouse_dom_dry_run_hard_stop_goes_to_human_required(tmp_path):
     repo, job, app_id = _seed_ready_with_resume(tmp_path)
     adapter = GreenhouseDryRunAdapter(repo, real_submission_enabled=False)
 
+    # An interstitial that has *replaced* the application form is a real bot wall.
     result = adapter.dry_run(
-        page=_Page("<html><body><div class='cf-turnstile'></div>" + GREENHOUSE_FORM + "</body></html>"),
+        page=_Page("<html><body><h1>Verify you are human</h1><div class='cf-turnstile'></div></body></html>"),
         application_id=app_id,
         job=job,
         profile=_profile(),
@@ -79,6 +80,27 @@ def test_greenhouse_dom_dry_run_hard_stop_goes_to_human_required(tmp_path):
     with repo.connect() as conn:
         task = conn.execute("SELECT category FROM human_tasks WHERE application_id = ?", (app_id,)).fetchone()
     assert task["category"] == "BOT_WALL"
+
+
+def test_greenhouse_dom_dry_run_passes_through_passive_turnstile_next_to_a_form(tmp_path):
+    """A passive turnstile widget shipped alongside a full application form is not a
+    hard stop — it is only challenged on submit, which the dry run never performs."""
+    repo, job, app_id = _seed_ready_with_resume(tmp_path)
+    adapter = GreenhouseDryRunAdapter(repo, real_submission_enabled=False)
+
+    result = adapter.dry_run(
+        page=_Page("<html><body><div class='cf-turnstile'></div>" + GREENHOUSE_FORM + "</body></html>"),
+        application_id=app_id,
+        job=job,
+        profile=_profile(),
+        resume_id="resume-1",
+        resume_path="data/resumes/resume-1.pdf",
+        resume_hash="sha256:abc",
+        resume_validation_status="VALIDATED",
+    )
+
+    assert result.status == ApplicationStatus.READY
+    assert adapter.submit_call_count == 0
 
 
 def test_greenhouse_bad_pdf_never_reaches_submit_ready_upload_path(tmp_path):

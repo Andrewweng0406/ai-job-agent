@@ -1,0 +1,13 @@
+{
+  "attempted_field_count": 4,
+  "autofill_mode": "partial_safe",
+  "matched_field_count": 4,
+  "mismatch_count": 0,
+  "planned_field_count": 11,
+  "submit_invocation_count": 0,
+  "unfilled_required_fields": [
+    "Country *",
+    "Location (City) *"
+  ],
+  "unplanned_browser_actions": 0
+}

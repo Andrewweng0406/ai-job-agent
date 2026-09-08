@@ -1,0 +1,9 @@
+{"action": "NAVIGATE", "lease_epoch": 1, "success": true, "timestamp": "2026-09-08T00:46:38.943665+00:00"}
+{"action": "SCAN_HARD_STOP", "lease_epoch": 1, "success": true, "timestamp": "2026-09-08T00:46:40.333276+00:00"}
+{"action": "EXTRACT_FIELDS", "field_count": 11, "lease_epoch": 1, "success": true, "timestamp": "2026-09-08T00:46:40.350455+00:00"}
+{"action": "APPROVAL_VERIFIED", "lease_epoch": 1, "mode": "partial_safe", "success": true, "timestamp": "2026-09-08T00:46:40.397859+00:00"}
+{"action": "FILL_TEXT", "field_id": "id=first_name", "lease_epoch": 1, "success": true, "timestamp": "2026-09-08T00:46:40.473164+00:00"}
+{"action": "FILL_TEXT", "field_id": "id=last_name", "lease_epoch": 1, "success": true, "timestamp": "2026-09-08T00:46:40.473171+00:00"}
+{"action": "FILL_TEXT", "field_id": "id=email", "lease_epoch": 1, "success": true, "timestamp": "2026-09-08T00:46:40.473172+00:00"}
+{"action": "FILL_TEXT", "field_id": "id=phone", "lease_epoch": 1, "success": true, "timestamp": "2026-09-08T00:46:40.473173+00:00"}
+{"action": "POST_FILL_SCAN", "human_required": false, "lease_epoch": 1, "success": true, "timestamp": "2026-09-08T00:46:40.628405+00:00"}

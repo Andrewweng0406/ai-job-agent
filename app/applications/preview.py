@@ -45,6 +45,10 @@ class AutofillPreview:
     application_id: str
     approved_by: str
     fields: list[dict[str, str]]
+    # "full" -> every required field resolved, the form could be submitted.
+    # "partial_safe" -> only the profile-safe subset is filled; a human must
+    # still answer the remaining required fields before any submission.
+    mode: str = "full"
 
     def to_markdown(self) -> str:
         lines = [
@@ -63,7 +67,15 @@ class ApprovedAutofillPreviewBuilder:
     def __init__(self, repository) -> None:
         self.repository = repository
 
-    def build(self, transcript_id: str) -> AutofillPreview:
+    def build(self, transcript_id: str, *, allow_partial: bool = False) -> AutofillPreview:
+        """Render the approved autofill for a transcript.
+
+        `allow_partial=False` (default) requires a fully submit-ready transcript.
+        `allow_partial=True` permits a transcript with unresolved HUMAN_REQUIRED
+        fields: only the profile-safe FILLED subset is previewed, a human still
+        owns the rest, and nothing here can submit. Approval + payload-hash
+        integrity are enforced identically in both modes.
+        """
         row = self.repository.get_dry_run_transcript(transcript_id)
         if row is None:
             raise KeyError(f"Unknown transcript_id: {transcript_id}")
@@ -72,21 +84,35 @@ class ApprovedAutofillPreviewBuilder:
         actual_hash = hashlib.sha256(row["payload_json"].encode("utf-8")).hexdigest()
         if actual_hash != row["payload_hash"]:
             raise RuntimeError("Dry-run transcript payload hash mismatch")
-        if not row["would_submit"]:
+        submit_ready = bool(row["would_submit"])
+        if not submit_ready and not allow_partial:
             raise RuntimeError("Dry-run transcript is not submit-ready")
         payload = json.loads(row["payload_json"])
+        all_fields = payload.get("fields", [])
         fields = [
             {
                 "label": str(field["label"]),
                 "selector": str(field["selector"]),
                 "value": str(field["value"]),
             }
-            for field in payload.get("fields", [])
+            for field in all_fields
             if field.get("status") == "FILLED" and field.get("value") is not None
         ]
+        if not submit_ready:
+            # In partial mode, never let a NEVER_GUESS / legal-sensitive field
+            # slip through even if some upstream marked it FILLED.
+            unsafe = [
+                f for f in all_fields
+                if f.get("status") == "FILLED" and (
+                    f.get("legal_sensitive") or str(f.get("policy") or "") in {"NEVER_GUESS", "HUMAN_REQUIRED"}
+                )
+            ]
+            if unsafe:
+                raise RuntimeError(f"Partial autofill would touch a non-safe field: {unsafe[0].get('label')}")
         return AutofillPreview(
             transcript_id=transcript_id,
             application_id=row["application_id"],
             approved_by=row["approved_by"],
             fields=fields,
+            mode="full" if submit_ready else "partial_safe",
         )

@@ -26,6 +26,10 @@ class BrowserCaptureResult:
     posting_closed: bool = False
     validation_errors: list[str] = field(default_factory=list)
     drift_reasons: list[str] = field(default_factory=list)
+    # Passive captcha/turnstile markup that ships with a working form and is only
+    # challenged on submit. Recorded for the evidence bundle, never a hard stop for
+    # a no-submit dry run.
+    passive_bot_protection: list[str] = field(default_factory=list)
 
     @property
     def human_required(self) -> bool:
@@ -67,21 +71,39 @@ class BrowserFieldCapture:
     ) -> BrowserCaptureResult:
         html = page.content()
         visible_html = re.sub(r"<(script|style)\b[^>]*>.*?</\1>", " ", html, flags=re.I | re.S)
-        reasons = []
-        if self.CAPTCHA_PATTERN.search(visible_html) or self.CAPTCHA_WIDGET_PATTERN.search(html):
+        # Match challenge language against visible *text* only. Tag/class/data-* names
+        # and the passive reCAPTCHA/Turnstile snippet that ships on virtually every
+        # Greenhouse/Lever form must not by themselves read as an active wall — that
+        # snippet is only ever challenged on submit, which a dry run never does.
+        visible_text = _plain_text(visible_html)
+        form_detected = bool(re.search(r"<form\b", html, re.I))
+        # A real *application* form: several inputs, not one stray search box.
+        field_element_count = len(re.findall(r"<(input|select|textarea)\b", html, re.I))
+        real_form_present = field_element_count >= 3
+
+        reasons: list[str] = []
+        passive: list[str] = []
+        captcha_widget = bool(self.CAPTCHA_WIDGET_PATTERN.search(html))
+        botwall_widget = bool(self.BOT_WALL_WIDGET_PATTERN.search(html))
+        # Visible challenge TEXT is always a hard stop — active challenges and
+        # interstitials render text to the user.
+        if self.CAPTCHA_PATTERN.search(visible_text):
             reasons.append("CAPTCHA")
-        if self.BOT_WALL_PATTERN.search(visible_html) or self.BOT_WALL_WIDGET_PATTERN.search(html):
+        elif captcha_widget:
+            (passive if real_form_present else reasons).append("CAPTCHA")
+        if self.BOT_WALL_PATTERN.search(visible_text):
             reasons.append("BOT_WALL")
-        if self.EMAIL_VERIFICATION_PATTERN.search(visible_html):
+        elif botwall_widget:
+            (passive if real_form_present else reasons).append("BOT_WALL")
+        if self.EMAIL_VERIFICATION_PATTERN.search(visible_text):
             reasons.append("EMAIL_VERIFICATION")
-        elif self.MFA_PATTERN.search(visible_html):
+        elif self.MFA_PATTERN.search(visible_text):
             reasons.append("MFA")
         saved_screenshot = None
         if screenshot_path is not None:
             saved_screenshot = str(screenshot_path)
             Path(saved_screenshot).parent.mkdir(parents=True, exist_ok=True)
             page.screenshot(path=saved_screenshot)
-        form_detected = bool(re.search(r"<form\b", html, re.I))
         submit_control_detected = bool(re.search(r"<(button|input)\b[^>]*type=[\"']submit[\"']", html, re.I))
         posting_closed = bool(self.CLOSED_PATTERN.search(html))
         validation_errors = [
@@ -105,6 +127,7 @@ class BrowserFieldCapture:
             posting_closed=posting_closed,
             validation_errors=validation_errors,
             drift_reasons=drift_reasons,
+            passive_bot_protection=passive,
         )
 
 
