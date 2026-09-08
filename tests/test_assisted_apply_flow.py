@@ -108,7 +108,12 @@ def test_answers_accept_a_complete_approved_set(tmp_path):
 def test_assisted_apply_script_has_no_submit_primitive():
     src = (Path(__file__).resolve().parents[1] / "scripts" / "assisted_apply.py").read_text()
     for banned in (".requestSubmit(", ".submit()", '.press("Enter")', ".press('Enter')",
-                   'click("[type=submit', "keyboard.press("):
+                   '.press("Return")', 'click("[type=submit', 'click("button[type=submit',
+                   "get_by_role(\"button\", name=\"Submit"):
         assert banned not in src, f"assisted_apply.py contains a submit primitive: {banned}"
+    # keyboard.press is allowed only for non-activating keys
+    import re as _re
+    for m in _re.findall(r'keyboard\.press\(["\']([^"\']+)["\']\)', src):
+        assert m in {"Escape", "Tab"}, f"assisted_apply.py presses an activating key: {m}"
     assert "real_submission_enabled=True" not in src
     assert "real_submission_enabled =" not in src

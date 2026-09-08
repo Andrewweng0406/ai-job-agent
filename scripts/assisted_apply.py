@@ -130,19 +130,57 @@ def cmd_fill(args) -> int:
 
 
 def _fill_one(page, selector: str, value: str) -> None:
-    """fill / select / check only — never a click on a submit control, never Enter."""
+    """fill / select / check only — never a click on a submit control, never Enter.
+
+    Handles native <select>, checkboxes/radios, react-select comboboxes, and plain
+    text. A react-select value that does not exactly match an offered option is
+    skipped with a warning rather than guessed.
+    """
     loc = page.locator(_css(selector))
     if loc.count() == 0:
         print(f"  ! selector not found, skipped: {selector}")
         return
+    loc.scroll_into_view_if_needed()
     tag = (loc.evaluate("el => el.tagName") or "").lower()
     input_type = (loc.get_attribute("type") or "").lower()
+    role = (loc.get_attribute("role") or "").lower()
+    is_react_select = role == "combobox" or loc.evaluate(
+        "el => !!el.closest('.select__control, [class*=\"-control\"], [class*=\"select__\"]')"
+    )
+
     if tag == "select":
         loc.select_option(label=value)
     elif input_type in {"checkbox", "radio"}:
         loc.check()
+    elif is_react_select:
+        _fill_react_select(page, loc, value, selector)
     else:
         loc.fill(value)
+
+
+def _fill_react_select(page, loc, value: str, selector: str) -> None:
+    loc.click()
+    page.wait_for_timeout(250)
+    try:
+        loc.fill(value)
+    except Exception:
+        loc.type(value, delay=10)
+    page.wait_for_timeout(350)
+    options = page.locator('[id^="react-select"][id*="option"], [role="option"]')
+    target = None
+    n = options.count()
+    for i in range(n):
+        text = (options.nth(i).inner_text() or "").strip()
+        base = text.split(" +")[0].strip()  # country options carry a " +1" dial-code suffix
+        if text == value or base == value or text.lower() == value.lower():
+            target = options.nth(i)
+            break
+    if target is None:
+        page.keyboard.press("Escape")
+        print(f"  ! no exact option '{value}' for {selector} — left for you to pick")
+        return
+    target.click()
+    page.wait_for_timeout(150)
 
 
 def _css(selector: str) -> str:
