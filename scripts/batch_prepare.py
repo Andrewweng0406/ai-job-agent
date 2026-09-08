@@ -30,7 +30,7 @@ from app.llm.runtime import build_router
 from app.resumes.profile import CandidateProfile
 from app.utils.config import load_yaml
 from app.utils.env import load_dotenv
-from scripts.assisted_apply import _fill_one, _harvest_options, _role_from_title
+from scripts.assisted_apply import _fill_one, _harvest_options, _role_from_title, _verify_filled
 from scripts.live_dry_run import _sanitize_html
 
 
@@ -175,8 +175,11 @@ def main() -> int:
                 for selector, value in record.fill_map().items():
                     try:
                         _fill_one(page, selector, value)
+                        _verify_filled(page, selector, value)
                     except Exception as fx:  # noqa: BLE001
-                        record.blockers.append(f"could not fill '{selector}' ({type(fx).__name__})")
+                        record.blockers.append(
+                            f"could not verify fill '{selector}' ({type(fx).__name__}: {fx})"
+                        )
                 # résumé upload — fallback to the first file input if nothing mapped it
                 if resume_pdf and not any(f.kind == "file" and f.value for f in record.fields):
                     try:

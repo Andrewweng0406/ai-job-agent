@@ -236,6 +236,84 @@ def _fill_one(page, selector: str, value: str) -> None:
         loc.fill(value, timeout=T)
 
 
+def _verify_filled(page, selector: str, expected: str) -> str:
+    """Read a value back from the rendered control and fail closed on mismatch.
+
+    A successful Playwright click/fill only proves that an action was dispatched.
+    React controls can discard it during hydration, and grouped controls can bind
+    the click to a different input.  This verifies the browser state that the
+    applicant will actually review.
+    """
+    if selector.startswith("q="):
+        actual = _read_group_value(page, selector[2:])
+    else:
+        controls = page.locator(_css(selector))
+        if controls.count() == 0:
+            raise RuntimeError(f"VERIFY_SELECTOR_NOT_FOUND:{selector}")
+        loc = controls.first
+        actual = loc.evaluate(
+            """el => {
+                const clean = value => (value || '').replace(/\\s+/g, ' ').trim();
+                const type = (el.getAttribute('type') || '').toLowerCase();
+                if (type === 'file') return el.files && el.files.length ? el.files[0].name : '';
+                if (type === 'radio' || type === 'checkbox') {
+                    const checked = [...document.querySelectorAll(`[name="${CSS.escape(el.name)}"]`)]
+                        .filter(node => node.checked);
+                    return checked.map(node => {
+                        const label = node.id && document.querySelector(`label[for="${CSS.escape(node.id)}"]`);
+                        return clean((label && label.innerText) || node.closest('label')?.innerText || node.value);
+                    }).join('; ');
+                }
+                if (el.tagName === 'SELECT') return clean(el.options[el.selectedIndex]?.textContent || el.value);
+                if ((el.getAttribute('role') || '').toLowerCase() === 'combobox') {
+                    const box = el.closest('.select__control,[class*="-control"],[class*="select__"], [role=group]');
+                    return clean(el.value || (box && box.innerText) || el.getAttribute('aria-valuetext'));
+                }
+                return clean(el.value || el.textContent);
+            }""",
+            timeout=4_000,
+        )
+    if not _filled_values_match(expected, actual, file_field=selector.lower().endswith(("resume", "cover"))):
+        raise RuntimeError(f"FILL_READBACK_MISMATCH:{selector}")
+    return actual
+
+
+def _read_group_value(page, question: str) -> str:
+    q = " ".join(question.split())[:80]
+    box = page.locator(
+        "fieldset, [role=radiogroup], [role=group], [class*='fieldEntry'], [class*='form-field']"
+    ).filter(has_text=q[:40]).first
+    if box.count() == 0:
+        box = page.locator(
+            f"xpath=//*[contains(normalize-space(.), {_xpath_lit(q[:40])})][.//button or .//input]"
+        ).last
+    if box.count() == 0:
+        raise RuntimeError(f"VERIFY_GROUP_NOT_FOUND:{q}")
+    return box.evaluate(
+        """box => {
+            const clean = value => (value || '').replace(/\\s+/g, ' ').trim();
+            const selected = [...box.querySelectorAll('input:checked,[aria-checked="true"],[aria-pressed="true"]')];
+            return selected.map(node => {
+                const label = node.id && document.querySelector(`label[for="${CSS.escape(node.id)}"]`);
+                return clean((label && label.innerText) || node.closest('label')?.innerText || node.innerText || node.value);
+            }).filter(Boolean).join('; ');
+        }""",
+        timeout=4_000,
+    )
+
+
+def _filled_values_match(expected: str, actual: str, *, file_field: bool = False) -> bool:
+    from pathlib import Path as _P
+    from app.applications.standard_answers import _map_to_option
+
+    want = _P(expected).name if file_field or _P(expected).is_file() else expected
+    want_parts = [part.strip() for part in re.split(r"[;,]", want) if part.strip()]
+    got_parts = [part.strip() for part in re.split(r"[;,]", actual or "") if part.strip()]
+    if not want_parts or not got_parts:
+        return False
+    return all(_map_to_option(part, got_parts) is not None for part in want_parts)
+
+
 def _fill_group_by_question(page, question: str, value: str) -> None:
     """Grouped control located by its question text: find the fieldset/container
     whose label matches, then click the option (radio label / checkbox / Yes-No

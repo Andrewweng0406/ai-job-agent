@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.applications.batch_prepare import BATCH_RECORD_SCHEMA_VERSION, BatchRecord
 from app.applications.batch_answers import BatchAnswersError, load_batch_answers, rebind_fill_map
 from app.applications.live_field_scan import scan_form
-from scripts.assisted_apply import _fill_one
+from scripts.assisted_apply import _fill_one, _verify_filled
 
 
 def main() -> int:
@@ -69,8 +69,9 @@ def main() -> int:
             for selector, value in fill_map.items():
                 try:
                     _fill_one(page, selector, value)
+                    _verify_filled(page, selector, value)
                 except Exception as exc:  # noqa: BLE001
-                    print(f"  ! {selector}: {type(exc).__name__}")
+                    print(f"  ! {selector}: {type(exc).__name__}: {exc}")
                     print("Mapped-field fill failed. Closing without leaving a partial form for submission.")
                     return 2
             print("\nForm filled. NOT submitted. Review it and click Submit yourself.")

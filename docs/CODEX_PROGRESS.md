@@ -280,3 +280,12 @@ Latest local verification:
 - Live rebind verification found and safely replaced four changed selectors on both Notion and Benchling; Anthropic retained a 26-field stable structure.
 - Batch records now carry an explicit schema version. Older captures are surfaced as `STALE_REVIEW_RECORD` and cannot be approved or filled, preventing fixed code from consuming screenshots/transcripts produced by obsolete mapping logic.
 - Rebuilt the Anthropic, Benchling, Notion, and Scale AI baseline records with schema v2 against their current live forms; all remained non-submitting attention records for explicit candidate-only answers.
+
+## 2026-09-08 Browser fill read-back verification
+
+- Closed a batch-testing blind spot where a Playwright fill/click that returned successfully was counted as a successful fill without checking the final DOM state.
+- Added fail-closed read-back verification for text inputs, native selects, React comboboxes, radio/checkbox groups, question-scoped controls, and file uploads.
+- Both headless batch preparation and the final headed assisted-fill path now stop on a missing selector, empty value, wrong selected option, discarded React value, or other transcript/browser mismatch.
+- Added browser-level regression tests, including the observed failure class where an essay field is expected but the DOM contains the candidate name instead.
+- Verification: `683 passed, 1 skipped`; Python bytecode compilation and `git diff --check` passed. Ruff was not installed in the execution environment.
+- Safety state remains unchanged: `real_submission_enabled=false`; no submit primitive was introduced and no application was submitted.
