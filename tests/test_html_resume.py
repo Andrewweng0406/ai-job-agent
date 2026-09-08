@@ -11,10 +11,10 @@ from app.resumes.html_resume import (
 PROFILE = """
 meta: {candidate_id: internal-test, schema_version: 2}
 facts:
-  - {fact_id: name.full, type: identity, value: Andrew Weng}
+  - {fact_id: name.full, type: identity, value: Test Candidate}
   - {fact_id: contact.email, type: contact, value: a@sjsu.edu}
   - {fact_id: contact.phone, type: contact, value: "(415) 555-0000"}
-  - {fact_id: links.github, type: link, value: https://github.com/x}
+  - {fact_id: links.github, type: link, value: https://github.com/testcand}
   - {fact_id: links.linkedin, type: link, value: https://linkedin.com/in/x}
   - {fact_id: edu.primary.school, type: education, value: San Jose State University}
   - {fact_id: edu.primary.degree, type: education, value: B.S. in Data Science}
@@ -47,7 +47,7 @@ def data(tmp_path):
 
 def test_all_profile_content_is_present(data):
     html = render_resume_html(data)
-    for needle in ("Andrew Weng", "a@sjsu.edu", "(415) 555-0000",
+    for needle in ("Test Candidate", "a@sjsu.edu", "(415) 555-0000",
                    "San Jose State University", "B.S. in Data Science", "May 2027",
                    "Data Analytics, Operations Research", "Python, SQL", "NLP, ARIMA",
                    "Earnings Radar", "Parsed transcripts across 50+ stocks.",
@@ -58,7 +58,7 @@ def test_all_profile_content_is_present(data):
 def test_links_render_as_short_labels_not_raw_urls(data):
     html = render_resume_html(data)
     assert ">GitHub<" in html and ">LinkedIn<" in html
-    assert 'href="https://github.com/x"' in html
+    assert 'href="https://github.com/testcand"' in html
 
 
 def test_objective_is_full_time_new_grad_not_internship(data):
