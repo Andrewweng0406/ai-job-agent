@@ -251,3 +251,19 @@ def test_polluted_or_semantically_wrong_labels_cannot_receive_identity_facts():
     assert _profile_value(profile, "Additional Information for your name") is None
     assert _profile_value(profile, "LinkedIn Profile") is None
     assert _profile_value(profile, "First Name") == ("Test", "name.full")
+
+
+def test_optional_phone_country_is_not_claimed_as_a_verified_fill(std):
+    profile = CandidateProfile("candidate", 2, {}, {})
+    scanned = [ScannedField("Country", "combobox", "id=country", False)]
+
+    rec = resolve_scanned(
+        company="Acme", role="Analyst", apply_url="https://example.test/job",
+        ats="greenhouse", resume_pdf="resume.pdf", scanned=scanned, profile=profile,
+        standard_answers=std,
+    )
+
+    assert rec.ready
+    assert rec.fields[0].source == "unresolved"
+    assert rec.fields[0].value is None
+    assert rec.fill_map() == {}
