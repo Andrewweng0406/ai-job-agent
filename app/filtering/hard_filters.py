@@ -87,7 +87,10 @@ US_LOCATION_TERMS = {
 NON_US_LOCATION_PATTERN = re.compile(
     r"\b(london|united kingdom|uk|canada|toronto|vancouver|india|bengaluru|bangalore|singapore|germany|"
     r"ireland|dublin|japan|tokyo|south korea|seoul|australia|sydney|france|paris|"
-    r"poland|brazil|sao paulo|são paulo)\b|\bontario\s*-\s*remote\b",
+    r"poland|brazil|sao paulo|são paulo|mexico|mexico city|guadalajara|"
+    r"netherlands|amsterdam|spain|madrid|barcelona|portugal|lisbon|"
+    r"israel|tel aviv|china|shanghai|beijing|hong kong|philippines|manila)\b|"
+    r"\bontario\s*-\s*remote\b|\bremote\s*[-–]\s*(emea|apac|latam|india|canada|uk|europe)\b",
     re.I,
 )
 THREE_PLUS_REQUIRED_PATTERN = re.compile(
@@ -96,6 +99,18 @@ THREE_PLUS_REQUIRED_PATTERN = re.compile(
     re.I,
 )
 EXPORT_CONTROL_PATTERN = re.compile(r"\b(itar|export-controlled|export controlled|u\.s\.\s+persons?)\b", re.I)
+# Internships / co-ops are not full-time new-grad roles. "internal" must not match.
+INTERNSHIP_PATTERN = re.compile(r"\b(intern|internship|co-?op)\b", re.I)
+# Government / defense / intelligence roles are citizenship- or clearance-gated in
+# practice even when the JD omits the boilerplate; not viable for a candidate who
+# needs sponsorship. Matched on the title.
+GOV_DEFENSE_TITLE_PATTERN = re.compile(
+    r"\b(us|u\.s\.|uk|u\.k\.|aus|australian)\s+government\b|"
+    r"\b(defense|defence)\s+(tech|applications?)\b|[-–]\s*(defense|defence)\b|"
+    r"[-–]\s*intel\b|\bintelligence\s+community\b|\bnational\s+security\b|"
+    r"\bfederal\s+(health|civilian)\b|\bpublic\s+sector\b",
+    re.I,
+)
 # Language that unambiguously implies years of professional seniority even when
 # no explicit "N years" / "Senior" marker is present.
 SOFT_SENIORITY_PATTERN = re.compile(
@@ -134,6 +149,10 @@ def apply_hard_filters(
         return FilterResult(False, "LOCATION_INELIGIBLE")
     if SENIORITY_PATTERN.search(job.title):
         return FilterResult(False, "SENIORITY_TOO_HIGH")
+    if INTERNSHIP_PATTERN.search(job.title):
+        return FilterResult(False, "INCOMPATIBLE_EMPLOYMENT_TYPE")
+    if not allow_security_clearance and GOV_DEFENSE_TITLE_PATTERN.search(job.title):
+        return FilterResult(False, "INCOMPATIBLE_SECURITY_CLEARANCE")
     if _requires_high_experience(job.description):
         return FilterResult(False, "EXPERIENCE_REQUIREMENT_TOO_HIGH")
     if not is_new_grad_signal(text) and SOFT_SENIORITY_PATTERN.search(_required_section(job.description)):

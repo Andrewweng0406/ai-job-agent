@@ -75,3 +75,363 @@ companies:
     metadata:
       discovery_status: adapter_required
       reason: Official careers search is not yet covered by a verified read-only adapter.
+  - company_id: airbnb
+    company_name: Airbnb
+    career_url: https://job-boards.greenhouse.io/airbnb
+    ats_type: greenhouse
+    ats_identifier: airbnb
+    active: true
+    industry: Travel
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 167
+  - company_id: gitlab
+    company_name: GitLab
+    career_url: https://job-boards.greenhouse.io/gitlab
+    ats_type: greenhouse
+    ats_identifier: gitlab
+    active: true
+    industry: Developer Tools
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 229
+  - company_id: coinbase
+    company_name: Coinbase
+    career_url: https://job-boards.greenhouse.io/coinbase
+    ats_type: greenhouse
+    ats_identifier: coinbase
+    active: true
+    industry: Crypto
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 192
+  - company_id: robinhood
+    company_name: Robinhood
+    career_url: https://job-boards.greenhouse.io/robinhood
+    ats_type: greenhouse
+    ats_identifier: robinhood
+    active: true
+    industry: Financial Technology
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 128
+  - company_id: discord
+    company_name: Discord
+    career_url: https://job-boards.greenhouse.io/discord
+    ats_type: greenhouse
+    ats_identifier: discord
+    active: true
+    industry: Consumer
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 48
+  - company_id: dropbox
+    company_name: Dropbox
+    career_url: https://job-boards.greenhouse.io/dropbox
+    ats_type: greenhouse
+    ats_identifier: dropbox
+    active: true
+    industry: Productivity
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 43
+  - company_id: instacart
+    company_name: Instacart
+    career_url: https://job-boards.greenhouse.io/instacart
+    ats_type: greenhouse
+    ats_identifier: instacart
+    active: true
+    industry: Delivery
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 108
+  - company_id: plaid
+    company_name: Plaid
+    career_url: https://jobs.ashbyhq.com/plaid
+    ats_type: ashby
+    ats_identifier: plaid
+    active: true
+    industry: Financial Technology
+    metadata:
+      discovery_status: verified_public_ashby_board
+      probe_job_count: 103
+  - company_id: brex
+    company_name: Brex
+    career_url: https://job-boards.greenhouse.io/brex
+    ats_type: greenhouse
+    ats_identifier: brex
+    active: true
+    industry: Financial Technology
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 282
+  - company_id: ramp
+    company_name: Ramp
+    career_url: https://jobs.ashbyhq.com/ramp
+    ats_type: ashby
+    ats_identifier: ramp
+    active: true
+    industry: Financial Technology
+    metadata:
+      discovery_status: verified_public_ashby_board
+      probe_job_count: 142
+  - company_id: gusto
+    company_name: Gusto
+    career_url: https://job-boards.greenhouse.io/gusto
+    ats_type: greenhouse
+    ats_identifier: gusto
+    active: true
+    industry: HR Tech
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 95
+  - company_id: samsara
+    company_name: Samsara
+    career_url: https://job-boards.greenhouse.io/samsara
+    ats_type: greenhouse
+    ats_identifier: samsara
+    active: true
+    industry: IoT
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 256
+  - company_id: benchling
+    company_name: Benchling
+    career_url: https://jobs.ashbyhq.com/benchling
+    ats_type: ashby
+    ats_identifier: benchling
+    active: true
+    industry: Biotech
+    metadata:
+      discovery_status: verified_public_ashby_board
+      probe_job_count: 49
+  - company_id: figma
+    company_name: Figma
+    career_url: https://job-boards.greenhouse.io/figma
+    ats_type: greenhouse
+    ats_identifier: figma
+    active: true
+    industry: Design
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 157
+  - company_id: notion
+    company_name: Notion
+    career_url: https://jobs.ashbyhq.com/notion
+    ats_type: ashby
+    ats_identifier: notion
+    active: true
+    industry: Productivity
+    metadata:
+      discovery_status: verified_public_ashby_board
+      probe_job_count: 132
+  - company_id: scaleai
+    company_name: Scale AI
+    career_url: https://job-boards.greenhouse.io/scaleai
+    ats_type: greenhouse
+    ats_identifier: scaleai
+    active: true
+    industry: AI
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 215
+  - company_id: affirm
+    company_name: Affirm
+    career_url: https://job-boards.greenhouse.io/affirm
+    ats_type: greenhouse
+    ats_identifier: affirm
+    active: true
+    industry: Financial Technology
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 205
+  - company_id: chime
+    company_name: Chime
+    career_url: https://job-boards.greenhouse.io/chime
+    ats_type: greenhouse
+    ats_identifier: chime
+    active: true
+    industry: Financial Technology
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 65
+  - company_id: sofi
+    company_name: SoFi
+    career_url: https://job-boards.greenhouse.io/sofi
+    ats_type: greenhouse
+    ats_identifier: sofi
+    active: true
+    industry: Financial Technology
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 61
+  - company_id: reddit
+    company_name: Reddit
+    career_url: https://job-boards.greenhouse.io/reddit
+    ats_type: greenhouse
+    ats_identifier: reddit
+    active: true
+    industry: Consumer
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 148
+  - company_id: pinterest
+    company_name: Pinterest
+    career_url: https://job-boards.greenhouse.io/pinterest
+    ats_type: greenhouse
+    ats_identifier: pinterest
+    active: true
+    industry: Consumer
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 189
+  - company_id: snowflake
+    company_name: Snowflake
+    career_url: https://jobs.ashbyhq.com/snowflake
+    ats_type: ashby
+    ats_identifier: snowflake
+    active: true
+    industry: Data
+    metadata:
+      discovery_status: verified_public_ashby_board
+      probe_job_count: 371
+  - company_id: datadog
+    company_name: Datadog
+    career_url: https://job-boards.greenhouse.io/datadog
+    ats_type: greenhouse
+    ats_identifier: datadog
+    active: true
+    industry: Observability
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 443
+  - company_id: twilio
+    company_name: Twilio
+    career_url: https://job-boards.greenhouse.io/twilio
+    ats_type: greenhouse
+    ats_identifier: twilio
+    active: true
+    industry: Communications
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 149
+  - company_id: asana
+    company_name: Asana
+    career_url: https://job-boards.greenhouse.io/asana
+    ats_type: greenhouse
+    ats_identifier: asana
+    active: true
+    industry: Productivity
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 115
+  - company_id: lyft
+    company_name: Lyft
+    career_url: https://job-boards.greenhouse.io/lyft
+    ats_type: greenhouse
+    ats_identifier: lyft
+    active: true
+    industry: Transportation
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 169
+  - company_id: nerdwallet
+    company_name: NerdWallet
+    career_url: https://jobs.ashbyhq.com/nerdwallet
+    ats_type: ashby
+    ats_identifier: nerdwallet
+    active: true
+    industry: Financial Technology
+    metadata:
+      discovery_status: verified_public_ashby_board
+      probe_job_count: 22
+  - company_id: wealthsimple
+    company_name: Wealthsimple
+    career_url: https://jobs.ashbyhq.com/wealthsimple
+    ats_type: ashby
+    ats_identifier: wealthsimple
+    active: true
+    industry: Financial Technology
+    metadata:
+      discovery_status: verified_public_ashby_board
+      probe_job_count: 47
+  - company_id: faire
+    company_name: Faire
+    career_url: https://job-boards.greenhouse.io/faire
+    ats_type: greenhouse
+    ats_identifier: faire
+    active: true
+    industry: Marketplace
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 60
+  - company_id: verkada
+    company_name: Verkada
+    career_url: https://job-boards.greenhouse.io/verkada
+    ats_type: greenhouse
+    ats_identifier: verkada
+    active: true
+    industry: Security
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 290
+  - company_id: airtable
+    company_name: Airtable
+    career_url: https://job-boards.greenhouse.io/airtable
+    ats_type: greenhouse
+    ats_identifier: airtable
+    active: true
+    industry: Productivity
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 16
+  - company_id: webflow
+    company_name: Webflow
+    career_url: https://job-boards.greenhouse.io/webflow
+    ats_type: greenhouse
+    ats_identifier: webflow
+    active: true
+    industry: Design
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 28
+  - company_id: vercel
+    company_name: Vercel
+    career_url: https://job-boards.greenhouse.io/vercel
+    ats_type: greenhouse
+    ats_identifier: vercel
+    active: true
+    industry: Developer Tools
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+      probe_job_count: 86
+  - company_id: linear
+    company_name: Linear
+    career_url: https://jobs.ashbyhq.com/linear
+    ats_type: ashby
+    ats_identifier: linear
+    active: true
+    industry: Developer Tools
+    metadata:
+      discovery_status: verified_public_ashby_board
+      probe_job_count: 29
+  - company_id: perplexity
+    company_name: Perplexity AI
+    career_url: https://jobs.ashbyhq.com/perplexity
+    ats_type: ashby
+    ats_identifier: perplexity
+    active: true
+    industry: AI
+    metadata:
+      discovery_status: verified_public_ashby_board
+      probe_job_count: 112
+  - company_id: palantir
+    company_name: Palantir
+    career_url: https://jobs.lever.co/palantir
+    ats_type: lever
+    ats_identifier: palantir
+    active: true
+    industry: Data
+    metadata:
+      discovery_status: verified_public_lever_board
+      probe_job_count: 310
