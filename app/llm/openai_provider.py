@@ -26,8 +26,11 @@ class OpenAIResponsesProvider:
     def complete(self, *, model: str, prompt: str, max_tokens: int) -> ProviderResult:
         if not self._api_key:
             raise RuntimeError("OPENAI_API_KEY_MISSING")
+        # Reasoning models spend part of max_output_tokens on hidden reasoning; keep
+        # that small for these short structured tasks and give the visible answer room.
         payload = {"model": model, "input": prompt,
-                   "max_output_tokens": max_tokens, "store": False}
+                   "max_output_tokens": max_tokens, "store": False,
+                   "reasoning": {"effort": "low"}}
         request = Request(
             f"{self.base_url}/responses",
             data=json.dumps(payload).encode("utf-8"),
@@ -59,12 +62,15 @@ def _response_text(body: dict[str, Any]) -> str:
         return direct
     chunks: list[str] = []
     for item in body.get("output") or []:
-        if not isinstance(item, dict):
+        if not isinstance(item, dict) or item.get("type") == "reasoning":
             continue
         for content in item.get("content") or []:
             if isinstance(content, dict) and isinstance(content.get("text"), str):
                 chunks.append(content["text"])
     if not chunks:
+        reason = (body.get("incomplete_details") or {}).get("reason")
+        if reason == "max_output_tokens":
+            raise RuntimeError("OPENAI_API_OUTPUT_TRUNCATED")
         raise RuntimeError("OPENAI_API_TEXT_MISSING")
     return "".join(chunks)
 

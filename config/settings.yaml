@@ -14,7 +14,7 @@ application_safety:
   captcha_policy: HUMAN_REQUIRED
   ambiguous_question_policy: HUMAN_REQUIRED
 llm:
-  enabled: false
+  enabled: true
   provider: openai
   cheap_model: gpt-5-nano
   strong_model: gpt-5-mini
@@ -23,4 +23,4 @@ llm:
   usage_ledger_path: data/llm_usage.sqlite3
   max_input_chars: 12000
   max_output_tokens: 2000
-  send_candidate_pii: false
+  send_candidate_pii: true

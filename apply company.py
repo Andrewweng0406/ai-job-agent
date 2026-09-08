@@ -59,6 +59,8 @@ def main() -> int:
     args = parser.parse_args()
     args.candidate_profile = _resolve_candidate_profile(args.candidate_profile)
 
+    from app.utils.env import load_dotenv
+    load_dotenv()
     configure_logging()
     settings = load_yaml(args.settings)
     repo = JobAgentRepository(settings.get("database_path", "data/job_agent.sqlite3"))

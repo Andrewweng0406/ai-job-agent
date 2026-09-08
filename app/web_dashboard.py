@@ -356,6 +356,8 @@ def serve(*, host: str = "127.0.0.1", port: int = 8765,
           database: str = "data/job_agent.sqlite3",
           profile: str = "config/candidate_profile.local.yaml",
           settings: str = "config/settings.yaml") -> None:
+    from app.utils.env import load_dotenv
+    load_dotenv()
     handler = DashboardHandler
     handler.repo = JobAgentRepository(database)
     handler.repo.initialize()

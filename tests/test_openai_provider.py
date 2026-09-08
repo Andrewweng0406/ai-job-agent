@@ -45,6 +45,7 @@ def test_provider_uses_responses_api_without_storage_or_retry(monkeypatch):
         "input": "redacted job",
         "max_output_tokens": 80,
         "store": False,
+        "reasoning": {"effort": "low"},
     }
     assert request.get_header("Authorization") == "Bearer test-secret"
     assert timeout == 4

@@ -13,16 +13,32 @@ from dataclasses import dataclass
 
 from app.llm.router import LLMRouter
 from app.resumes.profile import CandidateProfile
-from app.resumes.truth_validation import OVERREACH_PATTERN, _number_supported
+from app.resumes.truth_validation import _number_supported
+
+# Seniority / tenure claims a graduating student cannot truthfully make. Rejected
+# wherever they appear (unless literally present in the candidate's own facts).
+_HARD_OVERREACH_RE = re.compile(
+    r"\byears?\s+of\s+(professional\s+|industry\s+|relevant\s+)?experience\b|"
+    r"\b(a\s+)?decade\b|\bled\s+a\s+team\b|\bmanaged\s+(a\s+team|engineers|people|\d+)\b|"
+    r"\b(senior|staff|principal|lead)\s+(engineer|scientist|analyst|developer)\b|"
+    r"\bperformance reviews?\b|\bhiring (and firing|decisions)\b|"
+    r"\bfull[- ]time (work )?experience\b",
+    re.I,
+)
+# Company-scale language — fine only if it echoes the posting.
+_SCALE_RE = re.compile(r"\b(millions?|billions?|at scale|enterprise|production systems?)\b", re.I)
 
 _MAX_CHARS = 900
 _NUMBER_RE = re.compile(r"\b\d[\d,]*(?:\.\d+)?%?\b")
 _PROPER_NOUN_RE = re.compile(r"\b([A-Z][A-Za-z0-9&.\-]+(?:\s+[A-Z][A-Za-z0-9&.\-]+){0,3})\b")
 
-# proper nouns that are always fine to mention
+# proper nouns / acronyms that are always fine to mention
 _ALLOWED_NOUNS = {
-    "i", "i'm", "the", "my", "as", "at", "with", "python", "sql", "tableau",
-    "power bi", "git", "github", "nlp", "llm", "arima", "ai", "us",
+    "i", "i'm", "i've", "the", "my", "as", "at", "with", "in", "on", "and", "to",
+    "python", "sql", "tableau", "power bi", "powerbi", "excel", "vba", "git", "github",
+    "nlp", "llm", "llms", "arima", "ai", "ml", "us", "u.s.", "usa",
+    "gtm", "saas", "api", "apis", "kpi", "kpis", "okr", "okrs", "b2b", "b2c",
+    "etl", "ci/cd", "crm", "erp", "pnl", "p&l", "roi",
 }
 
 
@@ -44,18 +60,20 @@ class EssayWriter:
 
     def write(self, *, company: str, role: str, jd_excerpt: str, question: str) -> EssayResult:
         prompt = _prompt(company, role, jd_excerpt, question, self._fact_texts)
+        # role-title tokens are not "unverified entities"
+        self._role_tokens = {w.lower() for w in re.findall(r"[A-Za-z][A-Za-z0-9&.\-]+", role)}
         try:
             resp = self.router.complete(stage="3", model=self.model, prompt=prompt,
-                                        stage0_passed=True, max_tokens=280)
+                                        stage0_passed=True, max_tokens=900)
         except (RuntimeError, ValueError) as exc:
             return EssayResult(False, reason=f"LLM_UNAVAILABLE:{str(exc).split(':', 1)[0]}")
         text = (resp.text or "").strip().strip('"')
-        verdict = self._validate(text, company)
+        verdict = self._validate(text, company, jd_excerpt)
         if verdict:
             return EssayResult(False, text=text, reason=verdict, used_model=self.model)
         return EssayResult(True, text=text, used_model=self.model)
 
-    def _validate(self, text: str, company: str) -> str | None:
+    def _validate(self, text: str, company: str, jd: str) -> str | None:
         if not text or len(text) < 40:
             return "ESSAY_TOO_SHORT"
         if len(text) > _MAX_CHARS:
@@ -67,13 +85,22 @@ class EssayWriter:
                 continue
             if not _number_supported(number, self._fact_texts):
                 return f"ESSAY_UNSUPPORTED_NUMBER:{number}"
-        for m in OVERREACH_PATTERN.findall(text):
-            phrase = m if isinstance(m, str) else m[0]
-            if phrase and not any(phrase.lower() in ft.lower() for ft in self._fact_texts):
-                return f"ESSAY_OVERREACH:{phrase}"
+        facts_blob = " ".join(self._fact_texts).lower()
+        hard = _HARD_OVERREACH_RE.search(text)
+        if hard and hard.group(0).lower() not in facts_blob:
+            return f"ESSAY_OVERREACH:{hard.group(0).strip()}"
+        for m in _SCALE_RE.findall(text):
+            phrase = (m if isinstance(m, str) else m[0]).lower()
+            if phrase not in jd.lower() and phrase not in facts_blob:
+                return f"ESSAY_SCALE_CLAIM:{phrase}"
+        role_tokens = getattr(self, "_role_tokens", set())
         for noun in _PROPER_NOUN_RE.findall(text):
             n = noun.strip().lower()
             if n in _ALLOWED_NOUNS or n in company.lower() or company.lower() in n:
+                continue
+            if all(tok in role_tokens or tok in _ALLOWED_NOUNS for tok in n.split()):
+                continue
+            if n in jd.lower():
                 continue
             if any(n in a for a in self._allow) or any(a in n for a in self._allow):
                 continue
@@ -103,10 +130,12 @@ def _prompt(company: str, role: str, jd: str, question: str, fact_texts: list[st
         f"{facts}\n\n"
         "Rules:\n"
         "- 3 to 5 sentences, first person, specific, no clichés, no flattery padding.\n"
+        f"- Name {company} explicitly at least once.\n"
         "- Connect one or two candidate facts to something concrete in the role context.\n"
         "- Do NOT invent experience, employers, job titles, schools, coursework, metrics,\n"
         "  dates, tools, or commitments that are not in the facts above.\n"
         "- Do NOT claim years of experience, seniority, production systems, team management,\n"
         "  or external/enterprise scope.\n"
+        "- Do NOT mention work authorization, visa status, salary, or start dates.\n"
         "- Output ONLY the answer text, no preamble, no quotes.\n"
     )
