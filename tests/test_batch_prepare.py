@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from app.applications.batch_prepare import BatchRecord, build_batch_record, resolve_scanned
+from app.applications.batch_prepare import BatchRecord, _profile_value, build_batch_record, resolve_scanned
 from app.applications.live_field_scan import ScannedField
 from app.resumes.profile import CandidateFact, CandidateProfile
 from app.applications.form_engine import FormFieldResolution, FormFieldStatus, InputKind, RawFormField
@@ -237,3 +237,16 @@ def test_graduation_confirmation_is_derived_from_exact_profile_date(std):
 
     assert rec.fields[0].source == "profile"
     assert rec.fields[0].value == "Yes"
+
+
+def test_polluted_or_semantically_wrong_labels_cannot_receive_identity_facts():
+    profile = CandidateProfile(
+        "candidate", 2,
+        {"name.full": CandidateFact("name.full", "identity", "Test Candidate")},
+        {},
+    )
+
+    assert _profile_value(profile, "Why Acme? First Name Last Name") is None
+    assert _profile_value(profile, "Additional Information for your name") is None
+    assert _profile_value(profile, "LinkedIn Profile") is None
+    assert _profile_value(profile, "First Name") == ("Test", "name.full")

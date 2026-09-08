@@ -12,6 +12,7 @@ Approve/skip them in the dashboard; approving opens a headed browser you submit 
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 import json
 import re
 import sys
@@ -29,7 +30,7 @@ from app.llm.runtime import build_router
 from app.resumes.profile import CandidateProfile
 from app.utils.config import load_yaml
 from app.utils.env import load_dotenv
-from scripts.assisted_apply import _fill_one, _role_from_title
+from scripts.assisted_apply import _fill_one, _harvest_options, _role_from_title
 from scripts.live_dry_run import _sanitize_html
 
 
@@ -144,6 +145,15 @@ def main() -> int:
                     continue
                 page.wait_for_timeout(2500)  # let lazy field groups render
                 scanned = scan_form(page)
+                option_selectors = {
+                    f"q{i}": field.selector for i, field in enumerate(scanned)
+                    if field.kind in {"combobox", "select"} and not field.options
+                }
+                harvested = _harvest_options(page, option_selectors)
+                scanned = [
+                    replace(field, options=harvested.get(f"q{i}", field.options))
+                    for i, field in enumerate(scanned)
+                ]
                 if len(scanned) < 4:
                     (out / "record.json").write_text(json.dumps(
                         {"blocked": True, "reasons": ["TOO_FEW_FIELDS_CAPTURED"],

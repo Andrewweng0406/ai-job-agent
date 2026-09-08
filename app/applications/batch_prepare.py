@@ -119,6 +119,8 @@ def _profile_value(profile: CandidateProfile, label: str) -> tuple[str, str] | N
         fact = profile.facts.get("name.full")
         return (str(fact.value), "name.full") if fact and not fact.is_missing else None
     for needles, fid in _PROFILE_LABEL_MAP:
+        if not _profile_fact_matches_label(fid, low, needles):
+            continue
         if any(n in low for n in needles):
             if fid == "name.first":
                 f = profile.facts.get("name.full")
@@ -131,6 +133,29 @@ def _profile_value(profile: CandidateProfile, label: str) -> tuple[str, str] | N
             if f and not f.is_missing:
                 return (str(f.value), fid)
     return None
+
+
+def _profile_fact_matches_label(fact_id: str, label: str, needles: tuple[str, ...]) -> bool:
+    """Defense in depth against a polluted label routing identity/contact facts."""
+    if fact_id == "name.full":
+        return label in {"full name", "your name", "legal name", "first and last name"}
+    if fact_id == "name.first":
+        return label in {"first name", "legal first name", "given name"}
+    if fact_id == "name.last":
+        return label in {"last name", "legal last name", "surname", "family name"}
+    if fact_id == "contact.email":
+        return label in {"email", "email address", "personal email", "preferred email"}
+    if fact_id == "contact.phone":
+        return bool(re.fullmatch(r"(phone|phone number|mobile|mobile phone|telephone)( number)?", label))
+    if fact_id == "links.linkedin":
+        return "linkedin" in label and len(label) <= 80
+    if fact_id == "links.github":
+        return ("github" in label or "git hub" in label) and len(label) <= 80
+    if fact_id == "edu.primary.school":
+        return any(needle in label for needle in needles) and len(label) <= 120
+    if fact_id == "links.portfolio":
+        return label in {"portfolio", "portfolio url", "website", "personal site", "personal website"}
+    return False
 
 
 def resolve_scanned(

@@ -266,3 +266,12 @@ Latest local verification:
 - Approved answers are merged into the headed browser fill only after server-side revalidation. The browser helper still exposes no submit operation.
 - Coverage now counts approved answers only while their approval artifact remains valid, allowing truthful 100% required coverage without guessing consent, relocation, or legal status.
 - The approver name is remembered only in browser-local storage and is not hard-coded or committed as candidate PII.
+
+## 2026-09-08 Anthropic compatibility repair
+
+- Invalidated and re-captured the Anthropic batch record after screenshots exposed identity values in unrelated fields.
+- Added a second semantic boundary around profile facts: identity/contact values now require narrow label classes even if a future scanner emits polluted text.
+- Added regression coverage proving name facts cannot enter motivation, additional-information, or LinkedIn fields.
+- Harvested current Greenhouse React-select options for human-only questions and bound them to the approval artifact.
+- Changed headed assisted fill to close immediately on any mapped-field interaction failure instead of leaving a partially filled form available for submission.
+- Live Anthropic differential now shows no identity contamination. Motivation contains a verified-facts draft, Additional Information is empty, LinkedIn contains the configured URL, and the remaining four required controls are explicit AI-policy/interview/arbitration acknowledgements.

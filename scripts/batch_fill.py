@@ -64,6 +64,8 @@ def main() -> int:
                     _fill_one(page, selector, value)
                 except Exception as exc:  # noqa: BLE001
                     print(f"  ! {selector}: {type(exc).__name__}")
+                    print("Mapped-field fill failed. Closing without leaving a partial form for submission.")
+                    return 2
             if record.resume_pdf:
                 for f in record.fields:
                     if f.kind == "file":
