@@ -80,6 +80,133 @@ def _display(resolution: FormFieldResolution, value: str) -> str:
     return value if len(value) <= 60 else value[:57] + "…"
 
 
+_PROFILE_LABEL_MAP = [
+    (("full name", "your name", "legal name", "first and last"), "name.full"),
+    (("first name",), "name.first"),
+    (("last name", "surname", "family name"), "name.last"),
+    (("email",), "contact.email"),
+    (("phone", "mobile", "telephone"), "contact.phone"),
+    (("linkedin",), "links.linkedin"),
+    (("github", "git hub"), "links.github"),
+    (("school", "university", "college", "institution"), "edu.primary.school"),
+    (("portfolio", "website", "personal site"), "links.portfolio"),
+]
+
+
+def _profile_value(profile: CandidateProfile, label: str) -> tuple[str, str] | None:
+    low = label.lower()
+    for needles, fid in _PROFILE_LABEL_MAP:
+        if any(n in low for n in needles):
+            if fid == "name.first":
+                f = profile.facts.get("name.full")
+                return (str(f.value).split()[0], "name.full") if f and not f.is_missing else None
+            if fid == "name.last":
+                f = profile.facts.get("name.full")
+                parts = str(f.value).split() if f and not f.is_missing else []
+                return (" ".join(parts[1:]), "name.full") if len(parts) > 1 else None
+            f = profile.facts.get(fid)
+            if f and not f.is_missing:
+                return (str(f.value), fid)
+    return None
+
+
+def resolve_scanned(
+    *,
+    company: str,
+    role: str,
+    apply_url: str,
+    ats: str,
+    resume_pdf: str,
+    scanned: list,                       # list[ScannedField]
+    profile: CandidateProfile,
+    standard_answers: StandardAnswers,
+    jd_excerpt: str = "",
+    essay_writer=None,
+) -> BatchRecord:
+    fields: list[BatchField] = []
+    blockers: list[str] = []
+    essay_text: str | None = None
+    essay_reason: str | None = None
+
+    for i, sf in enumerate(scanned):
+        fid = f"q{i}"
+        label, kind, sel, required = sf.label, sf.kind, sf.selector, sf.required
+        opts = list(sf.options)
+
+        if kind == "file":
+            fields.append(BatchField(fid, label, sel, kind, required, "profile",
+                                     resume_pdf or None, "résumé" if resume_pdf else "",
+                                     None if resume_pdf else "no résumé configured"))
+            if required and not resume_pdf:
+                blockers.append("no résumé to upload")
+            continue
+
+        pv = _profile_value(profile, label) if kind in {"text", "long_text"} else None
+        if pv:
+            fields.append(BatchField(fid, label, sel, kind, required, "profile", pv[0],
+                                     _hint(label, pv[0]), None))
+            continue
+
+        low = label.lower()
+        looks_essay = is_essay_question(label) or (low.startswith("why") and company.split()[0].lower() in low)
+        if looks_essay and essay_writer is not None:
+            if essay_text is None and essay_reason is None:
+                r = essay_writer.write(company=company, role=role, jd_excerpt=jd_excerpt, question=label)
+                essay_text, essay_reason = (r.text, None) if r.ok else (None, r.reason)
+            if essay_text is not None:
+                fields.append(BatchField(fid, label, sel, kind, required, "essay", essay_text,
+                                         essay_text[:60] + "…", "AI draft — review before submitting"))
+            else:
+                fields.append(BatchField(fid, label, sel, kind, required, "unresolved", None, "",
+                                         f"essay rejected: {essay_reason}"))
+                if required:
+                    blockers.append(f"essay rejected ({essay_reason})")
+            continue
+
+        if is_experience_question(label) and essay_writer is not None:
+            d = essay_writer.answer_experience(question=label, role=role)
+            if d.ok:
+                fields.append(BatchField(fid, label, sel, kind, required, "essay", d.text,
+                                         d.text[:60] + "…", "AI draft — review before submitting"))
+            else:
+                fields.append(BatchField(fid, label, sel, kind, required, "unresolved", None, "",
+                                         f"draft rejected: {d.reason}"))
+                if required:
+                    blockers.append(f"you write: {label[:55]}")
+            continue
+
+        if is_must_queue_question(label) or is_experience_question(label):
+            fields.append(BatchField(fid, label, sel, kind, required, "must_queue", None, "",
+                                     "personal narrative / disclosure — you handle this"))
+            if required:
+                blockers.append(f"needs you: {label[:60]}")
+            continue
+
+        answer = standard_answers.resolve(label, opts or None)
+        if answer:
+            fields.append(BatchField(fid, label, sel, kind, required, "standard_answer", answer,
+                                     answer[:60], None))
+        else:
+            fields.append(BatchField(fid, label, sel, kind, required, "unresolved", None, "",
+                                     "no profile fact or standard answer"))
+            if required:
+                blockers.append(f"unmapped required: {label[:60]}")
+
+    return BatchRecord(company=company, role=role, apply_url=apply_url, ats=ats,
+                       resume_pdf=resume_pdf, fields=fields, essay_text=essay_text,
+                       essay_reason=essay_reason, optional_skipped=0, blockers=blockers)
+
+
+def _hint(label: str, value: str) -> str:
+    low = label.lower()
+    if "email" in low:
+        n, _, d = value.partition("@")
+        return f"{n[:2]}…@{d}" if d else "…"
+    if "phone" in low:
+        return f"…{value[-4:]}"
+    return value if len(value) <= 44 else value[:41] + "…"
+
+
 def build_batch_record(
     *,
     company: str,

@@ -19,9 +19,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.applications.batch_prepare import build_batch_record
-from app.applications.browser_capture import BrowserFieldCapture
-from app.applications.form_engine import InputKind, resolve_form_field
+from app.applications.batch_prepare import resolve_scanned
+from app.applications.live_field_scan import scan_form
 from app.applications.standard_answers import StandardAnswers
 from app.database.repository import JobAgentRepository
 from app.llm.essay import EssayWriter
@@ -133,31 +132,22 @@ def main() -> int:
                     print(f"  NO FORM  {row['company']} — application form did not render")
                     attention += 1
                     continue
-                capture = BrowserFieldCapture().capture(page, ats_type=row["ats_type"] or "greenhouse")
-                if sum(1 for r_ in capture.fields) < 4:
+                page.wait_for_timeout(2500)  # let lazy field groups render
+                scanned = scan_form(page)
+                if len(scanned) < 4:
                     (out / "record.json").write_text(json.dumps(
                         {"blocked": True, "reasons": ["TOO_FEW_FIELDS_CAPTURED"],
                          "company": row["company"], "role": row["position"],
                          "apply_url": row["apply_url"]}, indent=2))
-                    print(f"  THIN    {row['company']} — only {len(capture.fields)} fields captured")
+                    print(f"  THIN    {row['company']} — only {len(scanned)} fields scanned")
                     attention += 1
                     continue
                 (out / "dom.sanitized.html").write_text(_sanitize_html(page.content()), encoding="utf-8")
-                if capture.human_required:
-                    (out / "record.json").write_text(json.dumps(
-                        {"blocked": True, "reasons": capture.blocking_reasons,
-                         "company": row["company"], "role": row["position"],
-                         "apply_url": row["apply_url"]}, indent=2))
-                    print(f"  BLOCKED  {row['company']} — {capture.blocking_reasons}")
-                    attention += 1
-                    continue
 
-                resolutions = [resolve_form_field(f, profile, resume_pdf, resume_validated=bool(resume_pdf))
-                               for f in capture.fields]
-                record = build_batch_record(
+                record = resolve_scanned(
                     company=row["company"], role=_role_from_title(title, row["position"]),
                     apply_url=row["apply_url"], ats=row["ats_type"] or "greenhouse",
-                    resume_pdf=resume_pdf, raw_fields=capture.fields, resolutions=resolutions,
+                    resume_pdf=resume_pdf, scanned=scanned, profile=profile,
                     standard_answers=std, jd_excerpt=row["description"] or "", essay_writer=essay_writer,
                 )
 

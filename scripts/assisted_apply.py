@@ -183,7 +183,13 @@ def _fill_one(page, selector: str, value: str) -> None:
     Handles native <select> (with fuzzy option matching), checkboxes/radios,
     react-select comboboxes, file inputs, and plain text. A choice value that does
     not resemble any offered option is skipped rather than guessed.
+
+    A `q=<question text>` selector is a grouped control (radio / checkbox / Yes-No
+    buttons) located by its question label — used by the Playwright-native scanner.
     """
+    if selector.startswith("q="):
+        _fill_group_by_question(page, selector[2:], value)
+        return
     loc = page.locator(_css(selector)).first
     if page.locator(_css(selector)).count() == 0:
         print(f"  ! selector not found, skipped: {selector}")
@@ -229,6 +235,63 @@ def _fill_one(page, selector: str, value: str) -> None:
         _fill_react_select(page, loc, value, selector)
     else:
         loc.fill(value, timeout=T)
+
+
+def _fill_group_by_question(page, question: str, value: str) -> None:
+    """Grouped control located by its question text: find the fieldset/container
+    whose label matches, then click the option (radio label / checkbox / Yes-No
+    button) that matches `value`. Never guesses — no match, left for the human."""
+    from app.applications.standard_answers import _map_to_option
+
+    q = " ".join(question.split())[:80]
+    box = page.locator(
+        "fieldset, [role=radiogroup], [role=group], [class*='fieldEntry'], [class*='form-field']"
+    ).filter(has_text=q[:40]).first
+    if box.count() == 0:
+        box = page.locator(f"xpath=//*[contains(normalize-space(.), {_xpath_lit(q[:40])})][.//button or .//input]").last
+    if box.count() == 0:
+        print(f"  ! group '{q[:40]}…' not found — left for you")
+        return
+
+    clickable = box.locator("label, [class*='_option'], button, [role=radio], [role=checkbox]")
+    pairs = []
+    for i in range(min(clickable.count(), 40)):
+        el = clickable.nth(i)
+        try:
+            t = " ".join((el.inner_text(timeout=2000) or "").split())
+        except Exception:
+            t = ""
+        if t:
+            pairs.append((el, t))
+    if not pairs:
+        print(f"  ! group '{q[:40]}…' has no clickable options — left for you")
+        return
+
+    for wanted in ([value] if not _looks_multi(value) else re.split(r"[;,]", value)):
+        wanted = wanted.strip()
+        picked = _map_to_option(wanted, [t for _, t in pairs])
+        if picked is None:
+            print(f"  ! no option like '{wanted}' for '{q[:40]}…' — left for you")
+            continue
+        for el, t in pairs:
+            if t == picked:
+                try:
+                    el.click(timeout=6000)
+                except Exception as exc:
+                    print(f"  ! could not click '{picked}' for '{q[:30]}' ({type(exc).__name__})")
+                break
+
+
+def _looks_multi(value: str) -> bool:
+    return ("," in value or ";" in value) and len(value) < 120
+
+
+def _xpath_lit(s: str) -> str:
+    if '"' not in s:
+        return f'"{s}"'
+    if "'" not in s:
+        return f"'{s}'"
+    return "concat('" + s.replace("'", "', \"'\", '") + "')"
 
 
 def _check_matching_in_group(page, selector: str, value: str, *, kind: str) -> None:
