@@ -275,10 +275,19 @@ def _fill_group_by_question(page, question: str, value: str) -> None:
             continue
         for el, t in pairs:
             if t == picked:
-                try:
-                    el.click(timeout=6000)
-                except Exception as exc:
-                    print(f"  ! could not click '{picked}' for '{q[:30]}' ({type(exc).__name__})")
+                inner = el.locator("input[type=radio], input[type=checkbox], [role=radio], [role=checkbox]").first
+                if inner.count() and _try_check(page, inner):
+                    pass
+                else:
+                    ok = False
+                    for attempt in (lambda: el.click(timeout=4000),
+                                    lambda: el.click(timeout=3000, force=True)):
+                        try:
+                            attempt(); ok = True; break
+                        except Exception:
+                            continue
+                    if not ok:
+                        print(f"  ! could not click '{picked}' for '{q[:30]}'")
                 break
 
 
@@ -328,14 +337,38 @@ def _check_matching_in_group(page, selector: str, value: str, *, kind: str) -> N
             continue
         for el, lbl in pairs:
             if lbl == picked:
-                try:
-                    el.check(timeout=6_000)
+                if _try_check(page, el):
                     checked_any = True
-                except Exception as exc:
-                    print(f"  ! {selector}: could not check '{picked}' ({type(exc).__name__})")
+                else:
+                    print(f"  ! {selector}: could not check '{picked}'")
                 break
     if not checked_any and want_values:
         print(f"  ! {selector}: '{value}' did not match any option — left for you")
+
+
+def _try_check(page, el) -> bool:
+    """Check a radio/checkbox that a custom ATS may have visually hidden."""
+    for attempt in (
+        lambda: el.check(timeout=4_000),
+        lambda: el.check(timeout=3_000, force=True),
+        lambda: el.click(timeout=3_000, force=True),
+    ):
+        try:
+            attempt()
+            return True
+        except Exception:
+            continue
+    # last resort: click the label bound to its id
+    try:
+        eid = el.get_attribute("id", timeout=2_000)
+        if eid:
+            lab = page.locator(f'label[for="{eid}"]').first
+            if lab.count():
+                lab.click(timeout=3_000, force=True)
+                return True
+    except Exception:
+        pass
+    return False
 
 
 def _select_option_fuzzy(loc, value: str, selector: str) -> None:

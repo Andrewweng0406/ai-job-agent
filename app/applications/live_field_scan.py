@@ -86,8 +86,10 @@ _SCAN_JS = r"""
       peers = peers.filter(vis);
       const opts = [...new Set(peers.map(optLabel).map(clean).filter(Boolean))];
       if (opts.length < 1) continue;
+      const names = [...new Set(peers.map(p => p.name).filter(Boolean))];
+      const sel = names.length === 1 ? ('name=' + names[0]) : ('q=' + q);
       push({ label: q, kind: isCheck ? 'checkbox_group' : 'radio_group',
-             selector: 'q=' + q, required: peers.some(p => requiredOf(p, q)), options: opts });
+             selector: sel, required: peers.some(p => requiredOf(p, q)), options: opts });
       continue;
     }
 

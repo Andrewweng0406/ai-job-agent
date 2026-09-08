@@ -127,10 +127,33 @@ def _map_to_option(value: str, options: list[str]) -> str | None:
     # strongest word overlap (for phrased options like the "have you worked here" set)
     stop = {"i", "a", "an", "the", "to", "of", "at", "in", "or", "and", "for", "as", "have", "has", "you", "your", "any"}
     vw = {w for w in re.findall(r"[a-z]+", v) if w not in stop}
-    best, score = None, 0
+    best, score = None, 0.0
+
+    def _sim(a: set[str], b: set[str]) -> float:
+        s = 0.0
+        for x in a:
+            if x in b:
+                s += 1
+            elif any(len(x) >= 5 and (x.startswith(y) or y.startswith(x)) for y in b):
+                s += 0.8  # bachelor / bachelors, analytic / analytics
+        return s
+
     for o, ol in opts:
         ow = {w for w in re.findall(r"[a-z]+", ol) if w not in stop}
-        overlap = len(vw & ow)
-        if overlap > score:
-            best, score = o, overlap
-    return best if score >= 3 else None
+        sc = _sim(vw, ow)
+        if sc > score:
+            best, score = o, sc
+    if score >= 3:
+        return best
+    if best is not None and score >= 1.6 and len(vw) <= 3:
+        return best
+    # exactly one option shares a distinctive stem with a short answer
+    if len(vw) <= 3:
+        distinctive = {w for w in vw if len(w) >= 5}
+        hits = [o for o, ol in opts
+                if any(d in ol or any(t.startswith(d[:5]) or d.startswith(t[:5])
+                                      for t in re.findall(r"[a-z]+", ol) if len(t) >= 5)
+                       for d in distinctive)]
+        if len(hits) == 1:
+            return hits[0]
+    return None
