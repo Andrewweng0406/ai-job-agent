@@ -31,3 +31,8 @@ logs/*
 # --- local, gitignored: real candidate PII lives here, never committed ---
 config/candidate_profile.local.yaml
 config/*.local.yaml
+
+# Assisted-apply review packets contain real candidate answers/PII — never commit.
+review/
+# Generated resume PDFs (real candidate content)
+*.resume.pdf
