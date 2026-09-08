@@ -199,10 +199,11 @@ def _fill_one(page, selector: str, value: str) -> None:
         "el => !!el.closest('.select__control, [class*=\"-control\"], [class*=\"select__\"]')"
     )
 
+    T = 8000  # per-field cap so one stuck widget doesn't burn 30s
     if input_type == "file" or tag == "input" and input_type == "":
         from pathlib import Path as _P
         if _P(value).is_file():
-            loc.set_input_files(value)
+            loc.set_input_files(value, timeout=T)
             return
     if "candidate-location" in selector or (loc.get_attribute("aria-autocomplete") or "") == "list":
         _fill_places_autocomplete(page, loc, value, selector)
@@ -211,11 +212,11 @@ def _fill_one(page, selector: str, value: str) -> None:
         _select_option_fuzzy(loc, value, selector)
     elif input_type in {"checkbox", "radio"}:
         want = value.strip().lower() in {"yes", "true", "1", "on", "checked"}
-        loc.set_checked(want) if input_type == "checkbox" else loc.check()
+        loc.set_checked(want, timeout=T) if input_type == "checkbox" else loc.check(timeout=T)
     elif is_react_select:
         _fill_react_select(page, loc, value, selector)
     else:
-        loc.fill(value)
+        loc.fill(value, timeout=T)
 
 
 def _select_option_fuzzy(loc, value: str, selector: str) -> None:
@@ -238,9 +239,12 @@ def _select_option_fuzzy(loc, value: str, selector: str) -> None:
 
 def _fill_places_autocomplete(page, loc, value: str, selector: str) -> None:
     """Greenhouse's #candidate-location and similar: type, then pick a suggestion."""
-    loc.click()
-    loc.fill("")
-    loc.type(value, delay=25)
+    try:
+        loc.click(timeout=6000)
+        loc.fill(value, timeout=6000)
+    except Exception:
+        print(f"  ! {selector}: not interactable — left for you")
+        return
     page.wait_for_timeout(900)
     for sel in ('.pac-item', '[role="option"]', 'ul[role="listbox"] li', '.dropdown-item'):
         opts = page.locator(sel)
@@ -259,7 +263,11 @@ def _fill_react_select(page, loc, value: str, selector: str) -> None:
         opts = page.locator('[id^="react-select"][id*="option"], [role="option"]')
         return [(opts.nth(i), (opts.nth(i).inner_text() or "").strip()) for i in range(opts.count())]
 
-    loc.click()
+    try:
+        loc.click(timeout=6000)
+    except Exception:
+        print(f"  ! {selector}: not interactable — left for you")
+        return
     page.wait_for_timeout(300)
     texts = read_options()
 
@@ -274,8 +282,8 @@ def _fill_react_select(page, loc, value: str, selector: str) -> None:
         return None
 
     target = match(texts)
-    # Long list (country, school): type to filter, then match what remains.
-    if target is None and len(texts) > 12:
+    # Long or lazy list (country, school shows nothing until you type): filter, then match.
+    if target is None and (len(texts) > 12 or len(texts) == 0):
         try:
             loc.fill(value)
         except Exception:
