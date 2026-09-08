@@ -93,7 +93,12 @@ class StandardAnswers:
         return _map_to_option(value, options)
 
 
-_DECLINE_HINTS = ("decline", "prefer not", "don't wish", "do not wish", "rather not", "not disclose")
+_DECLINE_HINTS = (
+    "decline", "prefer not", "don't wish", "do not wish", "rather not", "not disclose",
+    "don't want to answer", "do not want to answer", "not want to answer",
+    "wish not to answer", "choose not to", "prefer not to say", "not to self-identify",
+    "i don't wish", "i do not wish",
+)
 
 
 def _map_to_option(value: str, options: list[str]) -> str | None:

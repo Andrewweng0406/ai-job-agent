@@ -204,6 +204,9 @@ def _fill_one(page, selector: str, value: str) -> None:
         if _P(value).is_file():
             loc.set_input_files(value)
             return
+    if "candidate-location" in selector or (loc.get_attribute("aria-autocomplete") or "") == "list":
+        _fill_places_autocomplete(page, loc, value, selector)
+        return
     if tag == "select":
         _select_option_fuzzy(loc, value, selector)
     elif input_type in {"checkbox", "radio"}:
@@ -233,36 +236,59 @@ def _select_option_fuzzy(loc, value: str, selector: str) -> None:
     loc.select_option(label=mapped)
 
 
+def _fill_places_autocomplete(page, loc, value: str, selector: str) -> None:
+    """Greenhouse's #candidate-location and similar: type, then pick a suggestion."""
+    loc.click()
+    loc.fill("")
+    loc.type(value, delay=25)
+    page.wait_for_timeout(900)
+    for sel in ('.pac-item', '[role="option"]', 'ul[role="listbox"] li', '.dropdown-item'):
+        opts = page.locator(sel)
+        if opts.count():
+            opts.first.click()
+            page.wait_for_timeout(150)
+            return
+    # no suggestions surfaced — leave the typed text, better than empty
+    print(f"  ~ {selector}: typed '{value}', no suggestion list appeared")
+
+
 def _fill_react_select(page, loc, value: str, selector: str) -> None:
     from app.applications.standard_answers import _map_to_option
 
+    def read_options():
+        opts = page.locator('[id^="react-select"][id*="option"], [role="option"]')
+        return [(opts.nth(i), (opts.nth(i).inner_text() or "").strip()) for i in range(opts.count())]
+
     loc.click()
-    page.wait_for_timeout(250)
-    try:
-        loc.fill(value)
-    except Exception:
+    page.wait_for_timeout(300)
+    texts = read_options()
+
+    # First try to match against the UNFILTERED list (EEO / yes-no / small enums).
+    def match(texts):
+        labels = [t.split(" +")[0].strip() for _, t in texts]
+        picked = _map_to_option(value, labels)
+        if picked is not None:
+            for el, t in texts:
+                if t.split(" +")[0].strip() == picked:
+                    return el
+        return None
+
+    target = match(texts)
+    # Long list (country, school): type to filter, then match what remains.
+    if target is None and len(texts) > 12:
         try:
-            loc.type(value, delay=10)
+            loc.fill(value)
         except Exception:
-            pass
-    page.wait_for_timeout(400)
-    options = page.locator('[id^="react-select"][id*="option"], [role="option"]')
-    texts = []
-    n = options.count()
-    for i in range(n):
-        texts.append((options.nth(i), (options.nth(i).inner_text() or "").strip()))
-    labels = [t.split(" +")[0].strip() for _, t in texts]  # country carries a " +1" suffix
-    picked = _map_to_option(value, labels)
-    target = None
-    if picked is not None:
-        for loc_i, t in texts:
-            if t.split(" +")[0].strip() == picked:
-                target = loc_i
-                break
-    if target is None:
-        # searchable combobox that filtered to one plausible row
-        if len(texts) == 1 and texts[0][1]:
+            try:
+                loc.type(value, delay=10)
+            except Exception:
+                pass
+        page.wait_for_timeout(450)
+        texts = read_options()
+        target = match(texts)
+        if target is None and len(texts) == 1 and texts[0][1]:
             target = texts[0][0]
+
     if target is None:
         page.keyboard.press("Escape")
         print(f"  ! no option like '{value}' for {selector} — left for you to pick")
