@@ -440,9 +440,13 @@ async function openBatch(dir){
   bTitle.textContent=`${rec.role||'?'} @ ${rec.company||'?'}`;
   if(rec.blocked){bBlockers.textContent='Blocked: '+((rec.reasons||[]).join(', '));bEssay.innerHTML='';bShot.removeAttribute('src');bFields.innerHTML='';return;}
   bBlockers.textContent=(rec.blockers||[]).length?('Still needs you in the browser: '+rec.blockers.join('; ')):'';
-  bEssay.innerHTML=rec.essay_text?`<h3>Essay draft (edit in the browser if needed)</h3><p style="white-space:pre-wrap;background:#f6f8fa;padding:10px;border-radius:5px">${esc(rec.essay_text)}</p>`:'';
+  const drafts=(rec.fields||[]).filter(f=>f.source==='essay'&&f.value);
+  bEssay.innerHTML=drafts.length?('<h3>AI drafts — read before submitting</h3>'+drafts.map(f=>
+    `<p class=hint style="margin:6px 0 2px">${esc(f.label)}</p><p style="white-space:pre-wrap;background:#f6f8fa;padding:10px;border-radius:5px">${esc(f.value)}</p>`).join('')):'';
   bShot.src='/batch/'+encodeURIComponent(dir)+'/filled.png?t='+Date.now();
-  bFields.innerHTML='<h3>Fields</h3>'+(rec.fields||[]).map(f=>`${esc(f.field_id)} · <b>${esc(f.source)}</b> · ${esc(f.label)} → ${esc(f.display||'')}`).join('<br>');
+  const need=(rec.fields||[]).filter(f=>['unresolved','must_queue'].includes(f.source));
+  bFields.innerHTML=(need.length?('<h3 class=warn>You finish these in the browser</h3>'+need.map(f=>`• ${esc(f.label)} <span class=hint>(${esc(f.reason||f.source)})</span>`).join('<br>')+'<br><br>'):'')
+    +'<h3>All fields</h3>'+(rec.fields||[]).map(f=>`<span class=hint>${esc(f.source)}</span> · ${esc(f.label)} → ${esc(f.display||'')}`).join('<br>');
 }
 async function batchApprove(){
   if(!confirm('Open a browser and pre-fill this application? It will NOT be submitted — you review and click Submit.'))return;
