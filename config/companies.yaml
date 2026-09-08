@@ -18,6 +18,33 @@ companies:
     metadata:
       discovery_status: adapter_required
       reason: Official careers search is not yet covered by a verified read-only adapter.
+  - company_id: anthropic
+    company_name: Anthropic
+    career_url: https://job-boards.greenhouse.io/anthropic
+    ats_type: greenhouse
+    ats_identifier: anthropic
+    active: true
+    industry: AI
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+  - company_id: stripe
+    company_name: Stripe
+    career_url: https://job-boards.greenhouse.io/stripe
+    ats_type: greenhouse
+    ats_identifier: stripe
+    active: true
+    industry: Financial Technology
+    metadata:
+      discovery_status: verified_public_greenhouse_board
+  - company_id: databricks
+    company_name: Databricks
+    career_url: https://job-boards.greenhouse.io/databricks
+    ats_type: greenhouse
+    ats_identifier: databricks
+    active: true
+    industry: Data and AI
+    metadata:
+      discovery_status: verified_public_greenhouse_board
   - company_id: meta
     company_name: Meta
     career_url: https://www.metacareers.com/jobs

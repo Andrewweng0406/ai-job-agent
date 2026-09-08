@@ -174,6 +174,14 @@ class JobAgentRepository:
     def insert_application(self, application: Application) -> str:
         dedupe_key = application.dedupe_key or _application_dedupe_key(application.job_id)
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            existing = conn.execute(
+                "SELECT application_id FROM applications WHERE job_id = ?",
+                (application.job_id,),
+            ).fetchone()
+            if existing is not None:
+                conn.execute("COMMIT")
+                return str(existing["application_id"])
             conn.execute(
                 """
                 INSERT INTO applications (
@@ -214,6 +222,7 @@ class JobAgentRepository:
                 "SELECT application_id FROM applications WHERE dedupe_key = ?",
                 (dedupe_key,),
             ).fetchone()
+            conn.execute("COMMIT")
             return str(row["application_id"])
 
     def application_exists_for_job(self, job_id: int) -> bool:

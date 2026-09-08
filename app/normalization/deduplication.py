@@ -63,9 +63,17 @@ def canonicalize_url(url: str) -> str:
 
 
 def _extract_req_id(url: str) -> str | None:
+    parsed = urlsplit(url)
+    query = dict(parse_qsl(parsed.query, keep_blank_values=False))
+    for key in ("gh_jid", "job_id", "jobId", "requisition_id", "requisitionId"):
+        value = query.get(key)
+        if value and re.fullmatch(r"[a-zA-Z0-9_-]+", value):
+            return value.lower()
     matches = re.findall(r"(?:jobs?|postings?|requisitions?)/([a-zA-Z0-9_-]+)", url)
     if matches:
-        return matches[-1].lower()
+        candidate = matches[-1].lower()
+        if candidate not in {"search", "results", "view", "apply", "openings"}:
+            return candidate
     numeric = re.findall(r"\b\d{3,}\b", url)
     return numeric[-1] if numeric else None
 

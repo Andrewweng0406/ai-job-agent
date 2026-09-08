@@ -28,6 +28,7 @@ class CandidateProfile:
     schema_version: int
     facts: dict[str, CandidateFact]
     application_answers: dict[str, str]
+    profile_source: str = "real"
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "CandidateProfile":
@@ -53,6 +54,7 @@ class CandidateProfile:
             schema_version=int(meta.get("schema_version", 2)),
             facts=facts,
             application_answers={str(key): str(value) for key, value in answers.items()},
+            profile_source=str(meta.get("profile_source", "real")),
         )
 
     def required_missing_fact_ids(self) -> list[str]:

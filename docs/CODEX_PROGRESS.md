@@ -197,6 +197,26 @@ Latest local verification:
   capture checkpoint, not an approved Gate G pass.
 - Full suite: 543 passed, 1 skipped, 8 xfailed.
 
+## Multi-Company Discovery Precision (2026-09-07)
+
+- Root cause of the inflated OpenAI match count was confirmed: 368 of 369 active candidates were
+  `job_family=UNKNOWN`, including legal, hardware, research, and senior roles. UNKNOWN jobs now remain
+  discoverable for later classification but cannot become application-eligible.
+- Added verified read-only Greenhouse boards for Anthropic, Stripe, and Databricks. Google, Meta,
+  Apple, and Tesla remain registered but inactive until dedicated official-careers adapters exist.
+- Added clear required `3+ years` filtering while preserving ranges that include early-career
+  candidates and explicitly preferred experience. Manager titles are now excluded for the new-grad
+  profile.
+- Expanded non-U.S. location handling for common locations observed in the live boards.
+- Fixed Greenhouse `/jobs/search?gh_jid=...` dedupe: the generic path word `search` can no longer act as
+  a requisition ID. Placeholder metadata such as `See Opening ID` is also rejected.
+- Discovery now idempotently creates a missing application for an unchanged eligible job, allowing
+  recovery after a previous dedupe defect. Legacy databases also check `job_id` transactionally before
+  inserting an application.
+- Live read-only results: OpenAI 750 jobs, Anthropic 584, Stripe 582, and Databricks 776. After strict
+  filtering, six active candidates remain: one OpenAI role and five Stripe roles. No application form
+  was opened and no submission occurred.
+
 ## Open-Source Reference Review
 
 ### Fixed / Adapted

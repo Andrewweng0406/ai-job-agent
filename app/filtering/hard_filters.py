@@ -7,7 +7,7 @@ from app.models.job import Job
 from app.models.enums import JobFamily
 
 
-SENIORITY_PATTERN = re.compile(r"\b(senior|sr\.?|staff|principal|director|vp|executive|head of)\b", re.I)
+SENIORITY_PATTERN = re.compile(r"\b(senior|sr\.?|staff|principal|manager|director|vp|executive|head of)\b", re.I)
 CLEARANCE_PATTERN = re.compile(
     r"\b(active\s+)?(top secret|ts/sci|secret)\s+clearance\b|\bsecurity clearance\b|"
     r"\bability\s+to\s+obtain\s+(a\s+)?security\s+clearance\b",
@@ -83,7 +83,17 @@ US_LOCATION_TERMS = {
     "austin",
     "atlanta",
 }
-NON_US_LOCATION_PATTERN = re.compile(r"\b(london|united kingdom|uk|canada|toronto|vancouver|india|singapore|germany)\b", re.I)
+NON_US_LOCATION_PATTERN = re.compile(
+    r"\b(london|united kingdom|uk|canada|toronto|vancouver|india|bengaluru|bangalore|singapore|germany|"
+    r"ireland|dublin|japan|tokyo|south korea|seoul|australia|sydney|france|paris|"
+    r"poland|brazil|sao paulo|são paulo)\b|\bontario\s*-\s*remote\b",
+    re.I,
+)
+THREE_PLUS_REQUIRED_PATTERN = re.compile(
+    r"\b(?:minimum(?:\s+of)?\s+|at\s+least\s+)?([3-9]|1[0-9])\+\s+years?"
+    r"(?:\s+of)?\s+(?:professional\s+|relevant\s+)?experience\b",
+    re.I,
+)
 EXPORT_CONTROL_PATTERN = re.compile(r"\b(itar|export-controlled|export controlled|u\.s\.\s+persons?)\b", re.I)
 
 
@@ -100,6 +110,8 @@ def apply_hard_filters(
     requires_visa_sponsorship: bool | None = True,
 ) -> FilterResult:
     text = f"{job.title}\n{job.description}"
+    if job.job_family == JobFamily.UNKNOWN:
+        return FilterResult(False, "ROLE_CLASSIFICATION_REQUIRED")
     if job.job_family != JobFamily.UNKNOWN and job.job_family.value not in accepted_families:
         return FilterResult(False, "ROLE_OUTSIDE_TARGET_FAMILIES")
     if _location_ineligible(job.location):
@@ -126,6 +138,10 @@ def apply_hard_filters(
 
 def _requires_high_experience(description: str) -> bool:
     required_text = _required_section(description)
+    for match in THREE_PLUS_REQUIRED_PATTERN.finditer(required_text):
+        suffix = required_text[match.end():match.end() + 24]
+        if not re.search(r"\b(preferred|desired|a plus)\b", suffix, re.I):
+            return True
     for match in HIGH_EXPERIENCE_PATTERN.finditer(required_text):
         start = max(0, match.start() - 4)
         prefix = required_text[start : match.start()]

@@ -127,6 +127,14 @@ def test_adv22_unknown_location_is_kept():
     assert r.allowed, "unknown location must be kept per PRIMARY PRINCIPLE"
 
 
+def test_common_non_us_locations_are_skipped():
+    for location in ("Dublin, Ireland", "Tokyo, Japan", "Seoul, South Korea",
+                     "Sydney, Australia", "Paris, France", "Poland - Remote", "Bengaluru",
+                     "Ontario - Remote"):
+        r = apply_hard_filters(make_job(location=location), DATA)
+        assert not r.allowed and r.reason == "LOCATION_INELIGIBLE", location
+
+
 # Employment type -------------------------------------------------------------
 def test_internship_employment_type_is_skipped():
     r = apply_hard_filters(make_job(employment_type="INTERNSHIP"), DATA)

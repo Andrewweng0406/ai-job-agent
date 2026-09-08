@@ -79,43 +79,15 @@ class DiscoveryPipeline:
                         self._reconcile_existing_ineligible(job_id, filter_result.reason)
                     if job.status in {JobStatus.NEW, JobStatus.UPDATED}:
                         changed_count += 1
-                        if filter_result.allowed:
-                            eligible_count += 1
-                            application = Application(
-                                job_id=job_id,
-                                company=job.company_name,
-                                position=job.title,
-                                location=job.location,
-                                job_family=job.job_family,
-                                source=job.source,
-                                ats_type=job.ats_type,
-                                dedupe_key=application_dedupe_key_for_job(job, self.candidate_id),
-                            )
-                            inserted_id = self.repository.insert_application(application)
-                            if inserted_id == application.application_id:
-                                self.repository.transition_application(
-                                    application.application_id,
-                                    ApplicationStatus.ELIGIBLE,
-                                    "passed deterministic hard filters",
-                                )
-                                created_count += 1
-                        elif filter_result.reason == "WORK_AUTHORIZATION_PROFILE_INCOMPLETE":
-                            application = Application(
-                                job_id=job_id,
-                                company=job.company_name,
-                                position=job.title,
-                                location=job.location,
-                                job_family=job.job_family,
-                                source=job.source,
-                                ats_type=job.ats_type,
-                                dedupe_key=application_dedupe_key_for_job(job, self.candidate_id),
-                            )
-                            app_id = self.repository.insert_application(application)
-                            if app_id == application.application_id:
-                                self.repository.mark_human_required(app_id, filter_result.reason)
-                            skipped_count += 1
-                        else:
-                            skipped_count += 1
+                    if filter_result.allowed:
+                        eligible_count += 1
+                        if self._ensure_application(job_id, job, human_reason=None):
+                            created_count += 1
+                    elif filter_result.reason == "WORK_AUTHORIZATION_PROFILE_INCOMPLETE":
+                        self._ensure_application(job_id, job, human_reason=filter_result.reason)
+                        skipped_count += 1
+                    else:
+                        skipped_count += 1
             except Exception as exc:
                 message = f"{company.company_id}: {exc}"
                 logger.exception("Discovery failed", extra={"adapter": company.ats_type})
@@ -131,6 +103,31 @@ class DiscoveryPipeline:
             applications_created=created_count,
             errors=errors,
         )
+
+    def _ensure_application(self, job_id: int, job: Job,
+                            human_reason: str | None) -> bool:
+        application = Application(
+            job_id=job_id,
+            company=job.company_name,
+            position=job.title,
+            location=job.location,
+            job_family=job.job_family,
+            source=job.source,
+            ats_type=job.ats_type,
+            dedupe_key=application_dedupe_key_for_job(job, self.candidate_id),
+        )
+        inserted_id = self.repository.insert_application(application)
+        if inserted_id != application.application_id:
+            return False
+        if human_reason:
+            self.repository.mark_human_required(inserted_id, human_reason)
+        else:
+            self.repository.transition_application(
+                inserted_id,
+                ApplicationStatus.ELIGIBLE,
+                "passed deterministic hard filters",
+            )
+        return True
 
     def _reconcile_existing_ineligible(self, job_id: int, reason: str | None) -> None:
         with self.repository.connect() as conn:

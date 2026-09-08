@@ -31,6 +31,15 @@ def test_skips_senior_role():
     assert result.reason == "SENIORITY_TOO_HIGH"
 
 
+def test_skips_manager_title_for_newgrad_candidate():
+    result = apply_hard_filters(
+        make_job("Product Operations Manager", "Product operations role."),
+        {"DATA_ANALYTICS"},
+    )
+    assert not result.allowed
+    assert result.reason == "SENIORITY_TOO_HIGH"
+
+
 def test_skips_us_citizen_only_role():
     result = apply_hard_filters(make_job("Data Analyst", "Applicants must be a U.S. citizen."), {"DATA_ANALYTICS"})
     assert not result.allowed
@@ -48,6 +57,7 @@ def test_no_sponsorship_depends_on_candidate_configuration():
     assert not incomplete.allowed and incomplete.reason == "WORK_AUTHORIZATION_PROFILE_INCOMPLETE"
 
 
-def test_unknown_job_family_is_kept_for_later_review():
+def test_unknown_job_family_is_not_application_eligible():
     result = apply_hard_filters(make_job("Analyst", "Ambiguous but not disqualified.", JobFamily.UNKNOWN), {"DATA_ANALYTICS"})
-    assert result.allowed
+    assert not result.allowed
+    assert result.reason == "ROLE_CLASSIFICATION_REQUIRED"

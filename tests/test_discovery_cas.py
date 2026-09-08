@@ -51,6 +51,7 @@ class _FixedSource:
             description="Analytics team. Requisition R-555. Build dashboards with SQL.",
             source=self._source, source_url=self._apply_url, apply_url=self._apply_url,
             ats_type=self._source,
+            job_family=TAXO.classify_title("Data Analyst"),
         )
 
 

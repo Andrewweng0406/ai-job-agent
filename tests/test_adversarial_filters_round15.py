@@ -65,6 +65,11 @@ def test_high_years_only_in_preferred_section_is_kept():
     assert result("Requirements: SQL, Python.\nPreferred: 6+ years of dashboarding.").allowed
 
 
+def test_three_plus_required_years_is_skipped_for_newgrad_candidate():
+    r = result("Requirements: 3+ years of relevant experience.")
+    assert not r.allowed and r.reason == "EXPERIENCE_REQUIREMENT_TOO_HIGH"
+
+
 def test_company_age_is_not_an_experience_requirement():
     assert result("For 10 years, the company has built software.\nRequirements: Python and React.").allowed
 

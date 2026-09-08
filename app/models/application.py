@@ -40,7 +40,7 @@ class Application:
 def requisition_key_for_job(job: Job) -> str:
     for key in ("requisition_id", "internal_job_id", "job_id", "jobId", "posting_id"):
         value = job.metadata.get(key)
-        if value not in (None, "", "TODO"):
+        if _valid_requisition_value(value):
             return f"req:{value}"
     canonical_url = canonicalize_url(job.apply_url)
     url_req = _extract_requisition_from_url(canonical_url)
@@ -49,6 +49,15 @@ def requisition_key_for_job(job: Job) -> str:
     if canonical_url:
         return f"url:{stable_hash(canonical_url)}"
     return f"{job.ats_type}:{job.external_job_id}"
+
+
+def _valid_requisition_value(value: object) -> bool:
+    if value in (None, "", "TODO"):
+        return False
+    normalized = " ".join(str(value).strip().lower().split())
+    return normalized not in {
+        "see opening id", "see job id", "opening id", "job id", "n/a", "na", "none",
+    }
 
 
 def application_dedupe_key_for_job(job: Job, candidate_id: str) -> str:

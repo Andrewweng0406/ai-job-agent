@@ -1,7 +1,7 @@
 """Adversarial dedup tests. See docs/CLAUDE_REVIEW.md P1-3 and docs/FAILURE_MODEL.md ADV-11/12."""
 from __future__ import annotations
 
-from app.normalization.deduplication import is_duplicate, job_identity_keys
+from app.normalization.deduplication import _extract_req_id, is_duplicate, job_identity_keys
 from tests.adv_helpers import make_job
 
 
@@ -27,6 +27,14 @@ def test_adv12_apply_url_tracking_params_are_ignored():
         company_name="Acme Inc",
     )
     assert is_duplicate(b, job_identity_keys(a))
+
+
+def test_greenhouse_job_id_query_beats_generic_search_path():
+    first = "https://stripe.com/jobs/search?gh_jid=8172487"
+    second = "https://stripe.com/jobs/search?gh_jid=8172508"
+    assert _extract_req_id(first) == "8172487"
+    assert _extract_req_id(second) == "8172508"
+    assert _extract_req_id(first) != _extract_req_id(second)
 
 
 def test_adv11_same_req_via_two_sources_is_deduped():
