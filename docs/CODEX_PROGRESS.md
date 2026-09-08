@@ -257,3 +257,12 @@ Latest local verification:
 - Routed AI tool/technology experience prompts through the verified-facts drafting path.
 - Live Benchling result: 6/8 required fields are safely resolved (75%). The remaining privacy acknowledgement and nuanced work-authorization category require explicit candidate choices; after those two choices the form can reach 100% required coverage.
 - The 90% target is treated as a coverage objective, never as permission to infer legal status or consent.
+
+## 2026-09-08 Hash-bound batch answer review
+
+- Added dashboard controls for required candidate-only answers, including real DOM option lists.
+- Human approvals are bound to the exact application URL and canonical SHA-256 of `record.json`; any refreshed form invalidates stale approval.
+- Missing answers, unknown field IDs, values outside the captured option set, blocked records, and preparation fill failures all fail closed.
+- Approved answers are merged into the headed browser fill only after server-side revalidation. The browser helper still exposes no submit operation.
+- Coverage now counts approved answers only while their approval artifact remains valid, allowing truthful 100% required coverage without guessing consent, relocation, or legal status.
+- The approver name is remembered only in browser-local storage and is not hard-coded or committed as candidate PII.

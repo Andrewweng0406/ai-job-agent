@@ -9,6 +9,9 @@ import sys
 from urllib.parse import urlparse, parse_qs
 
 from app.applications.assisted_answers import AnswersError, load_answers
+from app.applications.batch_answers import (
+    BatchAnswersError, load_batch_answers, record_hash, validate_batch_answers,
+)
 from app.applications.batch_prepare import BatchRecord
 from app.applications.review_packet import ReviewPacket
 from app.database.repository import JobAgentRepository
@@ -63,6 +66,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._batch_prepare(self._body())
         elif route == "/api/batch/approve":
             self._batch_approve(self._body())
+        elif route == "/api/batch/answers":
+            self._batch_answers(self._body())
         elif route == "/api/batch/skip":
             self._batch_skip(self._body())
         else:
@@ -95,12 +100,21 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 continue
             fields = raw.get("fields", [])
             resolved_sources = {"profile", "standard_answer", "essay"}
+            approved_ids: set[str] = set()
+            approval_valid = False
+            try:
+                approved_ids = set(load_batch_answers(d, raw).answers)
+                approval_valid = True
+            except BatchAnswersError:
+                pass
             required_fields = [field for field in fields if field.get("required")]
             required_resolved = sum(
-                1 for field in required_fields if field.get("source") in resolved_sources
+                1 for field in required_fields
+                if field.get("source") in resolved_sources or field.get("field_id") in approved_ids
             )
             total_resolved = sum(
-                1 for field in fields if field.get("source") in resolved_sources
+                1 for field in fields
+                if field.get("source") in resolved_sources or field.get("field_id") in approved_ids
             )
             out.append({
                 "dir": d.name,
@@ -108,7 +122,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 "role": raw.get("role", "?"),
                 "blocked": bool(raw.get("blocked")),
                 "reasons": raw.get("reasons", []),
-                "ready": bool(raw.get("ready")) and not raw.get("blocked"),
+                "ready": (bool(raw.get("ready")) or (
+                    approval_valid and required_resolved == len(required_fields)
+                )) and not raw.get("blocked"),
                 "skipped": (d / ".skipped").is_file(),
                 "auto_count": sum(1 for f in fields if f.get("source") in {"profile", "standard_answer", "essay"}),
                 "required_count": len(required_fields),
@@ -118,6 +134,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 "blocker_count": len(raw.get("blockers", [])),
                 "has_essay": bool(raw.get("essay_text")),
                 "has_shot": (d / "filled.png").is_file(),
+                "answers_approved": approval_valid,
             })
         return out
 
@@ -126,8 +143,22 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if d is None or not (d / "record.json").is_file():
             self.send_error(404)
             return
+        raw = json.loads((d / "record.json").read_text())
+        approval = {}
+        approval_valid = False
+        if (d / "approval.json").is_file():
+            try:
+                approval = json.loads((d / "approval.json").read_text())
+            except json.JSONDecodeError:
+                pass
+        try:
+            load_batch_answers(d, raw)
+            approval_valid = True
+        except BatchAnswersError:
+            pass
         self._json({"dir": name, "has_shot": (d / "filled.png").is_file(),
-                    "record": json.loads((d / "record.json").read_text())})
+                    "record_hash": record_hash(raw), "approval_valid": approval_valid,
+                    "approval": approval, "record": raw})
 
     def _batch_screenshot(self, name: str) -> None:
         d = self._safe_batch_dir(name)
@@ -158,13 +189,40 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if raw.get("blocked"):
             self._json({"ok": False, "error": "record is blocked"})
             return
-        if not BatchRecord.from_dict(raw).ready:
-            self._json({"ok": False, "error": "record has unresolved or failed fields"})
-            return
+        try:
+            load_batch_answers(d, raw)
+        except BatchAnswersError as exc:
+            if not BatchRecord.from_dict(raw).ready:
+                self._json({"ok": False, "error": str(exc)})
+                return
         keep = max(60, min(3600, int(body.get("keep_open_seconds") or 900)))
         subprocess.Popen([sys.executable, "scripts/batch_fill.py", "--record", str(d),
                           "--keep-open-seconds", str(keep)])
         self._json({"ok": True, "message": "A browser window is opening — review and click Submit yourself."})
+
+    def _batch_answers(self, body: dict) -> None:
+        d = self._safe_batch_dir(str(body.get("dir") or ""))
+        if d is None or not (d / "record.json").is_file():
+            self._json({"ok": False, "error": "unknown record"})
+            return
+        raw = json.loads((d / "record.json").read_text())
+        approval = {
+            "schema_version": 1,
+            "approved_by": str(body.get("approved_by") or "").strip(),
+            "approved_at": str(body.get("approved_at") or "").strip(),
+            "apply_url": raw.get("apply_url"),
+            "record_hash": str(body.get("record_hash") or ""),
+            "answers": body.get("answers") or {},
+        }
+        try:
+            validate_batch_answers(raw, approval)
+        except BatchAnswersError as exc:
+            self._json({"ok": False, "error": str(exc)})
+            return
+        temp = d / "approval.json.tmp"
+        temp.write_text(json.dumps(approval, indent=2, sort_keys=True), encoding="utf-8")
+        temp.replace(d / "approval.json")
+        self._json({"ok": True, "message": "Human answers approved for this exact form version."})
 
     def _batch_skip(self, body: dict) -> None:
         d = self._safe_batch_dir(str(body.get("dir") or ""))
@@ -415,9 +473,15 @@ textarea{min-height:70px}.q{border-top:1px solid #eee;padding-top:10px;margin-to
   <p id=bBlockers class=warn></p>
   <div id=bEssay></div>
   <img id=bShot alt="filled form" style="max-width:100%;border:1px solid #ccc;margin:8px 0">
+  <div id=bAnswers></div>
+  <div id=bApproval style="display:none;gap:10px;margin-top:12px">
+    <div style="flex:1"><label>Approved by</label><input id=bBy type=text placeholder="your name"></div>
+    <div style="flex:1"><label>Approved at</label><input id=bAt type=text></div>
+  </div>
   <div id=bFields class=hint></div>
   <p>
     <a id=bVisit class=button-link target="_blank" rel="noopener noreferrer">Open application website</a>
+    <button id=bSave onclick="saveBatchAnswers()">Approve my answers</button>
     <button id=bApprove class=primary onclick="batchApprove()">Open browser &amp; fill (you submit)</button>
     <button onclick="batchSkip()">Skip</button>
     <span id=bDMsg class=hint></span>
@@ -440,6 +504,8 @@ async function load(){
   loadPackets(); loadBatch();
 }
 let BCUR=null;
+let BRECORD=null;
+let BRECORDHASH='';
 async function loadBatch(){
   const {items}=await (await fetch('/api/batch')).json();
   batch.innerHTML='<tr><th>Company</th><th>Role</th><th>Required coverage</th><th>Total coverage</th><th>Needs you</th><th>Status</th><th></th></tr>'+
@@ -458,10 +524,11 @@ async function batchPrepare(){
 async function openBatch(dir){
   const x=await (await fetch('/api/batch/item?dir='+encodeURIComponent(dir))).json();
   const rec=x.record;
+  BRECORD=rec; BRECORDHASH=x.record_hash;
   BCUR=dir; bDetail.style.display='block'; bDetail.scrollIntoView({behavior:'smooth'});
   bTitle.textContent=`${rec.role||'?'} @ ${rec.company||'?'}`;
   bVisit.href=String(rec.apply_url||'').startsWith('https://')?rec.apply_url:'#';
-  bApprove.disabled=true;
+  bApprove.disabled=true; bSave.style.display='none'; bApproval.style.display='none'; bAnswers.innerHTML='';
   if(rec.blocked){bBlockers.textContent='Blocked: '+((rec.reasons||[]).join(', '));bEssay.innerHTML='';bShot.removeAttribute('src');bShot.style.display='none';bFields.innerHTML='';return;}
   bBlockers.textContent=(rec.blockers||[]).length?('Still needs you in the browser: '+rec.blockers.join('; ')):'';
   const drafts=(rec.fields||[]).filter(f=>f.source==='essay'&&f.value);
@@ -470,9 +537,31 @@ async function openBatch(dir){
   if(x.has_shot){bShot.src='/batch/'+encodeURIComponent(dir)+'/filled.png?t='+Date.now();bShot.style.display='block';}
   else{bShot.removeAttribute('src');bShot.style.display='none';}
   const need=(rec.fields||[]).filter(f=>['unresolved','must_queue'].includes(f.source));
+  const previous=(x.approval&&x.approval.record_hash===x.record_hash)?(x.approval.answers||{}):{};
+  const requiredNeed=need.filter(f=>f.required);
+  if(requiredNeed.length){
+    bSave.style.display='inline-block';bApproval.style.display='flex';bAt.value=new Date().toISOString();bBy.value=localStorage.getItem('batchApprovedBy')||'';
+    bAnswers.innerHTML='<h3>Your required answers</h3>'+requiredNeed.map(f=>{
+      const current=previous[f.field_id]||'';
+      const control=(f.options&&f.options.length)
+        ? `<select id="ba_${f.field_id}"><option value="">— choose —</option>${f.options.map(o=>`<option value="${esc(o)}"${o===current?' selected':''}>${esc(o)}</option>`).join('')}</select>`
+        : (f.kind==='long_text'?`<textarea id="ba_${f.field_id}">${esc(current)}</textarea>`:`<input id="ba_${f.field_id}" type=text value="${esc(current)}">`);
+      return `<div class=q><label>${esc(f.label)} <span class=warn>*</span></label>${control}<div class=hint>${esc(f.reason||'Candidate answer required')}</div></div>`;
+    }).join('');
+  }
   bFields.innerHTML=(need.length?('<h3 class=warn>You finish these in the browser</h3>'+need.map(f=>`• ${esc(f.label)} <span class=hint>(${esc(f.reason||f.source)})</span>`).join('<br>')+'<br><br>'):'')
     +'<h3>All fields</h3>'+(rec.fields||[]).map(f=>`<span class=hint>${esc(f.source)}</span> · ${esc(f.label)} → ${esc(f.display||'')}`).join('<br>');
-  bApprove.disabled=!rec.ready;
+  bApprove.disabled=!(rec.ready||x.approval_valid);
+}
+async function saveBatchAnswers(){
+  const answers={};
+  (BRECORD.fields||[]).filter(f=>f.required&&['unresolved','must_queue'].includes(f.source)).forEach(f=>{
+    const el=document.getElementById('ba_'+f.field_id);if(el&&el.value.trim())answers[f.field_id]=el.value.trim();
+  });
+  bDMsg.textContent='validating answers…';
+  if(bBy.value.trim())localStorage.setItem('batchApprovedBy',bBy.value.trim());
+  const r=await (await fetch('/api/batch/answers',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({dir:BCUR,record_hash:BRECORDHASH,approved_by:bBy.value,approved_at:bAt.value,answers})})).json();
+  bDMsg.textContent=r.ok?r.message:('✗ '+r.error);if(r.ok){await openBatch(BCUR);loadBatch();}
 }
 async function batchApprove(){
   if(!confirm('Open a browser and pre-fill this application? It will NOT be submitted — you review and click Submit.'))return;

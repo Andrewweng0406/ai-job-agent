@@ -31,6 +31,7 @@ class BatchField:
     value: str | None      # value to fill; None when unresolved
     display: str           # masked/short value for the review card
     reason: str | None = None
+    options: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)
@@ -204,7 +205,7 @@ def resolve_scanned(
 
         if is_must_queue_question(label) or is_experience_question(label):
             fields.append(BatchField(fid, label, sel, kind, required, "must_queue", None, "",
-                                     "personal narrative / disclosure — you handle this"))
+                                     "personal narrative / disclosure — you handle this", opts))
             if required:
                 blockers.append(f"needs you: {label[:60]}")
             continue
@@ -218,7 +219,7 @@ def resolve_scanned(
                                      answer[:60], None))
         else:
             fields.append(BatchField(fid, label, sel, kind, required, "unresolved", None, "",
-                                     "no profile fact or standard answer"))
+                                     "no profile fact or standard answer", opts))
             if required:
                 blockers.append(f"unmapped required: {label[:60]}")
 

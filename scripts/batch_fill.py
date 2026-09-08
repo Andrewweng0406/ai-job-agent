@@ -14,6 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.applications.batch_prepare import BatchRecord
+from app.applications.batch_answers import BatchAnswersError, load_batch_answers
 from scripts.assisted_apply import _fill_one
 
 
@@ -31,9 +32,16 @@ def main() -> int:
         return 2
     record = BatchRecord.from_dict(raw)
     if not record.ready:
-        print(f"record has unresolved or failed fields: {record.blockers}")
-        return 2
+        try:
+            approved = load_batch_answers(rec_path.parent, raw)
+        except BatchAnswersError as exc:
+            print(f"record has unresolved or failed fields: {exc}")
+            return 2
+    else:
+        approved = None
     fill_map = record.fill_map()
+    if approved is not None:
+        fill_map.update(approved.fill_map(record))
     print(f"{record.role} @ {record.company}")
     print(f"{len(fill_map)} fields to fill; résumé: {record.resume_pdf or '(none)'}")
     if record.blockers:
