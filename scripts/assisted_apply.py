@@ -49,28 +49,35 @@ def cmd_packet(args) -> int:
             page.screenshot(path=str(out / "before_fill.png"), full_page=True)
             html = page.content()
             capture = BrowserFieldCapture().capture(page, ats_type=args.ats)
+            if capture.human_required:
+                (out / "packet.json").write_text(json.dumps(
+                    {"blocked": True, "reasons": capture.blocking_reasons, "url": args.url}, indent=2))
+                (out / "dom.sanitized.html").write_text(_sanitize_html(html), encoding="utf-8")
+                print(f"BLOCKED: {capture.blocking_reasons} — see {out}")
+                return 2
+
+            resolutions = [resolve_form_field(f, profile, args.resume_pdf or "",
+                                              resume_validated=bool(args.resume_pdf))
+                           for f in capture.fields]
+            role = _role_from_title(title, args.role)
+            packet = build_review_packet(
+                company=args.company, role=role, apply_url=args.url, ats=args.ats,
+                raw_fields=capture.fields, resolutions=resolutions,
+            )
+            selectors = {f"q{i}": r.selector for i, r in enumerate(resolutions)
+                         if r.status.value in {"HUMAN_REQUIRED", "BLOCKED"}}
+            # Harvest options for react-select widgets so the reviewer sees real choices.
+            live_options = _harvest_options(page, selectors)
         finally:
             browser.close()
 
     (out / "dom.sanitized.html").write_text(_sanitize_html(html), encoding="utf-8")
-    if capture.human_required:
-        (out / "packet.json").write_text(json.dumps(
-            {"blocked": True, "reasons": capture.blocking_reasons, "url": args.url}, indent=2))
-        print(f"BLOCKED: {capture.blocking_reasons} — see {out}")
-        return 2
-
-    resolutions = [resolve_form_field(f, profile, args.resume_pdf or "", resume_validated=bool(args.resume_pdf))
-                   for f in capture.fields]
-    role = _role_from_title(title, args.role)
-    packet = build_review_packet(
-        company=args.company, role=role, apply_url=args.url, ats=args.ats,
-        raw_fields=capture.fields, resolutions=resolutions,
-    )
-    # field_id -> selector, needed by the fill step
-    selectors = {f"q{i}": r.selector for i, r in enumerate(resolutions)
-                 if r.status.value in {"HUMAN_REQUIRED", "BLOCKED"}}
+    packet_dict = packet.to_dict()
+    for q in packet_dict["needs_your_answer"]:
+        if not q["options"] and q["field_id"] in live_options:
+            q["options"] = live_options[q["field_id"]]
     (out / "field_selectors.json").write_text(json.dumps(selectors, indent=2, sort_keys=True))
-    (out / "packet.json").write_text(json.dumps(packet.to_dict(), indent=2, sort_keys=True))
+    (out / "packet.json").write_text(json.dumps(packet_dict, indent=2, sort_keys=True))
     (out / "packet.md").write_text(packet.to_markdown(), encoding="utf-8")
 
     print(packet.to_markdown())
@@ -85,16 +92,8 @@ def cmd_fill(args) -> int:
     if packet_raw.get("blocked"):
         print("packet is blocked; cannot fill")
         return 2
-    from app.applications.review_packet import ReviewPacket, SafeField, OpenQuestion
-    packet = ReviewPacket(
-        company=packet_raw["company"], role=packet_raw["role"], apply_url=packet_raw["apply_url"],
-        ats=packet_raw["ats"],
-        safe_prefill=[SafeField(**s) for s in packet_raw["safe_prefill"]],
-        needs_your_answer=[OpenQuestion(**q) for q in packet_raw["needs_your_answer"]],
-        optional_skipped=packet_raw["optional_skipped"],
-        blocked=[OpenQuestion(**q) for q in packet_raw["blocked"]],
-        resume_fact_ids=packet_raw.get("resume_fact_ids", []),
-    )
+    from app.applications.review_packet import ReviewPacket
+    packet = ReviewPacket.from_dict(packet_raw)
     approved = load_answers(args.answers or (packet_dir / "answers.yaml"), packet)
     selectors = json.loads((packet_dir / "field_selectors.json").read_text())
     answer_by_selector = {selectors[fid]: val for fid, val in approved.answers.items() if fid in selectors}
@@ -122,11 +121,60 @@ def cmd_fill(args) -> int:
             page.screenshot(path=str(packet_dir / "after_fill.png"), full_page=True)
             print(f"\nFilled {len(filled.filled_selectors)} profile fields + {len(answer_by_selector)} of your answers.")
             print("The form has NOT been submitted. Review it and click Submit yourself.")
-            if args.headed:
+            if args.headed and args.keep_open_seconds > 0:
+                print(f"Browser stays open for {args.keep_open_seconds}s — review and submit.")
+                page.wait_for_timeout(args.keep_open_seconds * 1000)
+            elif args.headed:
                 input("\nPress Enter here to close the browser once you are done...")
         finally:
             browser.close()
     return 0
+
+
+def _harvest_options(page, selectors: dict[str, str]) -> dict[str, list[str]]:
+    """Open each native <select> / react-select and record its option labels,
+    scoping to the menu THIS control owns so options don't bleed between fields."""
+    found: dict[str, list[str]] = {}
+    for field_id, selector in selectors.items():
+        loc = page.locator(_css(selector))
+        if loc.count() == 0:
+            continue
+        try:
+            tag = (loc.evaluate("el => el.tagName") or "").lower()
+            if tag == "select":
+                opts = loc.evaluate("el => [...el.options].map(o => o.text.trim()).filter(Boolean)")
+                if opts:
+                    found[field_id] = opts[:300]
+                continue
+            if not loc.evaluate("el => !!el.closest('[class*=\"-control\"],[class*=\"select__\"]')"):
+                continue
+            _close_menus(page)
+            loc.scroll_into_view_if_needed()
+            loc.click()
+            page.wait_for_timeout(350)
+            listbox_id = loc.get_attribute("aria-controls") or loc.get_attribute("aria-owns")
+            if listbox_id:
+                opts = page.locator(f'#{listbox_id} [role="option"]').all_inner_texts()
+            else:
+                opts = page.locator('[role="listbox"]:visible [role="option"]').all_inner_texts()
+            _close_menus(page)
+            cleaned = [re.sub(r"\+\d+$", "", o.strip()).strip() for o in opts if o.strip()]
+            if cleaned:
+                found[field_id] = list(dict.fromkeys(cleaned))[:300]
+        except Exception:
+            _close_menus(page)
+            continue
+    return found
+
+
+def _close_menus(page) -> None:
+    try:
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(150)
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(150)
+    except Exception:
+        pass
 
 
 def _fill_one(page, selector: str, value: str) -> None:
@@ -223,6 +271,8 @@ def main() -> int:
     fl.add_argument("--profile", default="config/candidate_profile.yaml")
     fl.add_argument("--resume-pdf")
     fl.add_argument("--headed", action="store_true")
+    fl.add_argument("--keep-open-seconds", type=int, default=0,
+                    help="with --headed, hold the browser open this long instead of waiting on Enter")
     fl.add_argument("--timeout-ms", type=int, default=30_000)
     fl.set_defaults(func=cmd_fill)
 

@@ -76,6 +76,18 @@ class ReviewPacket:
             "ready_for_assisted_fill": self.ready_for_assisted_fill,
         }
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ReviewPacket":
+        return cls(
+            company=data["company"], role=data["role"], apply_url=data["apply_url"],
+            ats=data["ats"],
+            safe_prefill=[SafeField(**s) for s in data.get("safe_prefill", [])],
+            needs_your_answer=[OpenQuestion(**q) for q in data.get("needs_your_answer", [])],
+            optional_skipped=int(data.get("optional_skipped", 0)),
+            blocked=[OpenQuestion(**q) for q in data.get("blocked", [])],
+            resume_fact_ids=list(data.get("resume_fact_ids", [])),
+        )
+
     def to_markdown(self) -> str:
         lines = [
             f"# Review packet — {self.role} @ {self.company}",
