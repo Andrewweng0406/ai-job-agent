@@ -216,15 +216,63 @@ def _fill_one(page, selector: str, value: str) -> None:
     if "candidate-location" in selector or (loc.get_attribute("aria-autocomplete", timeout=3_000) or "") == "list":
         _fill_places_autocomplete(page, loc, value, selector)
         return
+    group_n = page.locator(_css(selector)).count()
+    if input_type == "radio" or (input_type == "checkbox" and group_n > 1):
+        _check_matching_in_group(page, selector, value, kind=input_type)
+        return
     if tag == "select":
         _select_option_fuzzy(loc, value, selector)
-    elif input_type in {"checkbox", "radio"}:
+    elif input_type == "checkbox":
         want = value.strip().lower() in {"yes", "true", "1", "on", "checked"}
-        loc.set_checked(want, timeout=T) if input_type == "checkbox" else loc.check(timeout=T)
+        loc.set_checked(want, timeout=T)
     elif is_react_select:
         _fill_react_select(page, loc, value, selector)
     else:
         loc.fill(value, timeout=T)
+
+
+def _check_matching_in_group(page, selector: str, value: str, *, kind: str) -> None:
+    """Radio / checkbox group: check ONLY the option(s) whose label matches `value`.
+    Never falls back to 'first' — a wrong EEO / veteran selection is worse than none."""
+    from app.applications.standard_answers import _map_to_option
+
+    inputs = page.locator(_css(selector))
+    n = inputs.count()
+    pairs = []  # (locator, label)
+    for i in range(n):
+        el = inputs.nth(i)
+        try:
+            label = el.evaluate(
+                """el => {
+                    if (el.id) { const l = document.querySelector(`label[for="${el.id}"]`); if (l) return l.innerText; }
+                    const w = el.closest('label'); if (w) return w.innerText;
+                    const sib = el.nextElementSibling; if (sib && sib.innerText) return sib.innerText;
+                    return el.getAttribute('aria-label') || el.value || '';
+                }""",
+                timeout=3_000,
+            )
+        except Exception:
+            label = ""
+        pairs.append((el, " ".join((label or "").split())))
+
+    labels = [lbl for _, lbl in pairs]
+    want_values = [value] if kind == "radio" else [v.strip() for v in re.split(r"[;,]", value) if v.strip()]
+    checked_any = False
+    for wv in want_values:
+        picked = _map_to_option(wv, labels)
+        if picked is None:
+            print(f"  ! no {kind} option like '{wv}' for {selector} — left for you")
+            continue
+        for el, lbl in pairs:
+            if lbl == picked:
+                try:
+                    el.check(timeout=6_000)
+                    checked_any = True
+                except Exception as exc:
+                    print(f"  ! {selector}: could not check '{picked}' ({type(exc).__name__})")
+                break
+    if not checked_any and want_values:
+        print(f"  ! {selector}: '{value}' did not match any option — left for you")
 
 
 def _select_option_fuzzy(loc, value: str, selector: str) -> None:
