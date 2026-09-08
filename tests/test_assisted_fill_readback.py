@@ -74,6 +74,19 @@ def test_readback_handles_greenhouse_react_select(page):
     assert _verify_filled(page, "id=sponsor", "Yes")
 
 
+def test_phone_country_can_use_exact_clicked_option_as_secondary_evidence(page):
+    page.set_content('<input id="country" role="combobox" value="+1">')
+    assert _verify_filled(
+        page, "id=country", "United States", action_evidence="United States"
+    ) == "+1"
+
+
+def test_secondary_evidence_cannot_hide_an_empty_react_control(page):
+    page.set_content('<input id="country" role="combobox" value="">')
+    with pytest.raises(RuntimeError, match="FILL_READBACK_MISMATCH"):
+        _verify_filled(page, "id=country", "United States", action_evidence="United States")
+
+
 def test_long_essay_is_never_treated_as_a_filesystem_path():
     essay = "I built reliable data systems. " * 200
     assert _filled_values_match(essay, essay)

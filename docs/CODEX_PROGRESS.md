@@ -292,3 +292,13 @@ Latest local verification:
 - The repeated Anthropic live run verified every attempted safe fill. Its only remaining blockers are four explicit candidate decisions: AI-use policy, prior interview history, reading the arbitration agreement, and agreement to arbitrate.
 - Verification: `687 passed, 1 skipped`; Python bytecode compilation and `git diff --check` passed. Ruff was not installed in the execution environment.
 - Safety state remains unchanged: `real_submission_enabled=false`; no submit primitive was introduced and no application was submitted.
+
+## 2026-09-08 Cross-ATS live read-back audit
+
+- Re-ran current public application DOMs for Anthropic and Scale AI (Greenhouse), plus Benchling and Notion (Ashby), using the real candidate profile and validated resume without submitting.
+- Anthropic: every attempted safe field passed browser read-back; only AI-use policy, prior interview history, and two arbitration acknowledgements remain candidate-only.
+- Benchling: resume, profile, pronouns, hybrid-work answer, verified-facts AI-tools draft, EEO choices, and sponsorship passed read-back. Privacy-policy consent and its nuanced work-authorization category remain candidate-only.
+- Notion: all attempted safe fields passed read-back. Relocation destinations and the specific `OPT/H1B/TN/None/Other` sponsorship category remain candidate-only because the current profile does not establish those facts.
+- Scale AI: closed required phone-country verification by retaining the exact React option clicked and requiring a non-empty post-click control state. The only remaining blocker is the candidate's education start year; job-availability dates remain prohibited from filling that field.
+- Added adversarial tests proving secondary React option evidence cannot make an empty control pass verification.
+- Verification: `689 passed, 1 skipped`; bytecode compilation and `git diff --check` passed. No application was submitted.

@@ -242,7 +242,7 @@ def _fill_one(page, selector: str, value: str) -> str | None:
         want = value.strip().lower() in {"yes", "true", "1", "on", "checked"}
         loc.set_checked(want, timeout=T)
     elif is_react_select:
-        _fill_react_select(page, loc, value, selector)
+        return _fill_react_select(page, loc, value, selector)
     else:
         loc.fill(value, timeout=T)
 
@@ -292,7 +292,15 @@ def _verify_filled(page, selector: str, expected: str, *, action_evidence: str |
             }""",
             timeout=4_000,
         )
-    if not _filled_values_match(expected, actual, file_field=selector.lower().endswith(("resume", "cover"))):
+    matched = _filled_values_match(
+        expected, actual, file_field=selector.lower().endswith(("resume", "cover"))
+    )
+    # Some Greenhouse phone-country controls render only the dialing code after
+    # selection. Accept that non-empty state only when _fill_react_select also
+    # recorded the exact option label it clicked.
+    if not matched and actual and action_evidence:
+        matched = _filled_values_match(expected, action_evidence)
+    if not matched:
         raise RuntimeError(f"FILL_READBACK_MISMATCH:{selector}")
     return actual
 
@@ -512,7 +520,7 @@ def _fill_places_autocomplete(page, loc, value: str, selector: str) -> None:
     raise RuntimeError(f"FILL_AUTOCOMPLETE_UNCONFIRMED:{selector}")
 
 
-def _fill_react_select(page, loc, value: str, selector: str) -> None:
+def _fill_react_select(page, loc, value: str, selector: str) -> str:
     from app.applications.standard_answers import _map_to_option
 
     def read_options():
@@ -555,8 +563,10 @@ def _fill_react_select(page, loc, value: str, selector: str) -> None:
     if target is None:
         page.keyboard.press("Escape")
         raise RuntimeError(f"FILL_OPTION_NOT_FOUND:{selector}")
+    selected_label = (target.inner_text() or "").split(" +")[0].strip()
     target.click()
     page.wait_for_timeout(150)
+    return selected_label
 
 
 def _css(selector: str) -> str:
