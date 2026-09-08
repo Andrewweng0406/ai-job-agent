@@ -278,3 +278,5 @@ Latest local verification:
 - Re-navigation now rebinds reviewed values by normalized label and input kind instead of trusting ephemeral ATS selectors. Any required-field drift or ambiguous match closes the browser before filling.
 - Removed the duplicate resume-upload fallback that could target non-resume file controls.
 - Live rebind verification found and safely replaced four changed selectors on both Notion and Benchling; Anthropic retained a 26-field stable structure.
+- Batch records now carry an explicit schema version. Older captures are surfaced as `STALE_REVIEW_RECORD` and cannot be approved or filled, preventing fixed code from consuming screenshots/transcripts produced by obsolete mapping logic.
+- Rebuilt the Anthropic, Benchling, Notion, and Scale AI baseline records with schema v2 against their current live forms; all remained non-submitting attention records for explicit candidate-only answers.

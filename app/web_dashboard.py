@@ -12,7 +12,7 @@ from app.applications.assisted_answers import AnswersError, load_answers
 from app.applications.batch_answers import (
     BatchAnswersError, load_batch_answers, record_hash, validate_batch_answers,
 )
-from app.applications.batch_prepare import BatchRecord
+from app.applications.batch_prepare import BATCH_RECORD_SCHEMA_VERSION, BatchRecord
 from app.applications.review_packet import ReviewPacket
 from app.database.repository import JobAgentRepository
 from app.llm.budget import SQLiteDailyBudget
@@ -99,6 +99,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             except json.JSONDecodeError:
                 continue
             fields = raw.get("fields", [])
+            stale = int(raw.get("schema_version", 1)) != BATCH_RECORD_SCHEMA_VERSION
             resolved_sources = {"profile", "standard_answer", "essay"}
             approved_ids: set[str] = set()
             approval_valid = False
@@ -120,11 +121,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 "dir": d.name,
                 "company": raw.get("company", "?"),
                 "role": raw.get("role", "?"),
-                "blocked": bool(raw.get("blocked")),
-                "reasons": raw.get("reasons", []),
+                "blocked": bool(raw.get("blocked")) or stale,
+                "reasons": (["STALE_REVIEW_RECORD"] if stale else raw.get("reasons", [])),
                 "ready": (bool(raw.get("ready")) or (
                     approval_valid and required_resolved == len(required_fields)
-                )) and not raw.get("blocked"),
+                )) and not raw.get("blocked") and not stale,
                 "skipped": (d / ".skipped").is_file(),
                 "auto_count": sum(1 for f in fields if f.get("source") in {"profile", "standard_answer", "essay"}),
                 "required_count": len(required_fields),
@@ -135,6 +136,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 "has_essay": bool(raw.get("essay_text")),
                 "has_shot": (d / "filled.png").is_file(),
                 "answers_approved": approval_valid,
+                "stale": stale,
             })
         return out
 
@@ -144,6 +146,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_error(404)
             return
         raw = json.loads((d / "record.json").read_text())
+        stale = int(raw.get("schema_version", 1)) != BATCH_RECORD_SCHEMA_VERSION
         approval = {}
         approval_valid = False
         if (d / "approval.json").is_file():
@@ -158,6 +161,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             pass
         self._json({"dir": name, "has_shot": (d / "filled.png").is_file(),
                     "record_hash": record_hash(raw), "approval_valid": approval_valid,
+                    "stale": stale,
                     "approval": approval, "record": raw})
 
     def _batch_screenshot(self, name: str) -> None:
@@ -186,6 +190,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._json({"ok": False, "error": "unknown record"})
             return
         raw = json.loads((d / "record.json").read_text())
+        if int(raw.get("schema_version", 1)) != BATCH_RECORD_SCHEMA_VERSION:
+            self._json({"ok": False, "error": "stale review record; prepare it again"})
+            return
         if raw.get("blocked"):
             self._json({"ok": False, "error": "record is blocked"})
             return
@@ -529,7 +536,7 @@ async function openBatch(dir){
   bTitle.textContent=`${rec.role||'?'} @ ${rec.company||'?'}`;
   bVisit.href=String(rec.apply_url||'').startsWith('https://')?rec.apply_url:'#';
   bApprove.disabled=true; bSave.style.display='none'; bApproval.style.display='none'; bAnswers.innerHTML='';
-  if(rec.blocked){bBlockers.textContent='Blocked: '+((rec.reasons||[]).join(', '));bEssay.innerHTML='';bShot.removeAttribute('src');bShot.style.display='none';bFields.innerHTML='';return;}
+  if(x.stale||rec.blocked){bBlockers.textContent=x.stale?'Blocked: STALE_REVIEW_RECORD — prepare it again':'Blocked: '+((rec.reasons||[]).join(', '));bEssay.innerHTML='';bShot.removeAttribute('src');bShot.style.display='none';bFields.innerHTML='';return;}
   bBlockers.textContent=(rec.blockers||[]).length?('Still needs you in the browser: '+rec.blockers.join('; ')):'';
   const drafts=(rec.fields||[]).filter(f=>f.source==='essay'&&f.value);
   bEssay.innerHTML=drafts.length?('<h3>AI drafts — read before submitting</h3>'+drafts.map(f=>

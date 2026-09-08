@@ -155,6 +155,7 @@ def test_record_round_trips_through_dict(std):
     again = BatchRecord.from_dict(json.loads(json.dumps(rec.to_dict())))
     assert again.fill_map() == rec.fill_map()
     assert again.ready == rec.ready
+    assert again.schema_version == 2
 
 
 def test_scanned_combobox_uses_standard_degree_level_and_never_drafts_location(std):

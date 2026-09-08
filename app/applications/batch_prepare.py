@@ -19,6 +19,8 @@ from app.applications.standard_answers import (
     StandardAnswers, is_essay_question, is_experience_question, is_must_queue_question,
 )
 
+BATCH_RECORD_SCHEMA_VERSION = 2
+
 
 @dataclass(frozen=True, slots=True)
 class BatchField:
@@ -46,6 +48,7 @@ class BatchRecord:
     essay_reason: str | None
     optional_skipped: int
     blockers: list[str] = field(default_factory=list)
+    schema_version: int = BATCH_RECORD_SCHEMA_VERSION
 
     @property
     def ready(self) -> bool:
@@ -71,6 +74,7 @@ class BatchRecord:
             essay_text=data.get("essay_text"), essay_reason=data.get("essay_reason"),
             optional_skipped=int(data.get("optional_skipped", 0)),
             blockers=list(data.get("blockers", [])),
+            schema_version=int(data.get("schema_version", 1)),
         )
 
 

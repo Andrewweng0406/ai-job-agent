@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.applications.batch_prepare import BatchRecord
+from app.applications.batch_prepare import BATCH_RECORD_SCHEMA_VERSION, BatchRecord
 from app.applications.batch_answers import BatchAnswersError, load_batch_answers, rebind_fill_map
 from app.applications.live_field_scan import scan_form
 from scripts.assisted_apply import _fill_one
@@ -28,6 +28,9 @@ def main() -> int:
 
     rec_path = Path(args.record) / "record.json"
     raw = json.loads(rec_path.read_text())
+    if int(raw.get("schema_version", 1)) != BATCH_RECORD_SCHEMA_VERSION:
+        print("record is stale; prepare it again")
+        return 2
     if raw.get("blocked"):
         print(f"record is blocked: {raw.get('reasons')}")
         return 2

@@ -12,6 +12,7 @@ from app.applications.batch_prepare import BatchRecord
 
 def _record():
     return {
+        "schema_version": 2,
         "company": "Acme", "role": "Analyst", "apply_url": "https://example.test/job",
         "ats": "ashby", "resume_pdf": "resume.pdf", "essay_text": None,
         "essay_reason": None, "optional_skipped": 0, "ready": False,
@@ -51,6 +52,13 @@ def test_batch_answers_reject_stale_hash_and_non_option():
         validate_batch_answers(raw, _approval(raw, record_hash="0" * 64))
     with pytest.raises(BatchAnswersError, match="not an offered option"):
         validate_batch_answers(raw, _approval(raw, answers={"q1": "Guess"}))
+
+
+def test_legacy_batch_record_requires_fresh_preparation():
+    raw = _record()
+    raw.pop("schema_version")
+    with pytest.raises(BatchAnswersError, match="stale review record"):
+        validate_batch_answers(raw, _approval(raw))
 
 
 def test_batch_answers_require_every_required_open_field():

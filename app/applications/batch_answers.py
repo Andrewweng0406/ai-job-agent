@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 import re
 
-from app.applications.batch_prepare import BatchRecord
+from app.applications.batch_prepare import BATCH_RECORD_SCHEMA_VERSION, BatchRecord
 from app.applications.live_field_scan import ScannedField
 
 
@@ -37,6 +37,8 @@ def validate_batch_answers(raw: dict, approval: dict) -> ApprovedBatchAnswers:
     if raw.get("blocked"):
         raise BatchAnswersError("record is blocked")
     record = BatchRecord.from_dict(raw)
+    if record.schema_version != BATCH_RECORD_SCHEMA_VERSION:
+        raise BatchAnswersError("stale review record; prepare it again")
     approved_by = str(approval.get("approved_by") or "").strip()
     approved_at = str(approval.get("approved_at") or "").strip()
     if not approved_by:
