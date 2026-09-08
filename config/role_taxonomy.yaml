@@ -1,13 +1,27 @@
 accepted_job_families:
   DATA_ANALYTICS:
     persona: DATA
+    # Tier 1: explicit early-career titles — always classify.
     title_keywords:
       - data analyst
       - business intelligence analyst
       - product analyst
       - analytics analyst
+      - reporting analyst
       - junior data scientist
       - entry-level data scientist
+      - new grad data scientist
+      - associate data scientist
+    # Tier 2: generic titles — classify only when a new-grad signal is present
+    # in the title or job description (see app/matching/taxonomy.py).
+    base_title_keywords:
+      - data scientist
+      - data analyst
+      - analytics engineer
+      - decision scientist
+      - research analyst
+      - insights analyst
+      - marketing analyst
   PRODUCT_PM:
     persona: PRODUCT_PM
     title_keywords:
@@ -19,6 +33,10 @@ accepted_job_families:
       - technical product analyst
       - associate program manager
       - program analyst
+    base_title_keywords:
+      - product manager
+      - program manager
+      - technical program manager
   BUSINESS_SYSTEMS:
     persona: BUSINESS_SYSTEMS
     title_keywords:
@@ -28,6 +46,13 @@ accepted_job_families:
       - technology analyst
       - operations analyst
       - strategy analyst
+      - gtm strategy
+      - sales strategy
+      - revenue operations analyst
+    base_title_keywords:
+      - business operations
+      - strategy and operations
+      - revenue operations
   FINANCE:
     persona: FINANCE
     title_keywords:
@@ -37,6 +62,12 @@ accepted_job_families:
       - finance analyst
       - quantitative analyst
       - fintech analyst
+      - finance & strategy analyst
+      - finance and strategy analyst
+    base_title_keywords:
+      - finance analyst
+      - quantitative researcher
+      - quantitative analyst
   TECHNICAL:
     persona: TECHNICAL
     title_keywords:
@@ -44,5 +75,23 @@ accepted_job_families:
       - entry-level data engineer
       - junior software engineer
       - new grad software engineer
+      - new graduate software engineer
       - software engineer - new grad
       - software engineer (new grad
+      - software engineer, new grad
+      - software engineer new grad
+      - university graduate software engineer
+      - associate software engineer
+    base_title_keywords:
+      - software engineer
+      - data engineer
+      - machine learning engineer
+      - ml engineer
+      - backend engineer
+      - back end engineer
+      - frontend engineer
+      - front end engineer
+      - full stack engineer
+      - fullstack engineer
+      - platform engineer
+      - infrastructure engineer

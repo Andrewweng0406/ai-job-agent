@@ -5,6 +5,7 @@ import re
 
 from app.models.job import Job
 from app.models.enums import JobFamily
+from app.matching.taxonomy import is_new_grad_signal
 
 
 SENIORITY_PATTERN = re.compile(r"\b(senior|sr\.?|staff|principal|manager|director|vp|executive|head of)\b", re.I)
@@ -95,6 +96,21 @@ THREE_PLUS_REQUIRED_PATTERN = re.compile(
     re.I,
 )
 EXPORT_CONTROL_PATTERN = re.compile(r"\b(itar|export-controlled|export controlled|u\.s\.\s+persons?)\b", re.I)
+# Language that unambiguously implies years of professional seniority even when
+# no explicit "N years" / "Senior" marker is present.
+SOFT_SENIORITY_PATTERN = re.compile(
+    r"\bdeep\s+(industry\s+|professional\s+|hands[-\s]on\s+)?experience\b|"
+    r"\bextensive\s+(industry\s+|professional\s+|hands[-\s]on\s+)?experience\b|"
+    r"\bsignificant\s+(industry\s+|professional\s+|prior\s+)?experience\b|"
+    r"\bproven\s+track\s+record\b|"
+    r"\btrack\s+record\s+of\s+(leading|shipping|delivering|building|scaling|managing)\b|"
+    r"\bseasoned\b|"
+    r"\bmentor(ed|ing|s)?\s+(other\s+|fellow\s+|junior\s+|team\s+)?(engineers|scientists|developers|researchers)\b|"
+    r"\b(led|leading|managed|managing)\s+(a\s+)?(team|group)\s+of\b|"
+    r"\bproduction\s+systems\s+used\s+by\s+millions\b|"
+    r"\bph\.?d\.?\b[^.\n]{0,40}\b(or\s+equivalent|equivalent\s+(practical\s+)?experience)\b",
+    re.I,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,6 +136,8 @@ def apply_hard_filters(
         return FilterResult(False, "SENIORITY_TOO_HIGH")
     if _requires_high_experience(job.description):
         return FilterResult(False, "EXPERIENCE_REQUIREMENT_TOO_HIGH")
+    if not is_new_grad_signal(text) and SOFT_SENIORITY_PATTERN.search(_required_section(job.description)):
+        return FilterResult(False, "SENIORITY_TOO_HIGH")
     if US_CITIZEN_PATTERN.search(text):
         return FilterResult(False, "US_CITIZEN_ONLY")
     if EXPORT_CONTROL_PATTERN.search(text):
