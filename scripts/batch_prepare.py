@@ -53,6 +53,19 @@ def _slug(company: str, url: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", f"{company}-{url.rsplit('/', 1)[-1]}".lower()).strip("-")[:80]
 
 
+def _normalize_apply_url(url: str) -> str:
+    """A company careers page that only proxies Greenhouse (…?gh_jid=N) never
+    renders the real form; jump straight to the Greenhouse board."""
+    m = re.search(r"[?&]gh_jid=(\d+)", url)
+    if not m:
+        return url
+    host = re.sub(r"^https?://(www\.)?", "", url).split("/")[0]
+    if "greenhouse.io" in host:
+        return url
+    token = host.split(".")[0]  # e.g. stripe.com -> stripe
+    return f"https://job-boards.greenhouse.io/{token}/jobs/{m.group(1)}"
+
+
 def _candidates(repo: JobAgentRepository, limit: int) -> list[dict]:
     with repo.connect() as conn:
         rows = conn.execute(
@@ -104,6 +117,7 @@ def main() -> int:
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)
         for row in todo:
+            row["apply_url"] = _normalize_apply_url(row["apply_url"])
             slug = _slug(row["company"], row["apply_url"])
             out = out_root / slug
             out.mkdir(parents=True, exist_ok=True)

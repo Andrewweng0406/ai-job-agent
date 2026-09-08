@@ -94,6 +94,15 @@ class HtmlFormFieldExtractor:
         labelled_text = _element_text_by_id(html)
         fields: list[RawFormField] = []
         radio_groups: dict[str, list[_Element]] = {}
+        checkbox_groups: dict[str, list[_Element]] = {}
+        # A set of >=3 checkboxes sharing a name or a legend is one multi-select
+        # question (e.g. Lever's language-proficiency grid), not N required fields.
+        cb_key_counts: dict[str, int] = {}
+        for control in parser.controls:
+            if control.attrs.get("type", "").lower() == "checkbox" and not _is_noninteractive(control):
+                key = _checkbox_group_key(control)
+                if key:
+                    cb_key_counts[key] = cb_key_counts.get(key, 0) + 1
         for index, control in enumerate(parser.controls):
             input_type = control.attrs.get("type", "text").lower()
             if input_type in {"hidden", "submit", "button", "reset"}:
@@ -103,8 +112,13 @@ class HtmlFormFieldExtractor:
             if input_type == "radio" and control.attrs.get("name"):
                 radio_groups.setdefault(control.attrs["name"], []).append(control)
                 continue
+            if input_type == "checkbox":
+                key = _checkbox_group_key(control)
+                if key and cb_key_counts.get(key, 0) >= 3:
+                    checkbox_groups.setdefault(key, []).append(control)
+                    continue
             label = _label_for(control, parser.labels, labelled_text)
-            if not label:
+            if not label or not _MEANINGFUL_LABEL.search(label):
                 continue
             fields.append(
                 RawFormField(
@@ -128,7 +142,33 @@ class HtmlFormFieldExtractor:
                     options=options,
                 )
             )
+        for key, controls in checkbox_groups.items():
+            options = [_clean_label(_label_for(c, parser.labels, labelled_text) or c.attrs.get("value", ""))
+                       for c in controls]
+            options = [o for o in options if o]
+            group_label = next((c.attrs["data-group-label"] for c in controls
+                                if c.attrs.get("data-group-label")), "") or _clean_text(key)
+            fields.append(
+                RawFormField(
+                    label=group_label,
+                    kind=InputKind.MULTI_SELECT,
+                    selector=f"name={controls[0].attrs.get('name', key)}",
+                    required=any(_is_required(c, group_label) for c in controls),
+                    options=options,
+                )
+            )
         return fields
+
+
+_MEANINGFUL_LABEL = re.compile(r"[A-Za-z0-9]")
+
+
+def _checkbox_group_key(control: _Element) -> str:
+    name = control.attrs.get("name", "")
+    if name:
+        # Lever names cards distinctly per option; group on the shared prefix.
+        return re.sub(r"\[[^\]]*\]\s*$", "", name) or name
+    return control.attrs.get("data-group-label", "")
 
 
 def _label_for(control: _Element, labels: dict[str, str], labelled_text: dict[str, str]) -> str:
