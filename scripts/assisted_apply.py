@@ -177,7 +177,7 @@ def _close_menus(page) -> None:
         pass
 
 
-def _fill_one(page, selector: str, value: str) -> None:
+def _fill_one(page, selector: str, value: str) -> str | None:
     """fill / select / check / upload only — never a click on a submit control, never Enter.
 
     Handles native <select> (with fuzzy option matching), checkboxes/radios,
@@ -216,7 +216,18 @@ def _fill_one(page, selector: str, value: str) -> None:
         from pathlib import Path as _P
         if _P(value).is_file():
             loc.set_input_files(value, timeout=T)
-            return
+            # Greenhouse immediately unmounts the input after accepting the
+            # upload. That disappearance is a valid postcondition only after
+            # set_input_files itself returned successfully.
+            if page.locator(_css(selector)).count() == 0:
+                return _P(value).name
+            uploaded = loc.evaluate(
+                "el => el.files && el.files.length ? el.files[0].name : ''",
+                timeout=2_000,
+            )
+            if uploaded != _P(value).name:
+                raise RuntimeError(f"FILL_FILE_READBACK_MISMATCH:{selector}")
+            return uploaded
     classes = (loc.get_attribute("class", timeout=3_000) or "").lower()
     if "candidate-location" in selector or "pac-target-input" in classes:
         _fill_places_autocomplete(page, loc, value, selector)
@@ -236,7 +247,7 @@ def _fill_one(page, selector: str, value: str) -> None:
         loc.fill(value, timeout=T)
 
 
-def _verify_filled(page, selector: str, expected: str) -> str:
+def _verify_filled(page, selector: str, expected: str, *, action_evidence: str | None = None) -> str:
     """Read a value back from the rendered control and fail closed on mismatch.
 
     A successful Playwright click/fill only proves that an action was dispatched.
@@ -249,6 +260,14 @@ def _verify_filled(page, selector: str, expected: str) -> str:
     else:
         controls = page.locator(_css(selector))
         if controls.count() == 0:
+            # Greenhouse replaces its file input after upload.  The rendered
+            # filename may disappear too, so use the FileList read-back taken
+            # synchronously by _fill_one before React replaces the component.
+            expected_path = _existing_file_path(expected)
+            if expected_path is not None and action_evidence == expected_path.name:
+                return action_evidence
+            if expected_path is not None and page.get_by_text(expected_path.name, exact=True).count():
+                return expected_path.name
             raise RuntimeError(f"VERIFY_SELECTOR_NOT_FOUND:{selector}")
         loc = controls.first
         actual = loc.evaluate(
@@ -266,7 +285,7 @@ def _verify_filled(page, selector: str, expected: str) -> str:
                 }
                 if (el.tagName === 'SELECT') return clean(el.options[el.selectedIndex]?.textContent || el.value);
                 if ((el.getAttribute('role') || '').toLowerCase() === 'combobox') {
-                    const box = el.closest('.select__control,[class*="-control"],[class*="select__"], [role=group]');
+                    const box = el.closest('.select__control,[class*="-control"],[role=group]');
                     return clean(el.value || (box && box.innerText) || el.getAttribute('aria-valuetext'));
                 }
                 return clean(el.value || el.textContent);
@@ -303,15 +322,28 @@ def _read_group_value(page, question: str) -> str:
 
 
 def _filled_values_match(expected: str, actual: str, *, file_field: bool = False) -> bool:
-    from pathlib import Path as _P
     from app.applications.standard_answers import _map_to_option
 
-    want = _P(expected).name if file_field or _P(expected).is_file() else expected
+    expected_path = _existing_file_path(expected)
+    want = expected_path.name if file_field or expected_path is not None else expected
     want_parts = [part.strip() for part in re.split(r"[;,]", want) if part.strip()]
     got_parts = [part.strip() for part in re.split(r"[;,]", actual or "") if part.strip()]
     if not want_parts or not got_parts:
         return False
     return all(_map_to_option(part, got_parts) is not None for part in want_parts)
+
+
+def _existing_file_path(value: str):
+    """Return a Path only for plausible existing paths without OS path errors."""
+    from pathlib import Path as _P
+
+    if not value or len(value) > 1024 or "\n" in value or "\r" in value:
+        return None
+    try:
+        path = _P(value)
+        return path if path.is_file() else None
+    except OSError:
+        return None
 
 
 def _fill_group_by_question(page, question: str, value: str) -> None:

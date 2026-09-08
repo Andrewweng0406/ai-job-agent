@@ -68,8 +68,8 @@ def main() -> int:
             print(f"{len(fill_map)} fields to fill; résumé: {record.resume_pdf or '(none)'}")
             for selector, value in fill_map.items():
                 try:
-                    _fill_one(page, selector, value)
-                    _verify_filled(page, selector, value)
+                    action_evidence = _fill_one(page, selector, value)
+                    _verify_filled(page, selector, value, action_evidence=action_evidence)
                 except Exception as exc:  # noqa: BLE001
                     print(f"  ! {selector}: {type(exc).__name__}: {exc}")
                     print("Mapped-field fill failed. Closing without leaving a partial form for submission.")

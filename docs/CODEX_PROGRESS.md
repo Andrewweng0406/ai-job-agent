@@ -287,5 +287,8 @@ Latest local verification:
 - Added fail-closed read-back verification for text inputs, native selects, React comboboxes, radio/checkbox groups, question-scoped controls, and file uploads.
 - Both headless batch preparation and the final headed assisted-fill path now stop on a missing selector, empty value, wrong selected option, discarded React value, or other transcript/browser mismatch.
 - Added browser-level regression tests, including the observed failure class where an essay field is expected but the DOM contains the candidate name instead.
-- Verification: `683 passed, 1 skipped`; Python bytecode compilation and `git diff --check` passed. Ruff was not installed in the execution environment.
+- A real Anthropic Greenhouse run exposed and closed three verifier defects: long essays being probed as paths, React-select values being read from the input wrapper instead of the control, and file inputs unmounting immediately after a successful upload.
+- Optional Greenhouse phone-country selection is no longer claimed as verified because its final DOM retains only a non-unique dialing code (`+1` for the configured United States answer).
+- The repeated Anthropic live run verified every attempted safe fill. Its only remaining blockers are four explicit candidate decisions: AI-use policy, prior interview history, reading the arbitration agreement, and agreement to arbitrate.
+- Verification: `687 passed, 1 skipped`; Python bytecode compilation and `git diff --check` passed. Ruff was not installed in the execution environment.
 - Safety state remains unchanged: `real_submission_enabled=false`; no submit primitive was introduced and no application was submitted.

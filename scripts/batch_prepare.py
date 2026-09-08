@@ -174,8 +174,8 @@ def main() -> int:
                 # fill every mappable field; a per-field failure is noted, not fatal
                 for selector, value in record.fill_map().items():
                     try:
-                        _fill_one(page, selector, value)
-                        _verify_filled(page, selector, value)
+                        action_evidence = _fill_one(page, selector, value)
+                        _verify_filled(page, selector, value, action_evidence=action_evidence)
                     except Exception as fx:  # noqa: BLE001
                         record.blockers.append(
                             f"could not verify fill '{selector}' ({type(fx).__name__}: {fx})"

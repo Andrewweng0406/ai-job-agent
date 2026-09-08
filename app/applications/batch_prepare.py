@@ -185,6 +185,15 @@ def resolve_scanned(
         label, kind, sel, required = sf.label, sf.kind, sf.selector, sf.required
         opts = list(sf.options)
 
+        # Greenhouse's optional phone-country widget collapses a selected
+        # country to its dialing code (for example +1), which is not unique
+        # enough to verify. Leave it for the applicant instead of claiming a
+        # successful fill. Required country fields still go through resolution.
+        if label.strip().lower() == "country" and not required:
+            fields.append(BatchField(fid, label, sel, kind, required, "unresolved", None, "",
+                                     "optional phone country cannot be uniquely verified", opts))
+            continue
+
         if kind == "file":
             is_resume = any(word in label.lower() for word in ("resume", "résumé", "cv"))
             value = resume_pdf if is_resume else None
