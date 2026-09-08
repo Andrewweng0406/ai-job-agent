@@ -69,6 +69,7 @@ def main() -> int:
     load_dotenv()
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--limit", type=int, default=10)
+    ap.add_argument("--company", default=None, help="only prepare applications whose company contains this")
     ap.add_argument("--profile", default="config/candidate_profile.local.yaml")
     ap.add_argument("--standard-answers", default="config/standard_answers.local.yaml")
     ap.add_argument("--resume-pdf", default="data/resumes/andrew_weng_master.pdf")
@@ -89,7 +90,9 @@ def main() -> int:
     if not resume_pdf:
         print(f"! résumé not found at {args.resume_pdf} — records will note a missing resume")
 
-    todo = _candidates(repo, args.limit)
+    todo = _candidates(repo, args.limit if not args.company else 200)
+    if args.company:
+        todo = [r for r in todo if args.company.lower() in (r["company"] or "").lower()][:args.limit]
     if not todo:
         print("nothing QUEUED/READY to prepare")
         return 0
@@ -150,14 +153,16 @@ def main() -> int:
                         _fill_one(page, selector, value)
                     except Exception as fx:  # noqa: BLE001
                         record.blockers.append(f"could not fill '{selector}' ({type(fx).__name__})")
-                # résumé upload — best effort
-                if resume_pdf:
-                    for r in resolutions:
-                        if r.kind == InputKind.FILE:
-                            try:
-                                page.locator(r.selector.replace("id=", "#", 1)).set_input_files(resume_pdf)
-                            except Exception as up_exc:  # noqa: BLE001
-                                record.blockers.append(f"resume upload needs you ({type(up_exc).__name__})")
+                # résumé upload — fallback to the first file input if nothing mapped it
+                if resume_pdf and not any(f.kind == "file" and f.value for f in record.fields):
+                    try:
+                        fi = page.locator('input[type=file]').first
+                        if fi.count():
+                            fi.set_input_files(resume_pdf)
+                        else:
+                            record.blockers.append("resume upload needs you (no file input found)")
+                    except Exception as up_exc:  # noqa: BLE001
+                        record.blockers.append(f"resume upload needs you ({type(up_exc).__name__})")
                 page.screenshot(path=str(out / "filled.png"), full_page=True)
                 (out / "record.json").write_text(json.dumps(record.to_dict(), indent=2, sort_keys=True))
 

@@ -178,17 +178,20 @@ def _close_menus(page) -> None:
 
 
 def _fill_one(page, selector: str, value: str) -> None:
-    """fill / select / check only — never a click on a submit control, never Enter.
+    """fill / select / check / upload only — never a click on a submit control, never Enter.
 
-    Handles native <select>, checkboxes/radios, react-select comboboxes, and plain
-    text. A react-select value that does not exactly match an offered option is
-    skipped with a warning rather than guessed.
+    Handles native <select> (with fuzzy option matching), checkboxes/radios,
+    react-select comboboxes, file inputs, and plain text. A choice value that does
+    not resemble any offered option is skipped rather than guessed.
     """
-    loc = page.locator(_css(selector))
-    if loc.count() == 0:
+    loc = page.locator(_css(selector)).first
+    if page.locator(_css(selector)).count() == 0:
         print(f"  ! selector not found, skipped: {selector}")
         return
-    loc.scroll_into_view_if_needed()
+    try:
+        loc.scroll_into_view_if_needed(timeout=3_000)
+    except Exception:
+        pass
     tag = (loc.evaluate("el => el.tagName") or "").lower()
     input_type = (loc.get_attribute("type") or "").lower()
     role = (loc.get_attribute("role") or "").lower()
@@ -196,36 +199,73 @@ def _fill_one(page, selector: str, value: str) -> None:
         "el => !!el.closest('.select__control, [class*=\"-control\"], [class*=\"select__\"]')"
     )
 
+    if input_type == "file" or tag == "input" and input_type == "":
+        from pathlib import Path as _P
+        if _P(value).is_file():
+            loc.set_input_files(value)
+            return
     if tag == "select":
-        loc.select_option(label=value)
+        _select_option_fuzzy(loc, value, selector)
     elif input_type in {"checkbox", "radio"}:
-        loc.check()
+        want = value.strip().lower() in {"yes", "true", "1", "on", "checked"}
+        loc.set_checked(want) if input_type == "checkbox" else loc.check()
     elif is_react_select:
         _fill_react_select(page, loc, value, selector)
     else:
         loc.fill(value)
 
 
+def _select_option_fuzzy(loc, value: str, selector: str) -> None:
+    from app.applications.standard_answers import _map_to_option
+    options = loc.evaluate("el => [...el.options].map(o => o.textContent.trim()).filter(Boolean)")
+    if not options:
+        print(f"  ! <select> {selector} has no options")
+        return
+    try:
+        loc.select_option(label=value)
+        return
+    except Exception:
+        pass
+    mapped = _map_to_option(value, options)
+    if mapped is None:
+        print(f"  ! no option like '{value}' for {selector} — left for you")
+        return
+    loc.select_option(label=mapped)
+
+
 def _fill_react_select(page, loc, value: str, selector: str) -> None:
+    from app.applications.standard_answers import _map_to_option
+
     loc.click()
     page.wait_for_timeout(250)
     try:
         loc.fill(value)
     except Exception:
-        loc.type(value, delay=10)
-    page.wait_for_timeout(350)
+        try:
+            loc.type(value, delay=10)
+        except Exception:
+            pass
+    page.wait_for_timeout(400)
     options = page.locator('[id^="react-select"][id*="option"], [role="option"]')
-    target = None
+    texts = []
     n = options.count()
     for i in range(n):
-        text = (options.nth(i).inner_text() or "").strip()
-        base = text.split(" +")[0].strip()  # country options carry a " +1" dial-code suffix
-        if text == value or base == value or text.lower() == value.lower():
-            target = options.nth(i)
-            break
+        texts.append((options.nth(i), (options.nth(i).inner_text() or "").strip()))
+    labels = [t.split(" +")[0].strip() for _, t in texts]  # country carries a " +1" suffix
+    picked = _map_to_option(value, labels)
+    target = None
+    if picked is not None:
+        for loc_i, t in texts:
+            if t.split(" +")[0].strip() == picked:
+                target = loc_i
+                break
+    if target is None:
+        # searchable combobox that filtered to one plausible row
+        if len(texts) == 1 and texts[0][1]:
+            target = texts[0][0]
     if target is None:
         page.keyboard.press("Escape")
-        print(f"  ! no exact option '{value}' for {selector} — left for you to pick")
+        print(f"  ! no option like '{value}' for {selector} — left for you to pick")
         return
     target.click()
     page.wait_for_timeout(150)
