@@ -189,15 +189,23 @@ def _fill_one(page, selector: str, value: str) -> None:
         print(f"  ! selector not found, skipped: {selector}")
         return
     try:
+        loc.wait_for(state="attached", timeout=4_000)
         loc.scroll_into_view_if_needed(timeout=3_000)
     except Exception:
         pass
-    tag = (loc.evaluate("el => el.tagName") or "").lower()
-    input_type = (loc.get_attribute("type") or "").lower()
-    role = (loc.get_attribute("role") or "").lower()
-    is_react_select = role == "combobox" or loc.evaluate(
-        "el => !!el.closest('.select__control, [class*=\"-control\"], [class*=\"select__\"]')"
-    )
+    try:
+        meta = loc.evaluate(
+            "el => ({tag: el.tagName, type: el.getAttribute('type')||'', role: el.getAttribute('role')||'',"
+            " rs: !!el.closest('.select__control,[class*=\"-control\"],[class*=\"select__\"]')})",
+            timeout=4_000,
+        )
+    except Exception:
+        print(f"  ! {selector}: element not stable — left for you")
+        return
+    tag = (meta["tag"] or "").lower()
+    input_type = (meta["type"] or "").lower()
+    role = (meta["role"] or "").lower()
+    is_react_select = role == "combobox" or bool(meta["rs"])
 
     T = 8000  # per-field cap so one stuck widget doesn't burn 30s
     if input_type == "file" or tag == "input" and input_type == "":
@@ -205,7 +213,7 @@ def _fill_one(page, selector: str, value: str) -> None:
         if _P(value).is_file():
             loc.set_input_files(value, timeout=T)
             return
-    if "candidate-location" in selector or (loc.get_attribute("aria-autocomplete") or "") == "list":
+    if "candidate-location" in selector or (loc.get_attribute("aria-autocomplete", timeout=3_000) or "") == "list":
         _fill_places_autocomplete(page, loc, value, selector)
         return
     if tag == "select":
