@@ -275,3 +275,6 @@ Latest local verification:
 - Harvested current Greenhouse React-select options for human-only questions and bound them to the approval artifact.
 - Changed headed assisted fill to close immediately on any mapped-field interaction failure instead of leaving a partially filled form available for submission.
 - Live Anthropic differential now shows no identity contamination. Motivation contains a verified-facts draft, Additional Information is empty, LinkedIn contains the configured URL, and the remaining four required controls are explicit AI-policy/interview/arbitration acknowledgements.
+- Re-navigation now rebinds reviewed values by normalized label and input kind instead of trusting ephemeral ATS selectors. Any required-field drift or ambiguous match closes the browser before filling.
+- Removed the duplicate resume-upload fallback that could target non-resume file controls.
+- Live rebind verification found and safely replaced four changed selectors on both Notion and Benchling; Anthropic retained a 26-field stable structure.

@@ -14,7 +14,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.applications.batch_prepare import BatchRecord
-from app.applications.batch_answers import BatchAnswersError, load_batch_answers
+from app.applications.batch_answers import BatchAnswersError, load_batch_answers, rebind_fill_map
+from app.applications.live_field_scan import scan_form
 from scripts.assisted_apply import _fill_one
 
 
@@ -39,11 +40,7 @@ def main() -> int:
             return 2
     else:
         approved = None
-    fill_map = record.fill_map()
-    if approved is not None:
-        fill_map.update(approved.fill_map(record))
     print(f"{record.role} @ {record.company}")
-    print(f"{len(fill_map)} fields to fill; résumé: {record.resume_pdf or '(none)'}")
     if record.blockers:
         print("NOTE — these still need you in the browser:")
         for b in record.blockers:
@@ -59,6 +56,13 @@ def main() -> int:
                 page.wait_for_load_state("networkidle", timeout=15_000)
             except Exception:
                 pass
+            page.wait_for_timeout(2_500)
+            try:
+                fill_map = rebind_fill_map(record, scan_form(page), approved)
+            except BatchAnswersError as exc:
+                print(f"Form changed or selectors could not be rebound: {exc}")
+                return 2
+            print(f"{len(fill_map)} fields to fill; résumé: {record.resume_pdf or '(none)'}")
             for selector, value in fill_map.items():
                 try:
                     _fill_one(page, selector, value)
@@ -66,13 +70,6 @@ def main() -> int:
                     print(f"  ! {selector}: {type(exc).__name__}")
                     print("Mapped-field fill failed. Closing without leaving a partial form for submission.")
                     return 2
-            if record.resume_pdf:
-                for f in record.fields:
-                    if f.kind == "file":
-                        try:
-                            page.locator(f.selector.replace("id=", "#", 1)).set_input_files(record.resume_pdf)
-                        except Exception:
-                            print(f"  ! résumé upload — do it yourself ({f.selector})")
             print("\nForm filled. NOT submitted. Review it and click Submit yourself.")
             page.wait_for_timeout(max(60, args.keep_open_seconds) * 1000)
         finally:

@@ -4,8 +4,10 @@ import json
 import pytest
 
 from app.applications.batch_answers import (
-    BatchAnswersError, load_batch_answers, record_hash, validate_batch_answers,
+    BatchAnswersError, load_batch_answers, rebind_fill_map, record_hash, validate_batch_answers,
 )
+from app.applications.live_field_scan import ScannedField
+from app.applications.batch_prepare import BatchRecord
 
 
 def _record():
@@ -63,3 +65,32 @@ def test_loading_tampered_approval_fails_closed(tmp_path):
     raw["apply_url"] = "https://example.test/changed"
     with pytest.raises(BatchAnswersError, match="hash mismatch"):
         load_batch_answers(tmp_path, raw)
+
+
+def test_rebind_uses_current_dynamic_selector_and_approved_value():
+    raw = _record()
+    record = BatchRecord.from_dict(raw)
+    approved = validate_batch_answers(raw, _approval(raw))
+    current = [
+        ScannedField("Name", "text", "id=new-name", True),
+        ScannedField("Work authorization", "radio_group", "name=random-new-id", True,
+                     ["Current employer", "Any employer"]),
+    ]
+
+    assert rebind_fill_map(record, current, approved) == {
+        "id=new-name": "Test Candidate",
+        "name=random-new-id": "Current employer",
+    }
+
+
+def test_rebind_rejects_required_form_drift_and_ambiguous_fields():
+    record = BatchRecord.from_dict(_record())
+    with pytest.raises(BatchAnswersError, match="structure changed"):
+        rebind_fill_map(record, [ScannedField("Name", "text", "id=name", True)])
+    duplicated = [
+        ScannedField("Name", "text", "id=name-1", True),
+        ScannedField("Name", "text", "id=name-2", False),
+        ScannedField("Work authorization", "radio_group", "name=auth", True),
+    ]
+    with pytest.raises(BatchAnswersError, match="uniquely rebound"):
+        rebind_fill_map(record, duplicated)

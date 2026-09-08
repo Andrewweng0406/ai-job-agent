@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from collections import Counter, defaultdict
 from hashlib import sha256
 import json
 from pathlib import Path
+import re
 
 from app.applications.batch_prepare import BatchRecord
+from app.applications.live_field_scan import ScannedField
 
 
 class BatchAnswersError(RuntimeError):
@@ -79,3 +82,41 @@ def load_batch_answers(record_dir: Path, raw: dict) -> ApprovedBatchAnswers:
     except (json.JSONDecodeError, OSError) as exc:
         raise BatchAnswersError("approval artifact is invalid") from exc
     return validate_batch_answers(raw, approval)
+
+
+def rebind_fill_map(
+    record: BatchRecord,
+    current_fields: list[ScannedField],
+    approved: ApprovedBatchAnswers | None = None,
+) -> dict[str, str]:
+    """Bind reviewed values to selectors from the current render, rejecting drift."""
+    expected_required = Counter(_field_key(field.label, field.kind) for field in record.fields if field.required)
+    current_required = Counter(_field_key(field.label, field.kind) for field in current_fields if field.required)
+    if expected_required != current_required:
+        raise BatchAnswersError("required form structure changed; prepare a fresh review")
+
+    current_by_key: dict[tuple[str, str], list[ScannedField]] = defaultdict(list)
+    for field in current_fields:
+        current_by_key[_field_key(field.label, field.kind)].append(field)
+
+    values = {field.field_id: field.value for field in record.fields
+              if field.value is not None and field.source in {"profile", "standard_answer", "essay"}}
+    if approved is not None:
+        values.update(approved.answers)
+    record_by_id = {field.field_id: field for field in record.fields}
+    rebound: dict[str, str] = {}
+    for field_id, value in values.items():
+        field = record_by_id[field_id]
+        candidates = current_by_key.get(_field_key(field.label, field.kind), [])
+        if len(candidates) != 1:
+            raise BatchAnswersError(f"field cannot be uniquely rebound: {field.label}")
+        selector = candidates[0].selector
+        if selector in rebound and rebound[selector] != value:
+            raise BatchAnswersError(f"selector collision after rebind: {field.label}")
+        rebound[selector] = value
+    return rebound
+
+
+def _field_key(label: str, kind: str) -> tuple[str, str]:
+    normalized = " ".join(re.sub(r"[^a-z0-9]+", " ", label.lower()).split())
+    return normalized, kind
