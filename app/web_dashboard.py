@@ -35,6 +35,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._json({"packets": self._list_packets()})
         elif route == "/api/packet":
             self._packet_detail(query.get("dir", [""])[0])
+        elif route == "/api/batch":
+            self._json({"items": self._list_batch()})
+        elif route == "/api/batch/item":
+            self._batch_detail(query.get("dir", [""])[0])
+        elif route.startswith("/batch/") and route.endswith("/filled.png"):
+            self._batch_screenshot(route[len("/batch/"):-len("/filled.png")])
         elif route == "/":
             self._html()
         else:
@@ -52,8 +58,103 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._packet_answers(self._body())
         elif route == "/api/packet/fill":
             self._packet_fill(self._body())
+        elif route == "/api/batch/prepare":
+            self._batch_prepare(self._body())
+        elif route == "/api/batch/approve":
+            self._batch_approve(self._body())
+        elif route == "/api/batch/skip":
+            self._batch_skip(self._body())
         else:
             self.send_error(404)
+
+    # ---------------------------------------------------------------- batch review
+    def _batch_root(self) -> Path:
+        return self.review_root / "batch"
+
+    def _safe_batch_dir(self, name: str) -> Path | None:
+        if not name or not _SLUG_RE.match(name):
+            return None
+        d = (self._batch_root() / name).resolve()
+        if self._batch_root().resolve() not in d.parents:
+            return None
+        return d
+
+    def _list_batch(self) -> list[dict]:
+        out: list[dict] = []
+        root = self._batch_root()
+        if not root.exists():
+            return out
+        for d in sorted(root.iterdir()):
+            rj = d / "record.json"
+            if not rj.is_file():
+                continue
+            try:
+                raw = json.loads(rj.read_text())
+            except json.JSONDecodeError:
+                continue
+            fields = raw.get("fields", [])
+            out.append({
+                "dir": d.name,
+                "company": raw.get("company", "?"),
+                "role": raw.get("role", "?"),
+                "blocked": bool(raw.get("blocked")),
+                "reasons": raw.get("reasons", []),
+                "ready": bool(raw.get("ready")) and not raw.get("blocked"),
+                "skipped": (d / ".skipped").is_file(),
+                "auto_count": sum(1 for f in fields if f.get("source") in {"profile", "standard_answer", "essay"}),
+                "blocker_count": len(raw.get("blockers", [])),
+                "has_essay": bool(raw.get("essay_text")),
+                "has_shot": (d / "filled.png").is_file(),
+            })
+        return out
+
+    def _batch_detail(self, name: str) -> None:
+        d = self._safe_batch_dir(name)
+        if d is None or not (d / "record.json").is_file():
+            self.send_error(404)
+            return
+        self._json({"dir": name, "record": json.loads((d / "record.json").read_text())})
+
+    def _batch_screenshot(self, name: str) -> None:
+        d = self._safe_batch_dir(name)
+        if d is None or not (d / "filled.png").is_file():
+            self.send_error(404)
+            return
+        blob = (d / "filled.png").read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Length", str(len(blob)))
+        self.end_headers()
+        self.wfile.write(blob)
+
+    def _batch_prepare(self, body: dict) -> None:
+        limit = max(1, min(40, int(body.get("limit") or 10)))
+        resume_pdf = str(body.get("resume_pdf") or "data/resumes/andrew_weng_master.pdf")
+        cmd = [sys.executable, "scripts/batch_prepare.py", "--limit", str(limit),
+               "--profile", str(self.profile_path), "--resume-pdf", resume_pdf]
+        subprocess.Popen(cmd)
+        self._json({"ok": True, "message": f"Preparing up to {limit} applications — refresh in ~1 min."})
+
+    def _batch_approve(self, body: dict) -> None:
+        d = self._safe_batch_dir(str(body.get("dir") or ""))
+        if d is None or not (d / "record.json").is_file():
+            self._json({"ok": False, "error": "unknown record"})
+            return
+        if json.loads((d / "record.json").read_text()).get("blocked"):
+            self._json({"ok": False, "error": "record is blocked"})
+            return
+        keep = max(60, min(3600, int(body.get("keep_open_seconds") or 900)))
+        subprocess.Popen([sys.executable, "scripts/batch_fill.py", "--record", str(d),
+                          "--keep-open-seconds", str(keep)])
+        self._json({"ok": True, "message": "A browser window is opening — review and click Submit yourself."})
+
+    def _batch_skip(self, body: dict) -> None:
+        d = self._safe_batch_dir(str(body.get("dir") or ""))
+        if d is None:
+            self._json({"ok": False, "error": "unknown record"})
+            return
+        (d / ".skipped").write_text("")
+        self._json({"ok": True})
 
     # ---------------------------------------------------------------- review packets
     def _safe_dir(self, name: str) -> Path | None:
@@ -237,7 +338,8 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:8px;bord
 label{display:block;margin:10px 0 3px;font-weight:600}
 input[type=text],textarea,select{width:100%;padding:7px;border:1px solid #b7bec6;border-radius:5px;font:inherit}
 textarea{min-height:70px}.q{border-top:1px solid #eee;padding-top:10px;margin-top:10px}
-.hint{color:#5b6670;font-size:13px}#detail{display:none}
+.hint{color:#5b6670;font-size:13px}#detail{display:none}#bDetail{display:none}
+.pill.safe{background:#d8f0e2;color:#12603a}
 .notice{background:#fff8e6;border:1px solid #e6cf87;padding:8px 12px;border-radius:5px;margin:8px 0}
 </style></head>
 <body><main>
@@ -278,6 +380,30 @@ textarea{min-height:70px}.q{border-top:1px solid #eee;padding-top:10px;margin-to
   <div class=notice>Nothing here submits. “Open browser &amp; fill” pre-fills the form in a visible window; you review it and click Submit.</div>
 </section>
 
+<section>
+  <h2>Batch review</h2>
+  <div class=hint>Prepare fills every mappable field + an essay draft for queued applications and screenshots the form. You review each and click Submit.</div>
+  <p>
+    Résumé: <input id=bResume type=text value="data/resumes/andrew_weng_master.pdf" style="width:340px">
+    &nbsp;<button class=primary onclick="batchPrepare()">Prepare 10</button>
+    <span id=bMsg class=hint></span>
+  </p>
+  <table id=batch></table>
+</section>
+<section id=bDetail>
+  <h2 id=bTitle></h2>
+  <p id=bBlockers class=warn></p>
+  <div id=bEssay></div>
+  <img id=bShot alt="filled form" style="max-width:100%;border:1px solid #ccc;margin:8px 0">
+  <div id=bFields class=hint></div>
+  <p>
+    <button class=primary onclick="batchApprove()">Open browser &amp; fill (you submit)</button>
+    <button onclick="batchSkip()">Skip</button>
+    <span id=bDMsg class=hint></span>
+  </p>
+  <div class=notice>Nothing here submits. The browser opens pre-filled; you review and click Submit.</div>
+</section>
+
 <section><h2>Applications</h2><table id=apps></table></section>
 <section><h2>Human review queue</h2><table id=tasks></table></section>
 
@@ -290,7 +416,44 @@ async function load(){
   llm.innerHTML=`<h2>AI cost control</h2><p class="${s.llm.status==='READY'?'safe':'warn'}">${esc(s.llm.status)}</p><p class=hint>$${Number(s.llm.spent_today_usd).toFixed(4)} / $${Number(s.llm.daily_limit_usd).toFixed(2)} today · candidate PII ${s.llm.send_candidate_pii?'ALLOWED':'blocked'}</p>`;
   apps.innerHTML='<tr><th>Company</th><th>Role</th><th>Status</th><th>Reason</th></tr>'+s.applications.map(a=>`<tr><td>${esc(a.company)}</td><td>${esc(a.position)}</td><td class=status>${esc(a.status)}</td><td>${esc(a.human_required_reason)}</td></tr>`).join('');
   tasks.innerHTML='<tr><th>Category</th><th>Task</th><th>Status</th></tr>'+s.human_tasks.map(t=>`<tr><td>${esc(t.category)}</td><td>${esc(t.title)}</td><td>${esc(t.status)}</td></tr>`).join('');
-  loadPackets();
+  loadPackets(); loadBatch();
+}
+let BCUR=null;
+async function loadBatch(){
+  const {items}=await (await fetch('/api/batch')).json();
+  batch.innerHTML='<tr><th>Company</th><th>Role</th><th>Auto-filled</th><th>Needs you</th><th>Status</th><th></th></tr>'+
+    (items.map(it=>`<tr><td>${esc(it.company)}</td><td>${esc(it.role)}</td><td>${it.auto_count}</td>
+      <td>${it.blocked?'—':it.blocker_count}</td>
+      <td>${it.skipped?'<span class=pill>skipped</span>':it.blocked?('<span class=pill>'+esc((it.reasons||['blocked'])[0])+'</span>'):it.ready?'<span class="pill safe">ready</span>':'<span class=pill>attention</span>'}</td>
+      <td><button onclick="openBatch('${esc(it.dir)}')">Open</button></td></tr>`).join('') || '<tr><td>No prepared applications. Click “Prepare 10”.</td></tr>');
+}
+async function batchPrepare(){
+  bMsg.textContent='preparing… (loads each live form, ~6s each)';
+  const r=await (await fetch('/api/batch/prepare',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({limit:10,resume_pdf:bResume.value})})).json();
+  bMsg.textContent=r.message||JSON.stringify(r);
+  setTimeout(loadBatch,4000);
+}
+async function openBatch(dir){
+  const {record:rec}=await (await fetch('/api/batch/item?dir='+encodeURIComponent(dir))).json();
+  BCUR=dir; bDetail.style.display='block'; bDetail.scrollIntoView({behavior:'smooth'});
+  bTitle.textContent=`${rec.role||'?'} @ ${rec.company||'?'}`;
+  if(rec.blocked){bBlockers.textContent='Blocked: '+((rec.reasons||[]).join(', '));bEssay.innerHTML='';bShot.removeAttribute('src');bFields.innerHTML='';return;}
+  bBlockers.textContent=(rec.blockers||[]).length?('Still needs you in the browser: '+rec.blockers.join('; ')):'';
+  bEssay.innerHTML=rec.essay_text?`<h3>Essay draft (edit in the browser if needed)</h3><p style="white-space:pre-wrap;background:#f6f8fa;padding:10px;border-radius:5px">${esc(rec.essay_text)}</p>`:'';
+  bShot.src='/batch/'+encodeURIComponent(dir)+'/filled.png?t='+Date.now();
+  bFields.innerHTML='<h3>Fields</h3>'+(rec.fields||[]).map(f=>`${esc(f.field_id)} · <b>${esc(f.source)}</b> · ${esc(f.label)} → ${esc(f.display||'')}`).join('<br>');
+}
+async function batchApprove(){
+  if(!confirm('Open a browser and pre-fill this application? It will NOT be submitted — you review and click Submit.'))return;
+  bDMsg.textContent='opening browser…';
+  const r=await (await fetch('/api/batch/approve',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({dir:BCUR})})).json();
+  bDMsg.textContent=r.ok?r.message:('✗ '+r.error);
+}
+async function batchSkip(){
+  await fetch('/api/batch/skip',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({dir:BCUR})});
+  bDetail.style.display='none'; loadBatch();
 }
 async function loadPackets(){
   const {packets:ps}=await (await fetch('/api/packets')).json();
