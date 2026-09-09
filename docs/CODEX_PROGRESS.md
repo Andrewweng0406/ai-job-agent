@@ -302,3 +302,12 @@ Latest local verification:
 - Scale AI: closed required phone-country verification by retaining the exact React option clicked and requiring a non-empty post-click control state. The only remaining blocker is the candidate's education start year; job-availability dates remain prohibited from filling that field.
 - Added adversarial tests proving secondary React option evidence cannot make an empty control pass verification.
 - Verification: `689 passed, 1 skipped`; bytecode compilation and `git diff --check` passed. No application was submitted.
+
+## 2026-09-08 Candidate-approved recurring answers
+
+- Recorded the candidate-provided education, authorization, relocation, and ATS-specific answers in gitignored local configuration only; concrete personal values are not repeated in tracked documentation.
+- Added company-and-full-prompt-bound `approved_exact` answers for Anthropic AI/interview/arbitration questions, Benchling privacy/work-authorization questions, and Notion relocation/sponsorship questions. Similar wording at another company does not match.
+- Added all-or-nothing multi-option mapping so comma-bearing choices such as `New York, NY` remain intact and every requested checkbox must exist in the current DOM.
+- Added profile-derived education start month/year handling without allowing the generic job-availability answer to enter education rows.
+- Re-ran all four live forms without submission. Required-field browser-verified coverage is Anthropic 13/13, Benchling 8/8, Notion 14/14, and Scale AI 10/10; all four review records are `READY` with zero blockers.
+- Verification: `692 passed, 1 skipped`; bytecode compilation, PII guard, and `git diff --check` passed. `real_submission_enabled=false` remains unchanged.

@@ -122,6 +122,17 @@ def _profile_value(profile: CandidateProfile, label: str) -> tuple[str, str] | N
     if low in {"name", "candidate name"}:
         fact = profile.facts.get("name.full")
         return (str(fact.value), "name.full") if fact and not fact.is_missing else None
+    if low in {"start date month", "start date year"}:
+        fact = profile.facts.get("edu.primary.start_date")
+        value = "" if fact is None or fact.is_missing else str(fact.value)
+        match = re.fullmatch(
+            r"(january|february|march|april|may|june|july|august|"
+            r"september|october|november|december)\s+(20\d{2})",
+            value.strip(), re.I,
+        )
+        if match:
+            return (match.group(1).title() if low.endswith("month") else match.group(2),
+                    "edu.primary.start_date")
     for needles, fid in _PROFILE_LABEL_MAP:
         if not _profile_fact_matches_label(fid, low, needles):
             continue
@@ -205,7 +216,9 @@ def resolve_scanned(
                 blockers.append(f"required file needs you: {label[:60]}")
             continue
 
-        pv = _profile_value(profile, label) if kind in {"text", "long_text", "combobox", "select"} else None
+        pv = _profile_value(profile, label) if kind in {
+            "text", "long_text", "numeric", "combobox", "select"
+        } else None
         if pv:
             fields.append(BatchField(fid, label, sel, kind, required, "profile", pv[0],
                                      _hint(label, pv[0]), None))
@@ -239,6 +252,13 @@ def resolve_scanned(
                                          f"draft rejected: {d.reason}"))
                 if required:
                     blockers.append(f"you write: {label[:55]}")
+            continue
+
+        exact_answer = standard_answers.resolve_exact(company, label, opts or None)
+        if exact_answer:
+            fields.append(BatchField(fid, label, sel, kind, required, "standard_answer",
+                                     exact_answer, exact_answer[:60],
+                                     "candidate-approved exact company question", opts))
             continue
 
         if is_must_queue_question(label) or is_experience_question(label):
@@ -318,6 +338,15 @@ def build_batch_record(
                                      "unresolved", None, "", f"draft rejected: {draft.reason}"))
             if r.required:
                 blockers.append(f"you write: {r.label[:55]}")
+            continue
+
+        exact_answer = standard_answers.resolve_exact(
+            company, r.label, options_by_selector.get(r.selector) or None
+        )
+        if exact_answer:
+            fields.append(BatchField(fid, r.label, r.selector, r.kind.value, r.required,
+                                     "standard_answer", exact_answer, exact_answer[:60],
+                                     "candidate-approved exact company question"))
             continue
 
         if is_must_queue_question(r.label) or is_experience_question(r.label):

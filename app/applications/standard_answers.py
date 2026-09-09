@@ -63,6 +63,7 @@ def is_must_queue_question(label: str) -> bool:
 class StandardAnswers:
     values: dict[str, str]
     rules: list[tuple[str, tuple[str, ...]]]  # (answer_key, phrases)
+    exact_approvals: tuple[tuple[str, str, str], ...] = ()  # company, normalized label, answer
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "StandardAnswers":
@@ -74,7 +75,23 @@ class StandardAnswers:
             phrases = tuple(str(p).lower() for p in (row.get("phrases") or []))
             if key and phrases:
                 rules.append((key, phrases))
-        return cls(values=values, rules=rules)
+        exact_approvals = []
+        for row in data.get("approved_exact") or []:
+            company = _normalize_exact(str(row.get("company") or ""))
+            label = _normalize_exact(str(row.get("label") or ""))
+            answer = str(row.get("answer") or "").strip()
+            if company and label and answer:
+                exact_approvals.append((company, label, answer))
+        return cls(values=values, rules=rules, exact_approvals=tuple(exact_approvals))
+
+    def resolve_exact(self, company: str, label: str, options: list[str] | None = None) -> str | None:
+        """Resolve a candidate-approved answer only on exact company + prompt identity."""
+        key = (_normalize_exact(company), _normalize_exact(label))
+        matches = [answer for approved_company, approved_label, answer in self.exact_approvals
+                   if (approved_company, approved_label) == key]
+        if len(matches) != 1:
+            return None
+        return _map_answer(matches[0], options)
 
     def answer_key_for(self, label: str) -> str | None:
         low = " ".join(re.sub(r"[^a-z0-9]+", " ", (label or "").lower()).split())
@@ -97,9 +114,25 @@ class StandardAnswers:
         if key is None or key not in self.values:
             return None
         value = self.values[key]
-        if not options:
-            return value
+        return _map_answer(value, options)
+
+
+def _normalize_exact(value: str) -> str:
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", value.lower()).split())
+
+
+def _map_answer(value: str, options: list[str] | None) -> str | None:
+    if not options:
+        return value
+    # Semicolon is the canonical multi-value delimiter. Commas occur inside
+    # legitimate options such as "New York, NY" and must not split them.
+    parts = [part.strip() for part in value.split(";") if part.strip()]
+    if len(parts) <= 1:
         return _map_to_option(value, options)
+    mapped = [_map_to_option(part, options) for part in parts]
+    if any(part is None for part in mapped) or len(set(mapped)) != len(mapped):
+        return None
+    return "; ".join(part for part in mapped if part is not None)
 
 
 _DECLINE_HINTS = (
