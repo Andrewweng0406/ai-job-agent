@@ -100,7 +100,7 @@ _PROFILE_LABEL_MAP = [
 
 
 def _profile_value(profile: CandidateProfile, label: str) -> tuple[str, str] | None:
-    low = " ".join(label.lower().replace("*", " ").split())
+    low = " ".join(re.sub(r"[*✱]", " ", label.lower()).split())
     if "preferred" in low or "nickname" in low:
         return None
     if "i confirm" in low and "graduation date" in low:
@@ -133,6 +133,12 @@ def _profile_value(profile: CandidateProfile, label: str) -> tuple[str, str] | N
         if match:
             return (match.group(1).title() if low.endswith("month") else match.group(2),
                     "edu.primary.start_date")
+    if "graduation year" in low and "high school" not in low:
+        fact = profile.facts.get("edu.primary.grad_date")
+        value = "" if fact is None or fact.is_missing else str(fact.value)
+        year = re.search(r"\b(20\d{2})\b", value)
+        if year:
+            return (year.group(1), "edu.primary.grad_date")
     for needles, fid in _PROFILE_LABEL_MAP:
         if not _profile_fact_matches_label(fid, low, needles):
             continue
@@ -167,7 +173,13 @@ def _profile_fact_matches_label(fact_id: str, label: str, needles: tuple[str, ..
     if fact_id == "links.github":
         return ("github" in label or "git hub" in label) and len(label) <= 80
     if fact_id == "edu.primary.school":
-        return any(needle in label for needle in needles) and len(label) <= 120
+        if "high school" in label:
+            return False
+        return (
+            any(needle in label for needle in needles)
+            and len(label) <= 240
+            and not any(term in label for term in ("graduation", "degree", "major"))
+        )
     if fact_id == "links.portfolio":
         return label in {"portfolio", "portfolio url", "website", "personal site", "personal website"}
     return False

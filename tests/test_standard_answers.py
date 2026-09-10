@@ -65,6 +65,13 @@ def test_unknown_question_returns_none(sa):
     assert sa.resolve("What is your dog's name?", ["Rex", "Fido"]) is None
 
 
+def test_united_states_maps_only_to_explicit_us_alias():
+    answers = StandardAnswers(values={"country": "United States"}, rules=[("country", ("country",))])
+
+    assert answers.resolve("Country", ["Canada", "US", "Other"]) == "US"
+    assert answers.resolve("Country", ["Canada", "UK", "Other"]) is None
+
+
 def test_the_more_specific_visa_now_rule_wins_over_the_generic(sa):
     # 'do you now require' must resolve to visa_now=No, not the future-sponsorship Yes
     assert sa.resolve("Do you now require immigration sponsorship?", ["Yes", "No"]) == "No"
@@ -79,6 +86,12 @@ def test_the_more_specific_visa_now_rule_wins_over_the_generic(sa):
 def test_essay_questions_detected(label):
     assert is_essay_question(label)
     assert not is_must_queue_question(label)
+
+
+def test_hypothetical_company_preference_is_an_essay_question():
+    assert is_essay_question(
+        "If Acme didn't exist, what kind of company or work would interest you?"
+    )
 
 
 @pytest.mark.parametrize("label", [
@@ -101,6 +114,14 @@ def test_experience_questions_are_draftable_not_must_queue(label):
     from app.applications.standard_answers import is_experience_question
     assert is_experience_question(label)
     assert not is_must_queue_question(label)
+
+
+def test_hardest_technical_challenge_is_draftable():
+    from app.applications.standard_answers import is_experience_question
+
+    assert is_experience_question(
+        "What is the hardest technical challenge you've faced as part of a personal project?"
+    )
 
 
 @pytest.mark.parametrize("label", ["First name", "Country", "Email address", "Start date"])

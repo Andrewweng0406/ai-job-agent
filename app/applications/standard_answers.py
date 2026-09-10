@@ -19,7 +19,8 @@ from app.utils.config import load_yaml
 _ESSAY_RE = re.compile(
     r"why (do|are) you|why this (company|role|team)|why (join|work (here|at|for))|"
     r"what (interests|excites|draws) you|what (about|makes).{0,40}(interest|excit)|"
-    r"tell us why|motivat(e|ion)|cover letter|what would you (bring|contribute)",
+    r"tell us why|motivat(e|ion)|cover letter|what would you (bring|contribute)|"
+    r"if .{0,50}(didn't|did not) exist|what kind of company or work would you",
     re.I,
 )
 
@@ -29,7 +30,7 @@ _EXPERIENCE_RE = re.compile(
     r"describe (a|your|an)|tell us about a time|tell us about your|walk us through|"
     r"give an example|provide an example|outline your experience|"
     r"what.{0,20}experience (do you have|with)|how have you|"
-    r"share an example|example of a time|biggest challenge|a project you|"
+    r"share an example|example of a time|biggest challenge|hardest technical challenge|a project you|"
     r"what.{0,40}\b(tools|technologies)\b.{0,80}(using|use|comfortable)|"
     r"which.{0,40}\b(tools|technologies)\b.{0,80}(using|use|comfortable)",
     re.I,
@@ -147,8 +148,16 @@ def _map_to_option(value: str, options: list[str]) -> str | None:
     v = " ".join(value.strip().lower().split())
     opts = [(o, " ".join(o.strip().lower().split())) for o in options]
 
+    aliases = {
+        "united states": {"us", "u.s.", "u.s.a.", "usa", "united states of america"},
+        "us": {"united states", "united states of america", "u.s.", "u.s.a.", "usa"},
+    }
+
     for o, ol in opts:                       # exact
         if ol == v:
+            return o
+    for o, ol in opts:                       # explicit geographic aliases
+        if ol in aliases.get(v, set()):
             return o
     if v in {"yes", "no"}:                   # yes/no
         for o, ol in opts:

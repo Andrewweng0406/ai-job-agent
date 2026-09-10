@@ -60,21 +60,24 @@ _SCAN_JS = r"""
     }
     const box = el.closest(FIELD);
     if (box) {
-      const lab = box.querySelector(':scope > label, :scope > legend, :scope > [class*="label" i], :scope > div, :scope > p, :scope > span');
+      const lab = box.querySelector('.application-label .text') || box.querySelector(
+        ':scope > label, :scope > legend, :scope > [class*="label" i], ' +
+        ':scope > div, :scope > p, :scope > span'
+      );
       if (lab) {
         // the label node, not an option row
         const t = clean(lab.innerText);
-        if (t && t.length <= 280 && !lab.querySelector('input, button')) return t;
+        if (t && t.length <= 1000 && !lab.querySelector('input, button')) return t;
       }
       const first = clean(box.innerText).split('\n')[0];
-      if (first && first.length <= 280) return first;
+      if (first && first.length <= 1000) return first;
     }
     // generic: nearest previous heading/label-ish text
     let n = el;
     for (let i = 0; i < 6 && n; i++) {
       n = n.parentElement; if (!n) break;
       const c = n.querySelector(':scope > label, :scope > legend, :scope > p, :scope > [class*="label" i], :scope > [class*="title" i]');
-      if (c && clean(c.innerText) && !c.querySelector('input,button') && clean(c.innerText).length < 280) return clean(c.innerText);
+      if (c && clean(c.innerText) && !c.querySelector('input,button') && clean(c.innerText).length < 1000) return clean(c.innerText);
     }
     return clean(el.getAttribute('placeholder') || el.name || el.id || '');
   };
@@ -194,7 +197,7 @@ def scan_form(page) -> list[ScannedField]:
             continue
         seen.add(key)
         fields.append(ScannedField(
-            label=label[:280],
+            label=label[:1000],
             kind=str(item.get("kind") or "text"),
             selector=selector,
             required=bool(item.get("required")),

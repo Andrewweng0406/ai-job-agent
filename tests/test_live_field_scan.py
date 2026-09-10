@@ -95,3 +95,45 @@ def test_optional_sms_consent_does_not_inherit_required_phone_label(page):
 
     assert consent.label == "SMS communication consent"
     assert not consent.required
+
+
+def test_scanner_reads_nested_lever_custom_question_label(page):
+    page.set_content("""
+      <li class="application-question custom-question">
+        <div>
+          <div class="application-label full-width multiple-choice">
+            <div class="text">May we use an AI notetaker?<span class="required">✱</span></div>
+          </div>
+          <div class="application-field required-field"><ul><li><label>
+            <input type="radio" name="cards[id][field0]" value="Yes" required>
+            <span>Yes</span>
+          </label></li><li><label>
+            <input type="radio" name="cards[id][field0]" value="No" required>
+            <span>No</span>
+          </label></li></ul></div>
+        </div>
+      </li>
+    """)
+
+    fields = scan_form(page)
+
+    assert len(fields) == 1
+    assert fields[0].label == "May we use an AI notetaker?✱"
+    assert fields[0].options == ["Yes", "No"]
+
+
+def test_scanner_preserves_long_structured_consent_prompt(page):
+    prompt = "May we process this interview transcript? " + ("Detailed policy text. " * 20)
+    page.set_content(f"""
+      <li class="application-question custom-question">
+        <div><div class="application-label"><div class="text">{prompt}</div></div>
+          <div><label><input type="radio" name="consent" value="Yes" required>Yes</label>
+          <label><input type="radio" name="consent" value="No" required>No</label></div>
+        </div>
+      </li>
+    """)
+
+    fields = scan_form(page)
+
+    assert fields[0].label == prompt.strip()
+    assert len(fields[0].label) > 280

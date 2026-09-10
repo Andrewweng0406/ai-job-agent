@@ -267,3 +267,62 @@ def test_optional_phone_country_is_not_claimed_as_a_verified_fill(std):
     assert rec.fields[0].source == "unresolved"
     assert rec.fields[0].value is None
     assert rec.fill_map() == {}
+
+
+def test_lever_unicode_required_marker_does_not_break_identity_mapping(std):
+    profile = CandidateProfile(
+        "candidate", 2,
+        {
+            "name.full": CandidateFact("name.full", "identity", "Test Candidate"),
+            "contact.email": CandidateFact("contact.email", "contact", "test@example.test"),
+        }, {},
+    )
+    scanned = [
+        ScannedField("Full name✱", "text", "name=name", True),
+        ScannedField("Email✱", "text", "name=email", True),
+    ]
+
+    rec = resolve_scanned(
+        company="Acme", role="Analyst", apply_url="https://example.test/job",
+        ats="lever", resume_pdf="resume.pdf", scanned=scanned, profile=profile,
+        standard_answers=std,
+    )
+
+    assert rec.fill_map() == {"name=name": "Test Candidate", "name=email": "test@example.test"}
+
+
+def test_college_fact_never_fills_high_school_fields(std):
+    profile = CandidateProfile(
+        "candidate", 2,
+        {
+            "edu.primary.school": CandidateFact(
+                "edu.primary.school", "education", "Example State University"
+            ),
+            "edu.primary.grad_date": CandidateFact(
+                "edu.primary.grad_date", "education", "May 2027"
+            ),
+        }, {},
+    )
+    scanned = [
+        ScannedField("High School Name ✱", "long_text", "name=hs", True),
+        ScannedField("Year of High School Graduation ✱", "select", "name=hs-year", True),
+        ScannedField(
+            "Which university are you currently attending or did you last attend? ✱",
+            "select", "name=university", True,
+        ),
+        ScannedField(
+            "Please include your intended graduation year for the degree you are currently pursuing. ✱",
+            "select", "name=grad-year", True,
+        ),
+    ]
+
+    rec = resolve_scanned(
+        company="Acme", role="Analyst", apply_url="https://example.test/job",
+        ats="lever", resume_pdf="resume.pdf", scanned=scanned, profile=profile,
+        standard_answers=std,
+    )
+
+    assert rec.fields[0].value is None
+    assert rec.fields[1].value is None
+    assert rec.fill_map()["name=university"] == "Example State University"
+    assert rec.fill_map()["name=grad-year"] == "2027"

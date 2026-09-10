@@ -18,6 +18,7 @@ import re
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
+from urllib.parse import urljoin
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -40,15 +41,51 @@ def _wait_for_form(page, timeout_ms: int = 15_000) -> bool:
         page.wait_for_load_state("networkidle", timeout=timeout_ms)
     except Exception:
         pass
-    for sel in ('input:not([type=hidden]):not([type=submit]):not([type=button])',
-                'textarea', 'form input:not([type=hidden])', 'form textarea',
-                'input[type=email]', 'input[name*="name" i]', '[role="textbox"]'):
+    for sel in ('input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=search])',
+                'textarea', 'form input:not([type=hidden]):not([type=search])', 'form textarea',
+                'input[type=email]', 'input[name*="name" i]'):
         try:
             page.wait_for_selector(sel, timeout=4_000, state="visible")
             return True
         except Exception:
             continue
     return False
+
+
+def _follow_explicit_apply_form(page, timeout_ms: int) -> bool:
+    """Follow a same-origin, explicit application-form link without submitting."""
+    links = page.locator('a[href*="/careers/apply/"]')
+    if links.count() == 0:
+        return False
+    href = links.first.get_attribute("href") or ""
+    target = urljoin(page.url, href)
+    if urlparse(target).netloc != urlparse(page.url).netloc:
+        return False
+    page.goto(target, wait_until="domcontentloaded", timeout=timeout_ms)
+    return _wait_for_form(page)
+
+
+def _follow_greenhouse_embed(page, timeout_ms: int) -> bool:
+    """Open a trusted Greenhouse application iframe as the top-level form."""
+    frames = page.locator('iframe[src*="/embed/job_app"]')
+    if frames.count() == 0:
+        return False
+    src = frames.first.get_attribute("src") or ""
+    target = urljoin(page.url, src)
+    parsed = urlparse(target)
+    if parsed.scheme != "https" or parsed.hostname not in {
+        "job-boards.greenhouse.io", "job-boards.eu.greenhouse.io"
+    } or parsed.path != "/embed/job_app":
+        return False
+    page.goto(target, wait_until="domcontentloaded", timeout=timeout_ms)
+    return _wait_for_form(page)
+
+
+def _no_form_reason(page) -> str:
+    path = urlparse(page.url).path.rstrip("/").lower()
+    if path.endswith("/careers/search") or path.endswith("/jobs/search"):
+        return "JOB_NO_LONGER_AVAILABLE"
+    return "FORM_DID_NOT_LOAD"
 
 
 def _slug(company: str, url: str) -> str:
@@ -135,12 +172,18 @@ def main() -> int:
             try:
                 page.goto(row["apply_url"], wait_until="domcontentloaded", timeout=args.timeout_ms)
                 title = page.title()
-                if not _wait_for_form(page):
+                form_loaded = _wait_for_form(page)
+                if not form_loaded:
+                    form_loaded = _follow_explicit_apply_form(page, args.timeout_ms)
+                if not form_loaded:
+                    form_loaded = _follow_greenhouse_embed(page, args.timeout_ms)
+                if not form_loaded:
+                    reason = _no_form_reason(page)
                     (out / "record.json").write_text(json.dumps(
-                        {"blocked": True, "reasons": ["FORM_DID_NOT_LOAD"],
+                        {"blocked": True, "reasons": [reason],
                          "company": row["company"], "role": row["position"],
                          "apply_url": row["apply_url"]}, indent=2))
-                    print(f"  NO FORM  {row['company']} — application form did not render")
+                    print(f"  NO FORM  {row['company']} — {reason}")
                     attention += 1
                     continue
                 page.wait_for_timeout(2500)  # let lazy field groups render

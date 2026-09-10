@@ -319,3 +319,16 @@ Latest local verification:
 - Fixed Ashby phone SMS-consent radios inheriting the containing Phone field's required marker and label. The consent now appears as a separate optional field and is never guessed.
 - Re-ran Ramp's current Ashby application without submission. The verified-facts product/data essay passed truth validation and browser read-back; the record moved from `ATTENTION` to `READY` with zero blockers.
 - Verification: `695 passed, 1 skipped`; bytecode compilation and `git diff --check` passed. No application was submitted.
+
+## 2026-09-09 Cross-company compatibility expansion
+
+- Audited every existing batch record by failure class instead of treating a green unit suite as cross-company compatibility evidence.
+- Fixed Lever's Unicode required marker breaking identity/contact mapping and blocked college facts from ever entering high-school name or graduation fields.
+- Added verified profile mapping for university and intended college graduation year, plus safe draft routing for hypothetical company-interest and hardest-technical-challenge prompts.
+- Preserved long structured Lever consent prompts up to 1000 characters so exact review/approval can use the real question instead of an internal `cards[...]` selector.
+- Added same-origin careers-apply navigation and an allowlisted Greenhouse embed transition for official company career pages. Arbitrary external apply links and iframe hosts remain rejected.
+- Search-page redirects are now classified as `JOB_NO_LONGER_AVAILABLE`; search boxes can no longer masquerade as application forms.
+- Added an explicit `United States`/`US` option alias and used candidate-confirmed local rules for Stripe residence, intended work country, authorization, and sponsorship questions.
+- Live non-submitting coverage: a second Benchling role reached 8/8 required fields and `READY`; a second Notion role reached 12/14; Stripe Finance & Strategy reached 13/18 after previously yielding no form; Palantir improved from 5/19 unsafe mappings to 10/19 safe mappings with the two incorrect high-school fills removed.
+- Remaining Notion, Stripe, and Palantir blockers are candidate facts, preferences, narratives, or consent decisions. They remain unresolved rather than guessed.
+- Verification: `705 passed, 1 skipped`; bytecode compilation and `git diff --check` passed. `real_submission_enabled=false`; no application was submitted.
