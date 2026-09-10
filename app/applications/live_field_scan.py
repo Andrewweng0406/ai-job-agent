@@ -100,7 +100,8 @@ _SCAN_JS = r"""
     const isCheck = type === 'checkbox' || role === 'checkbox';
 
     if (isRadio || isCheck) {
-      const q = questionOf(el, true);
+      const isCommunicationConsent = el.name === 'communicationConsent';
+      const q = isCommunicationConsent ? 'SMS communication consent' : questionOf(el, true);
       const box = el.closest(FIELD);
       const gkey = (box ? (box.className + '|' + q) : (el.name || q)) + '|' + (isCheck ? 'c' : 'r');
       if (doneGroup.has(gkey)) continue;
@@ -115,8 +116,8 @@ _SCAN_JS = r"""
       const names = [...new Set(peers.map(p => p.name).filter(Boolean))];
       const sel = names.length === 1 ? ('name=' + names[0]) : ('q=' + q);
       push({ label: q, kind: isCheck ? 'checkbox_group' : 'radio_group',
-             selector: sel, required: peers.some(p => requiredOf(p, q)) ||
-               !!(box && box.querySelector('[class*="required" i], [aria-required="true"]')),
+             selector: sel, required: !isCommunicationConsent && (peers.some(p => requiredOf(p, q)) ||
+               !!(box && box.querySelector('[class*="required" i], [aria-required="true"]'))),
              options: opts });
       continue;
     }

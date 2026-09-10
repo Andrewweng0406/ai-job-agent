@@ -311,3 +311,11 @@ Latest local verification:
 - Added profile-derived education start month/year handling without allowing the generic job-availability answer to enter education rows.
 - Re-ran all four live forms without submission. Required-field browser-verified coverage is Anthropic 13/13, Benchling 8/8, Notion 14/14, and Scale AI 10/10; all four review records are `READY` with zero blockers.
 - Verification: `692 passed, 1 skipped`; bytecode compilation, PII guard, and `git diff --check` passed. `real_submission_enabled=false` remains unchanged.
+
+## 2026-09-09 Ramp live-form regression repair
+
+- Fixed the essay entity validator treating ordinary sentence-initial evaluation and transition words such as `Success` and `After` as fabricated proper nouns. Named entities not supported by candidate facts or job context remain rejected.
+- Added regression coverage confirming ordinary narrative phrasing passes while the existing invented-employer guard remains active.
+- Fixed Ashby phone SMS-consent radios inheriting the containing Phone field's required marker and label. The consent now appears as a separate optional field and is never guessed.
+- Re-ran Ramp's current Ashby application without submission. The verified-facts product/data essay passed truth validation and browser read-back; the record moved from `ATTENTION` to `READY` with zero blockers.
+- Verification: `695 passed, 1 skipped`; bytecode compilation and `git diff --check` passed. No application was submitted.

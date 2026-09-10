@@ -39,6 +39,9 @@ _ALLOWED_NOUNS = {
     "nlp", "llm", "llms", "arima", "ai", "ml", "us", "u.s.", "usa",
     "gtm", "saas", "api", "apis", "kpi", "kpis", "okr", "okrs", "b2b", "b2c",
     "etl", "ci/cd", "crm", "erp", "pnl", "p&l", "roi",
+    # Ordinary sentence-initial evaluation language, not named entities.
+    "success", "after", "before", "using", "through", "when", "while", "because",
+    "instead", "overall", "finally", "first", "next", "then", "this", "these", "those",
 }
 
 

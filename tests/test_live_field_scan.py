@@ -76,3 +76,22 @@ def test_scanner_groups_ashby_options_under_question_label(page):
     assert fields[0].selector == "name=auth"
     assert fields[0].required
     assert fields[0].options == ["Can work for any employer", "Can work for current employer"]
+
+
+def test_optional_sms_consent_does_not_inherit_required_phone_label(page):
+    page.set_content("""
+      <div class="ashby-application-form-field-entry">
+        <label class="required" for="phone">Phone</label>
+        <input id="phone" required>
+        <div class="consentRadioGroup">
+          <label><input type="radio" name="communicationConsent" value="given">Yes - I consent</label>
+          <label><input type="radio" name="communicationConsent" value="notGiven">No - I do not consent</label>
+        </div>
+      </div>
+    """)
+
+    fields = scan_form(page)
+    consent = next(field for field in fields if field.selector == "name=communicationConsent")
+
+    assert consent.label == "SMS communication consent"
+    assert not consent.required

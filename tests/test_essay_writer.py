@@ -93,3 +93,32 @@ def test_provider_failure_is_reported_not_raised():
     r = LLMRouter(Boom(), model_prices={"gpt-5-mini": ModelPrice(1, 1)})
     res = EssayWriter(r, _profile()).write(company="Stripe", role="x", jd_excerpt=JD, question="Why?")
     assert not res.ok and res.reason.startswith("LLM_UNAVAILABLE")
+
+
+def test_sentence_initial_success_is_not_treated_as_an_entity():
+    text = (
+        "I built an NLP pipeline that parses earnings transcripts across 50+ tech stocks. "
+        "Success was measured by whether the pipeline consistently extracted the financial metrics "
+        "needed for analysis. I used Python and SQL to turn those results into a clearer workflow."
+    )
+    writer, _ = _writer(text)
+
+    result = writer.answer_experience(
+        question="How did you use data to improve a product and measure success?",
+        role="Product Operations Specialist",
+    )
+
+    assert result.ok, result.reason
+
+
+def test_sentence_initial_transition_word_is_not_treated_as_an_entity():
+    text = (
+        "I built an NLP pipeline that parses earnings transcripts across 50+ tech stocks. "
+        "After reviewing the extracted metrics, I used Python and SQL to improve the analysis workflow. "
+        "Success was measured by whether the pipeline consistently produced the inputs needed for analysis."
+    )
+    writer, _ = _writer(text)
+
+    result = writer.answer_experience(question="How did you improve a product?", role="Analyst")
+
+    assert result.ok, result.reason
